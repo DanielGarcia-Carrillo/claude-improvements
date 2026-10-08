@@ -5,6 +5,7 @@
   "author": {
     "name": "Daniel Garcia Carrillo"
   },
+  "license": "MIT",
   "userConfig": {
     "thresholdPercent": {
       "type": "number",
