@@ -185,6 +185,17 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   expect(await opened.find({ key: 'orig-t1', text: /show lens view/ })).toBeDefined()
   expect(await opened.find({ key: 'lens-t1' })).toBeDefined()
 
+  // With the original showing, the purpose buttons are unselected, dim and inert.
+  for (const id of ['all', 'progress', 'blocked', 'done']) {
+    const button = await opened.find({ key: `ru-t1-${id}` })
+    expect(button?.props.variant).toBe('secondary')
+    expect(button?.props.dimColor).toBe(true)
+  }
+  await opened.press({ key: 'ru-t1-done' })
+  const still = await draw('c2', 'The toggle ships behind a flag.')
+  expect(await shows(still, /ships behind a flag/)).toBe(true)
+  expect((await still.find({ key: 'ru-t1-blocked' }))?.props.dimColor).toBe(true)
+
   // The pane's purpose buttons, in the box: they refilter every reply, the chosen one primary.
   await opened.press({ key: 'orig-t1' })
   await opened.press({ key: 'ru-t1-progress' })

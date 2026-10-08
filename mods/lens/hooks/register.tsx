@@ -296,7 +296,15 @@ export const register: Register = on => {
         {/* The pane's purpose buttons, here too: they refilter every reply at once. */}
         <Box flexWrap="wrap" columnGap={1} rowGap={1} alignItems="center">
           {PURPOSES.map(x => (
-            <Button key={`ru-${turn.id}-${x.id}`} variant={x.id === p ? 'primary' : 'secondary'} label={x.label} onPress={() => update($, purpose, () => x.id)} />
+            // While the original shows, the lists are not on screen: no choice is
+            // highlighted and the buttons draw dim and do nothing (Button has no disabled).
+            <Button
+              key={`ru-${turn.id}-${x.id}`}
+              variant={!isOriginal && x.id === p ? 'primary' : 'secondary'}
+              dimColor={isOriginal}
+              label={x.label}
+              onPress={() => (isOriginal ? undefined : update($, purpose, () => x.id))}
+            />
           ))}
         </Box>
         {isOriginal ? (
