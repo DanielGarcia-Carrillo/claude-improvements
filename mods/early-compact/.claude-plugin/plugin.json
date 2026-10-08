@@ -1,0 +1,25 @@
+{
+  "name": "early-compact",
+  "version": "0.1.0",
+  "description": "Has Claude write a checkpoint once context passes a threshold, then compacts early with that checkpoint as the brief and resumes the work",
+  "author": {
+    "name": "Daniel Garcia Carrillo"
+  },
+  "userConfig": {
+    "thresholdPercent": {
+      "type": "number",
+      "title": "Early-compact threshold (%)",
+      "description": "Context-window fill at which the session is checkpointed and compacted",
+      "default": 60,
+      "min": 10,
+      "max": 95
+    },
+    "minTokens": {
+      "type": "number",
+      "title": "Minimum tokens",
+      "description": "Never compact early below this many context tokens",
+      "default": 40000,
+      "min": 0
+    }
+  }
+}
