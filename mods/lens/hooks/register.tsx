@@ -4,6 +4,7 @@ import type { EngineInterface, Register, ResolveInput, Timer } from 'claude-code
 import type { Digest, InlineMode, Purpose, Turn, View } from '../types'
 import { LENS, headingSvg, mid } from './heading'
 import type { Hue } from './heading'
+import { turnsFrom, withBackfill } from './backfill'
 import { endsAnswer, turnContaining } from './match'
 import { timeOf } from './time'
 import { BUCKETS, PURPOSES, overviewRequest, parseDigest, titleOf, turnRequest } from './digest'
@@ -14,19 +15,20 @@ const NEAR = 2 // turns this close to the focus show their headline; farther one
 const TICK_MS = 400 // how often the inline rows' wanted digests are generated
 const REPLY_MAX = 8000 // characters kept per reply block for matching
 const INLINE_MAX = 3 // inline digests generated at once
+const BACKFILL = 10 // earlier turns rebuilt from the transcript when the lens loads
 
 const turns = atom({ plugin: 'lens', key: 'turns' } as const, [])
 const purpose = atom({ plugin: 'lens', key: 'purpose' } as const, 'all')
 const focus = atom({ plugin: 'lens', key: 'focus' } as const, null)
 const views = atom({ plugin: 'lens', key: 'views' } as const, {})
 const isOpen = atom({ plugin: 'lens', key: 'isOpen' } as const, false)
-const inline = atom({ plugin: 'lens', key: 'inline' } as const, 'callout')
+const inline = atom({ plugin: 'lens', key: 'inline' } as const, 'replace')
 const expanded = atom({ plugin: 'lens', key: 'expanded' } as const, [])
 
 const MODES: InlineMode[] = ['off', 'callout', 'replace']
 // Sessions from before the third mode stored this as a boolean.
 const modeOf = (stored: unknown): InlineMode =>
-  stored === false ? 'off' : MODES.includes(stored as InlineMode) ? (stored as InlineMode) : 'callout'
+  stored === false ? 'off' : stored === true ? 'callout' : MODES.includes(stored as InlineMode) ? (stored as InlineMode) : 'replace'
 
 const viewKey = (turnId: string) => `digest|${turnId}`
 const overviewKey = (lastTurnId: string) => `digest|overview|${lastTurnId}`
@@ -173,6 +175,17 @@ async function showTurn($: EngineInterface, id: string) {
   else await openPane($)
 }
 
+// The turns from before the lens loaded (a resumed session, or the mod added
+// mid-session): the last few are rebuilt from the transcript, without times.
+async function backfill($: EngineInterface) {
+  try {
+    const rebuilt = turnsFrom(await $.session.messages())
+    if (rebuilt.length > 0) await update($, turns, known => withBackfill(known, rebuilt, BACKFILL).slice(-50))
+  } catch {
+    // No transcript to read: the lens starts from the next turn.
+  }
+}
+
 const toggleExpanded = ($: EngineInterface, id: string) =>
   update($, expanded, ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id].slice(-200)))
 
@@ -190,6 +203,7 @@ export const register: Register = on => {
       description: 'Sort this session into in progress, needs you and done: /lens [all|progress|blocked|done]',
       argumentHint: '[purpose]',
     })
+    await backfill($)
 
     return next(e)
   })
@@ -383,7 +397,7 @@ export const register: Register = on => {
       await update($, focus, () => id)
       await refresh($)
     }
-    const cycleInline = () => update($, inline, () => MODES[(MODES.indexOf(mode) + 1) % MODES.length] ?? 'callout')
+    const cycleInline = () => update($, inline, () => MODES[(MODES.indexOf(mode) + 1) % MODES.length] ?? 'replace')
 
     const header = (
       <Box flexDirection="column">

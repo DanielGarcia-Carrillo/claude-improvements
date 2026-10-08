@@ -23,7 +23,7 @@ date once it isn't today), not when it was summarised.
 
 ### In the transcript
 
-The `inline` button cycles three modes:
+The `inline` button cycles three modes. Replace is the default:
 
 - **off**: replies draw as usual.
 - **callout**: a strip under each answer shows the headline, the list counts
@@ -54,7 +54,10 @@ inline mode, `o` toggles the original, and `k`/`j`/`l` move between turns.
 - **Cost.** One Haiku call per turn when you first view it, at most three at a
   time, plus one for the session overview after each new turn while the pane
   is open.
-- **Scope.** Turns from before the mod loaded, and the reply being streamed,
+- **Earlier turns.** When the lens loads (a resumed session, or the mod
+  added mid-session), it rebuilds the last 10 turns already in the
+  transcript. Those turns have no timestamp, because the conversation API
+  doesn't expose message times. Older turns, and the reply being streamed,
   draw as usual.
 
 ## Limits of the mod API this works around

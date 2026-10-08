@@ -2,6 +2,7 @@ import type { On, SessionMessage } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { turnsFrom, withBackfill } from '../hooks/backfill'
 import { turnContaining } from '../hooks/match'
 import { timeOf } from '../hooks/time'
 import { parseDigest } from '../hooks/digest'
@@ -57,6 +58,15 @@ const answerTurn = async ($: Engine, id: string, ask: string, answer: string) =>
 type Drawing = { find: (q: { text: RegExp }) => Promise<unknown>; findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }
 const shows = async (ui: Drawing, text: RegExp) =>
   (await ui.find({ text })) !== undefined || (await ui.findAll({ type: 'Svg' })).some(svg => text.test(String(svg.props.alt)))
+
+// Cycles the pane's inline button until it reads the mode wanted.
+const inlineMode = async ($: Engine, mode: 'off' | 'callout' | 'replace') => {
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop', requestId: 'lens' })
+  for (let i = 0; i < 3 && (await pane.find({ key: 'inline', text: new RegExp(`inline: ${mode}`) })) === undefined; i++) {
+    await pane.press({ key: 'inline' })
+  }
+  await pane.unmount()
+}
 
 const lens = ($: Engine, args: string) => $.command.run({ ...RUN, command: 'lens', args })
 
@@ -116,6 +126,8 @@ test('callout: the headline under the answer, with what needs the person or the 
   await answerTurn($, 't1', 'Explain the cache', 'The cache keys on the route.')
   await answerTurn($, 't2', 'Now the router', 'The router reads the table.')
 
+  await lens($, 'all')
+  await inlineMode($, 'callout')
   for (const surface of ['terminal', 'desktop'] as const) {
     await lens($, 'all')
     const draw = (n: number) =>
@@ -155,11 +167,10 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   transcript.push({ role: 'assistant', text: 'The toggle ships behind a flag.', toolUses: [] })
   await answerTurn($, 't1', 'Ship the toggle', 'The toggle ships behind a flag.')
 
-  // callout → replace, showing what needs the person
+  // Replace is the default; show what needs the person.
   await lens($, 'blocked')
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await pane.press({ key: 'inline' })
-  expect(await pane.find({ key: 'inline', text: /replace/ })).toBeDefined()
+  expect(await pane.find({ key: 'inline', text: /inline: replace/ })).toBeDefined()
 
   const draw = (requestId: string, text: string) =>
     $.ui.mount({ plugin: 'lens', surface: 'desktop', component: 'AssistantMessage', requestId, props: { text, isFirstOfReply: requestId === 'a' } })
@@ -262,4 +273,47 @@ test('a time from an earlier day carries its date', () => {
   expect(timeOf(at, now)).toBe(`${new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
   expect(timeOf(at, at)).toBe(new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
   expect(timeOf(undefined, now)).toBeUndefined()
+})
+
+test('rebuilds the last few turns from the transcript when the lens loads', async ($, on) => {
+  const transcript: SessionMessage[] = []
+  for (let n = 1; n <= 12; n++) {
+    transcript.push({ role: 'user', text: `ask ${n}`, toolUses: [] })
+    transcript.push({ role: 'assistant', text: `Working on ${n}.`, toolUses: [{ tool_use_id: `u${n}`, tool: 'Edit', input: { file_path: `/src/f${n}.ts` } }] })
+    transcript.push({ role: 'user', text: '', toolUses: [], toolResults: [{ tool_use_id: `u${n}`, text: 'ok', isError: false }] })
+    transcript.push({ role: 'assistant', text: `Answer ${n}.`, toolUses: [] })
+  }
+  engine(on, transcript)
+  model(on)
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await lens($, '')
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shows(pane, /^12\. ask 12$/)).toBe(false) // the last ten: turns 3 to 12
+  expect(await shows(pane, /^10\. ask 12$/)).toBe(true)
+  expect(await shows(pane, /Lens headline for ask 12/)).toBe(true)
+  expect(await shows(pane, /\/src\/f12\.ts/)).toBe(true)
+})
+
+test('a rebuilt turn joins the known ones without doubling them', () => {
+  const rows: SessionMessage[] = [
+    { role: 'user', text: 'first', toolUses: [] },
+    { role: 'assistant', text: 'First answer.', toolUses: [] },
+    { role: 'user', text: '<local-command-caveat>ran /reload-plugins</local-command-caveat>', toolUses: [] },
+    { role: 'user', text: 'second', toolUses: [] },
+    { role: 'assistant', text: 'Looking.', toolUses: [] },
+    { role: 'assistant', text: 'Second answer.', toolUses: [] },
+  ]
+  const rebuilt = turnsFrom(rows)
+  expect(rebuilt.map(t => [t.prompt, t.answer, t.replies])).toEqual([
+    ['first', 'First answer.', []],
+    ['second', 'Second answer.', ['Looking.']],
+  ])
+  expect(turnsFrom(rows)[1]!.id).toBe(rebuilt[1]!.id) // stable across rebuilds
+
+  const known = { id: 't9', prompt: 'second', answer: 'Second answer.', files: ['/a.ts'], tools: 2, replies: [], at: 123 }
+  const merged = withBackfill([known], rebuilt, 10)
+  expect(merged.map(t => t.id)).toEqual([rebuilt[0]!.id, 't9'])
+  expect(merged[1]!.at).toBe(123)
+  expect(withBackfill([known], rebuilt, 0).map(t => t.id)).toEqual(['t9'])
 })
