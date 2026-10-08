@@ -70,9 +70,10 @@ export function parseDigest(text: string): Digest | undefined {
   const body = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
   try {
     const raw = JSON.parse(body) as Record<string, unknown>
-    if (typeof raw.headline !== 'string') return undefined
+    const headline = typeof raw.headline === 'string' ? raw.headline.trim() : ''
+    if (headline === '') return undefined
 
-    return { headline: raw.headline.trim(), progress: strings(raw.progress), blocked: strings(raw.blocked), done: strings(raw.done) }
+    return { headline, progress: strings(raw.progress), blocked: strings(raw.blocked), done: strings(raw.done) }
   } catch {
     return undefined
   }

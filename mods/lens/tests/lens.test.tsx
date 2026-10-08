@@ -221,6 +221,7 @@ test('reads a digest even when the model fences it, and refuses one with no head
   const fenced = '```json\n{"headline": "Done", "progress": [], "blocked": ["ok?"], "done": ["a", 3]}\n```'
   expect(parseDigest(fenced)).toEqual({ headline: 'Done', progress: [], blocked: ['ok?'], done: ['a'] })
   expect(parseDigest('{"progress": []}')).toBeUndefined()
+  expect(parseDigest('{"headline": "   ", "progress": ["x"]}')).toBeUndefined()
   expect(parseDigest('not json')).toBeUndefined()
 })
 
@@ -316,4 +317,28 @@ test('a rebuilt turn joins the known ones without doubling them', () => {
   expect(merged.map(t => t.id)).toEqual([rebuilt[0]!.id, 't9'])
   expect(merged[1]!.at).toBe(123)
   expect(withBackfill([known], rebuilt, 0).map(t => t.id)).toEqual(['t9'])
+})
+
+test('a model call that rejects ends as an error the next refresh retries, not stuck sorting', async ($, on) => {
+  engine(on)
+  let calls = 0
+  on('model.complete', ($, e) => {
+    calls += 1
+    if (calls <= 2) throw new Error('transport failed') // the turn's digest and the overview, first time round
+    const ask = /<ask>\n(.*)\n/.exec(e.prompt)?.[1] ?? 'session'
+    const text = JSON.stringify({ headline: `Lens headline for ${ask}`, progress: [], blocked: [], done: [] })
+
+    return { value: { isAnswered: true, text, usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }
+  })
+
+  await answerTurn($, 't1', 'Ship it', 'Shipped.')
+  await lens($, '') // must not throw though every call failed
+  const failed = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await shows(failed, /couldn't summarize/)).toBe(true)
+  expect(await shows(failed, /sorting…/)).toBe(false)
+  await failed.unmount()
+
+  await lens($, '')
+  const retried = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await shows(retried, /Lens headline for Ship it/)).toBe(true)
 })

@@ -45,11 +45,18 @@ async function generate($: EngineInterface, key: string, ask: { system: string; 
 
   const pending: View = { status: 'pending', text: '' }
   await update($, views, v => ({ ...v, [key]: pending }))
-  const result = await $.model.complete({ model: MODEL, effort: 'low', timeoutMs: 60_000, ...ask })
-  const digest = result.isAnswered ? parseDigest(result.text) : undefined
-  const view: View = digest
-    ? { status: 'done', text: digest.headline, digest }
-    : { status: 'error', text: result.isAnswered ? "couldn't read the summary" : `couldn't summarize (${result.reason})` }
+  // A call that rejects (the engine refusing to send it) ends as an error view
+  // too, never left pending: an error is what the next refresh retries.
+  let view: View
+  try {
+    const result = await $.model.complete({ model: MODEL, effort: 'low', timeoutMs: 60_000, ...ask })
+    const digest = result.isAnswered ? parseDigest(result.text) : undefined
+    view = digest
+      ? { status: 'done', text: digest.headline, digest }
+      : { status: 'error', text: result.isAnswered ? "couldn't read the summary" : `couldn't summarize (${result.reason})` }
+  } catch {
+    view = { status: 'error', text: "couldn't summarize" }
+  }
   await update($, views, v => ({ ...v, [key]: view }))
 }
 
