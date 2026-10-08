@@ -1,0 +1,10 @@
+{
+  "name": "lens",
+  "version": "0.1.0",
+  "description": "Sorts each of Claude's replies into what's in progress, what needs you and what got done, in a side pane and in place in the transcript",
+  "author": {
+    "name": "Daniel Garcia Carrillo"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
