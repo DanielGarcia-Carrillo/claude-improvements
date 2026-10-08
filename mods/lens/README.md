@@ -18,6 +18,9 @@ and returns a headline plus up to five items per list:
 One call covers all three lists, so switching between them never calls the
 model again. Digests are cached per turn for the session.
 
+Every view is stamped with when Claude finished the original reply (with the
+date once it isn't today), not when it was summarised.
+
 ### In the transcript
 
 The `inline` button cycles three modes:

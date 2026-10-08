@@ -12,6 +12,8 @@ export type Turn = {
   tools: number
   /** Each assistant text block of this turn, to find the turn a transcript message belongs to. */
   replies: string[]
+  /** When Claude finished the reply, in ms since the epoch; absent on turns kept before it was recorded. */
+  at?: number
 }
 
 /** A turn (or the session) sorted: a headline and what is in progress, needs the person, or got done. */

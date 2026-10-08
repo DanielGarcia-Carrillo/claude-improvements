@@ -5,6 +5,7 @@ import type { Digest, InlineMode, Purpose, Turn, View } from '../types'
 import { LENS, headingSvg, mid } from './heading'
 import type { Hue } from './heading'
 import { endsAnswer, turnContaining } from './match'
+import { timeOf } from './time'
 import { BUCKETS, PURPOSES, overviewRequest, parseDigest, titleOf, turnRequest } from './digest'
 
 const PANE = 'lens'
@@ -227,6 +228,7 @@ export const register: Register = on => {
     const { Box, Text, Button, Markdown } = $.ui.resolve(e)
     const label = PURPOSES.find(x => x.id === p)?.label ?? p
     const columns = e.viewport?.columns ?? 80
+    const when = timeOf(turn.at, await $.clock.now().catch(() => Date.now()))
 
     const color = mid(LENS)
     const openButton = <Button key={`lens-${turn.id}`} label="open in lens ›" onPress={() => showTurn($, turn.id)} />
@@ -246,6 +248,7 @@ export const register: Register = on => {
               <Text bold color={color}>
                 ◆ Lens
               </Text>
+              {when !== undefined && <Text dimColor>{when}</Text>}
               <Box flexShrink={1} flexGrow={1}>
                 <Text dimColor={d === undefined}>{d?.headline ?? status}</Text>
               </Box>
@@ -281,6 +284,7 @@ export const register: Register = on => {
           <Text bold color={color}>
             ◆ Lens · {d === undefined || isExpanded ? 'original' : label}
           </Text>
+          {when !== undefined && <Text dimColor>{when}</Text>}
           <Box flexShrink={1} flexGrow={1}>
             {d === undefined && <Text dimColor>{status}</Text>}
           </Box>
@@ -347,7 +351,9 @@ export const register: Register = on => {
       } catch {
         replies = []
       }
-      const turn: Turn = { id: e.turnId, prompt, answer: e.answer, files: [...files], tools, replies }
+      // The reply's own time, which every view stamps; a clock that fails costs the stamp, not the turn.
+      const at = await $.clock.now().catch(() => undefined)
+      const turn: Turn = { id: e.turnId, prompt, answer: e.answer, files: [...files], tools, replies, at }
       await update($, turns, list => [...list, turn].slice(-50))
       if (await read($, isOpen)) $.clock.after(50, () => void refresh($))
     }
@@ -393,6 +399,7 @@ export const register: Register = on => {
     }
 
     const f = focusIndex(list, await read($, focus))
+    const now = await $.clock.now().catch(() => Date.now())
     const shownOriginal = await read($, expanded)
     const body = (v: View | undefined) =>
       v?.digest !== undefined ? (
@@ -419,9 +426,9 @@ export const register: Register = on => {
               </Box>
               <Button key="pane-orig" hotkey="o" label={isOriginal ? 'lens view' : 'original'} onPress={() => toggleExpanded($, t.id)} />
             </Box>
-            {t.files.length > 0 && (
+            {(t.at !== undefined || t.files.length > 0) && (
               <Text dimColor wrap="truncate-end">
-                {t.files.join('  ')}
+                {[timeOf(t.at, now), ...t.files].filter(Boolean).join('  ·  ')}
               </Text>
             )}
             {isOriginal ? <Markdown text={t.answer} /> : body(view)}
@@ -430,13 +437,14 @@ export const register: Register = on => {
       }
       if (d <= NEAR) {
         const asks = view?.digest?.blocked.length ?? 0
+        const when = timeOf(t.at, now)
 
         return (
           <Button
             key={`t-${t.id}`}
             plain
             dimColor
-            label={`${i + 1}  ${view?.status === 'done' ? view.text : titleOf(t)}${asks > 0 ? `   ✋ ${asks}` : ''}`}
+            label={`${i + 1}  ${when !== undefined ? `${when}  ` : ''}${view?.status === 'done' ? view.text : titleOf(t)}${asks > 0 ? `   ✋ ${asks}` : ''}`}
             onPress={goTo(i === list.length - 1 ? null : t.id)}
           />
         )
@@ -453,6 +461,7 @@ export const register: Register = on => {
         {header}
         <Box flexDirection="column" rowGap={1}>
           {heading($, e, 'session', 'Session so far', 20, LENS, columns)}
+          {list.at(-1)?.at !== undefined && <Text dimColor>as of {timeOf(list.at(-1)?.at, now)}</Text>}
           {body(overview)}
         </Box>
         <Box flexDirection="column">

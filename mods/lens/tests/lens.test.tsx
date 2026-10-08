@@ -3,11 +3,13 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { turnContaining } from '../hooks/match'
+import { timeOf } from '../hooks/time'
 import { parseDigest } from '../hooks/digest'
 
 // Stand in for the engine beneath the plugin: a turn starts and ends, a pane opens,
-// the transcript holds what the test puts in it and a message draws as its text.
-const engine = (on: On, transcript: SessionMessage[] = []) => {
+// the transcript holds what the test puts in it, a message draws as its text, and
+// the clock stands still until the test moves it.
+const engine = (on: On, transcript: SessionMessage[] = [], now = 0) => {
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.messages', () => ({ value: transcript }))
   on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
@@ -19,6 +21,8 @@ const engine = (on: On, transcript: SessionMessage[] = []) => {
   on('turn.complete', ($, e) => ({ text: e.answer }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
+
+  return mock.clock(on, { now })
 }
 
 // The model: a digest naming the ask, so a test can tell turns apart.
@@ -105,8 +109,7 @@ test('switching purpose costs no model call', async ($, on) => {
 })
 
 test('callout: the headline under the answer, with what needs the person or the chosen list', async ($, on) => {
-  engine(on)
-  const clock = mock.clock(on)
+  const clock = engine(on)
   model(on, { blocked: ['pick a default theme'], done: ['toggle added'] })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
@@ -143,8 +146,7 @@ test('callout: the headline under the answer, with what needs the person or the 
 
 test('replace mode swaps the answer for the lists, folds the steps, and expands on demand', async ($, on) => {
   const transcript: SessionMessage[] = []
-  engine(on, transcript)
-  const clock = mock.clock(on)
+  const clock = engine(on, transcript)
   model(on, { progress: ['wire the flag'], blocked: ['pick a default theme'] })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
@@ -212,4 +214,41 @@ test('matches a message, drawn without markdown, to the turn that wrote it', () 
   expect(turnContaining(list, 'answer about caching')?.id).toBe('t1')
   expect(turnContaining(list, 'nowhere in the session')).toBeUndefined()
   expect(turnContaining(list, 'the')).toBeUndefined() // too short to mean one place
+})
+
+test('stamps each view with when the original reply was written, not when it was sorted', async ($, on) => {
+  const transcript: SessionMessage[] = []
+  const written = new Date(2026, 9, 8, 18, 5).getTime()
+  const clock = engine(on, transcript, written)
+  model(on, { blocked: ['pick a default theme'] })
+  const stamp = timeOf(written, written)!
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  transcript.push({ role: 'user', text: 'Ship the toggle', toolUses: [] })
+  transcript.push({ role: 'assistant', text: 'The toggle ships behind a flag.', toolUses: [] })
+  await answerTurn($, 't1', 'Ship the toggle', 'The toggle ships behind a flag.')
+
+  // Sorted twenty minutes later: the stamp stays the reply's own time.
+  await clock.advance(20 * 60 * 1000)
+  const draw = (requestId: string) =>
+    $.ui.mount({ plugin: 'lens', surface: 'desktop', component: 'AssistantMessage', requestId, props: { text: 'The toggle ships behind a flag.', isFirstOfReply: true } })
+  const callout = await draw('a')
+  await clock.advance(1000)
+  const sorted = await draw('b')
+  expect(await sorted.find({ text: stamp })).toBeDefined()
+  expect(await sorted.find({ text: timeOf(written + 20 * 60 * 1000, written)! })).toBeUndefined()
+  for (const one of [callout, sorted]) await one.unmount()
+
+  await lens($, '')
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shows(pane, new RegExp(`as of ${stamp}`))).toBe(true)
+  expect(await shows(pane, new RegExp(stamp))).toBe(true)
+})
+
+test('a time from an earlier day carries its date', () => {
+  const at = new Date(2026, 9, 6, 9, 30).getTime()
+  const now = new Date(2026, 9, 8, 12, 0).getTime()
+  expect(timeOf(at, now)).toBe(`${new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
+  expect(timeOf(at, at)).toBe(new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
+  expect(timeOf(undefined, now)).toBeUndefined()
 })
