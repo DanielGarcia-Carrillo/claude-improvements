@@ -16,6 +16,8 @@ const TICK_MS = 400 // how often the inline rows' wanted digests are generated
 const REPLY_MAX = 8000 // characters kept per reply block for matching
 const INLINE_MAX = 3 // inline digests generated at once
 const BACKFILL = 10 // earlier turns rebuilt from the transcript when the lens loads
+const TIMEOUT_MS = 60_000 // how long one model call may take
+const STALE_MS = TIMEOUT_MS + 15_000 // a call pending longer was lost (a reload mid-call) and may be retried
 
 const turns = atom({ plugin: 'lens', key: 'turns' } as const, [])
 const purpose = atom({ plugin: 'lens', key: 'purpose' } as const, 'all')
@@ -30,8 +32,9 @@ const MODES: InlineMode[] = ['off', 'callout', 'replace']
 const modeOf = (stored: unknown): InlineMode =>
   stored === false ? 'off' : stored === true ? 'callout' : MODES.includes(stored as InlineMode) ? (stored as InlineMode) : 'replace'
 
-const viewKey = (turnId: string) => `digest|${turnId}`
-const overviewKey = (lastTurnId: string) => `digest|overview|${lastTurnId}`
+// v2: digests cached before the five lists had a different shape.
+const viewKey = (turnId: string) => `digest|v2|${turnId}`
+const overviewKey = (lastTurnId: string) => `digest|v2|overview|${lastTurnId}`
 
 const focusIndex = (list: Turn[], id: string | null) => {
   const found = id === null ? -1 : list.findIndex(t => t.id === id)
@@ -39,17 +42,23 @@ const focusIndex = (list: Turn[], id: string | null) => {
   return found === -1 ? list.length - 1 : found
 }
 
-async function generate($: EngineInterface, key: string, ask: { system: string; prompt: string; maxTokens: number }) {
-  const known = (await read($, views))[key]
-  if (known && known.status !== 'error') return
+// What a retry button may redo: a failed call, or one pending past its timeout.
+const isRetryable = (view: View | undefined, now: number) =>
+  view?.status === 'error' || (view?.status === 'pending' && now - (view.since ?? 0) > STALE_MS)
 
-  const pending: View = { status: 'pending', text: '' }
+// `force` redoes the call whatever is known: the retry buttons.
+async function generate($: EngineInterface, key: string, ask: { system: string; prompt: string; maxTokens: number }, force = false) {
+  const now = await $.clock.now().catch(() => Date.now())
+  const known = (await read($, views))[key]
+  if (!force && known && known.status !== 'error' && !isRetryable(known, now)) return
+
+  const pending: View = { status: 'pending', text: '', since: now }
   await update($, views, v => ({ ...v, [key]: pending }))
   // A call that rejects (the engine refusing to send it) ends as an error view
   // too, never left pending: an error is what the next refresh retries.
   let view: View
   try {
-    const result = await $.model.complete({ model: MODEL, effort: 'low', timeoutMs: 60_000, ...ask })
+    const result = await $.model.complete({ model: MODEL, effort: 'low', timeoutMs: TIMEOUT_MS, ...ask })
     const digest = result.isAnswered ? parseDigest(result.text) : undefined
     view = digest
       ? { status: 'done', text: digest.headline, digest }
@@ -84,6 +93,19 @@ async function refresh($: EngineInterface) {
   const last = list.at(-1)
   if (last) jobs.push(generate($, overviewKey(last.id), overviewRequest(list.slice(-20))))
   await Promise.all(jobs)
+}
+
+async function retryTurn($: EngineInterface, turnId: string) {
+  const list = await read($, turns)
+  const i = list.findIndex(t => t.id === turnId)
+  const turn = list[i]
+  if (turn !== undefined) await generate($, viewKey(turnId), turnRequest(turn, contextFor(list, await read($, views), i)), true)
+}
+
+async function retryOverview($: EngineInterface) {
+  const list = await read($, turns)
+  const last = list.at(-1)
+  if (last) await generate($, overviewKey(last.id), overviewRequest(list.slice(-20)), true)
 }
 
 const shownBuckets = (d: Digest, p: Purpose) => BUCKETS.filter(b => (p === 'all' ? d[b.id].length > 0 : b.id === p))
@@ -207,7 +229,7 @@ export const register: Register = on => {
     ticker = $.clock.every(TICK_MS, () => void fillInline($))
     await $.command.register({
       name: 'lens',
-      description: 'Sort this session into in progress, needs you and done: /lens [all|progress|blocked|done]',
+      description: 'Sort this session into in progress, needs you, waiting on others, blocked and done: /lens [all|progress|needs|waiting|blocked|done]',
       argumentHint: '[purpose]',
     })
     await backfill($)
@@ -216,7 +238,16 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'lens' }, async ($, e) => {
-    const words: Record<string, Purpose> = { all: 'all', progress: 'progress', blocked: 'blocked', needs: 'blocked', done: 'done' }
+    const words: Record<string, Purpose> = {
+      all: 'all',
+      progress: 'progress',
+      needs: 'needs',
+      you: 'needs',
+      waiting: 'waiting',
+      others: 'waiting',
+      blocked: 'blocked',
+      done: 'done',
+    }
     for (const word of e.args.toLowerCase().split(/\s+/).filter(Boolean)) {
       const u = words[word]
       if (u) await update($, purpose, () => u)
@@ -254,12 +285,21 @@ export const register: Register = on => {
     const color = mid(LENS)
     const openButton = <Button key={`lens-${turn.id}`} label="open in lens ›" onPress={() => showTurn($, turn.id)} />
     const status = view?.status === 'error' ? `${view.text}; showing the original` : 'sorting…'
+    const retryButton = isRetryable(view, await $.clock.now().catch(() => Date.now())) && (
+      <Button key={`retry-${turn.id}`} label="↻" onPress={() => retryTurn($, turn.id)} />
+    )
 
     // Callout: the original, then a strip with the headline and the purpose's items
     // (with `all`, the counts and whatever needs the person).
     if (mode === 'callout') {
       if (!isEnd) return next(e)
-      const items = d === undefined ? [] : p === 'all' ? d.blocked.map(x => `✋ ${x}`) : d[p].map(x => `• ${x}`)
+      // With `all`, what needs a look: the person's asks and what is blocked.
+      const items: { text: string; hue?: Hue }[] =
+        d === undefined
+          ? []
+          : p === 'all'
+            ? BUCKETS.filter(b => b.id === 'needs' || b.id === 'blocked').flatMap(b => d[b.id].map(x => ({ text: `${b.mark} ${x}`, hue: b.hue })))
+            : d[p].map(x => ({ text: `• ${x}` }))
 
       return (
         <Box flexDirection="column" rowGap={1}>
@@ -273,13 +313,14 @@ export const register: Register = on => {
               <Box flexShrink={1} flexGrow={1}>
                 <Text dimColor={d === undefined}>{d?.headline ?? status}</Text>
               </Box>
+              {retryButton}
               {openButton}
             </Box>
             {d !== undefined && p === 'all' && <Text dimColor>{tally(d)}</Text>}
             {d !== undefined && p !== 'all' && items.length === 0 && <Text dimColor>{BUCKETS.find(b => b.id === p)?.empty}</Text>}
             {items.map((x, i) => (
-              <Text key={`i-${i}`} color={p === 'all' ? mid('amber') : undefined}>
-                {x}
+              <Text key={`i-${i}`} color={x.hue === undefined ? undefined : mid(x.hue)}>
+                {x.text}
               </Text>
             ))}
           </Box>
@@ -309,6 +350,7 @@ export const register: Register = on => {
           <Box flexShrink={1} flexGrow={1}>
             {d === undefined && <Text dimColor>{status}</Text>}
           </Box>
+          {retryButton}
           {d !== undefined && (
             <Button key={`orig-${turn.id}`} label={isExpanded ? 'show lens view' : 'show original'} onPress={() => toggleExpanded($, turn.id)} />
           )}
@@ -430,14 +472,17 @@ export const register: Register = on => {
     const f = focusIndex(list, await read($, focus))
     const now = await $.clock.now().catch(() => Date.now())
     const shownOriginal = await read($, expanded)
-    const body = (v: View | undefined) =>
+    const body = (v: View | undefined, key: string, retry: () => Promise<void>) =>
       v?.digest !== undefined ? (
         <Box flexDirection="column" rowGap={1}>
           <Text bold>{v.digest.headline}</Text>
           {sections($, e, v.digest, p, 15, columns)}
         </Box>
       ) : (
-        <Text dimColor>{v?.status === 'error' ? v.text : 'sorting…'}</Text>
+        <Box columnGap={2} alignItems="center">
+          <Text dimColor>{v?.status === 'error' ? v.text : 'sorting…'}</Text>
+          {isRetryable(v, now) && <Button key={key} hotkey={key === 'retry-turn' ? 'r' : undefined} label="↻" onPress={retry} />}
+        </Box>
       )
     const overview = known[overviewKey(list.at(-1)?.id ?? '')]
 
@@ -460,12 +505,14 @@ export const register: Register = on => {
                 {[timeOf(t.at, now), ...t.files].filter(Boolean).join('  ·  ')}
               </Text>
             )}
-            {isOriginal ? <Markdown text={t.answer} /> : body(view)}
+            {isOriginal ? <Markdown text={t.answer} /> : body(view, 'retry-turn', () => retryTurn($, t.id))}
           </Box>
         )
       }
       if (d <= NEAR) {
-        const asks = view?.digest?.blocked.length ?? 0
+        const flags = BUCKETS.filter(b => (b.id === 'needs' || b.id === 'blocked') && (view?.digest?.[b.id].length ?? 0) > 0)
+          .map(b => `   ${b.mark} ${view?.digest?.[b.id].length}`)
+          .join('')
         const when = timeOf(t.at, now)
 
         return (
@@ -473,7 +520,7 @@ export const register: Register = on => {
             key={`t-${t.id}`}
             plain
             dimColor
-            label={`${i + 1}  ${when !== undefined ? `${when}  ` : ''}${view?.status === 'done' ? view.text : titleOf(t)}${asks > 0 ? `   ✋ ${asks}` : ''}`}
+            label={`${i + 1}  ${when !== undefined ? `${when}  ` : ''}${view?.status === 'done' ? view.text : titleOf(t)}${flags}`}
             onPress={goTo(i === list.length - 1 ? null : t.id)}
           />
         )
@@ -491,7 +538,7 @@ export const register: Register = on => {
         <Box flexDirection="column" rowGap={1}>
           {heading($, e, 'session', 'Session so far', 20, LENS, columns)}
           {list.at(-1)?.at !== undefined && <Text dimColor>as of {timeOf(list.at(-1)?.at, now)}</Text>}
-          {body(overview)}
+          {body(overview, 'retry-overview', () => retryOverview($))}
         </Box>
         <Box flexDirection="column">
           {older > 0 && <Text dimColor>… {older} earlier</Text>}

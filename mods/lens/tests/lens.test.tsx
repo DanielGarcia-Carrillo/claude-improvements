@@ -27,12 +27,12 @@ const engine = (on: On, transcript: SessionMessage[] = [], now = 0) => {
 }
 
 // The model: a digest naming the ask, so a test can tell turns apart.
-const model = (on: On, lists: { progress?: string[]; blocked?: string[]; done?: string[] } = {}) => {
+const model = (on: On, lists: { progress?: string[]; needs?: string[]; waiting?: string[]; blocked?: string[]; done?: string[] } = {}) => {
   const asked: string[] = []
   on('model.complete', ($, e) => {
     asked.push(e.prompt)
     const ask = /<ask>\n(.*)\n/.exec(e.prompt)?.[1] ?? 'session'
-    const text = JSON.stringify({ headline: `Lens headline for ${ask}`, progress: [], blocked: [], done: [], ...lists })
+    const text = JSON.stringify({ headline: `Lens headline for ${ask}`, progress: [], needs: [], waiting: [], blocked: [], done: [], ...lists })
 
     return { value: { isAnswered: true, text, usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }
   })
@@ -86,7 +86,7 @@ test('shows the latest turn and the session in the pane', async ($, on) => {
 })
 test('the purpose filter shows one list, or every list that has items', async ($, on) => {
   engine(on)
-  model(on, { progress: ['wire the flag'], blocked: ['pick a default theme'] })
+  model(on, { progress: ['wire the flag'], needs: ['pick a default theme'] })
 
   await answerTurn($, 't1', 'Add a dark mode toggle', 'Added a toggle; which default?')
   await lens($, 'all')
@@ -98,7 +98,7 @@ test('the purpose filter shows one list, or every list that has items', async ($
   expect(await shows(ui, /✋ Needs you/)).toBe(true)
   expect((await ui.findAll({ type: 'Svg' })).length).toBeGreaterThan(0) // headings at a real size on the desktop
 
-  await ui.press({ key: 'u-blocked' })
+  await ui.press({ key: 'u-needs' })
   expect(await shows(ui, /wire the flag/)).toBe(false)
   expect(await shows(ui, /pick a default theme/)).toBe(true)
 
@@ -114,13 +114,13 @@ test('switching purpose costs no model call', async ($, on) => {
   await lens($, '')
   const before = asked.length
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  for (const key of ['u-progress', 'u-blocked', 'u-done', 'u-all']) await ui.press({ key })
+  for (const key of ['u-progress', 'u-needs', 'u-waiting', 'u-blocked', 'u-done', 'u-all']) await ui.press({ key })
   expect(asked.length).toBe(before)
 })
 
 test('callout: the headline under the answer, with what needs the person or the chosen list', async ($, on) => {
   const clock = engine(on)
-  model(on, { blocked: ['pick a default theme'], done: ['toggle added'] })
+  model(on, { needs: ['pick a default theme'], done: ['toggle added'] })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await answerTurn($, 't1', 'Explain the cache', 'The cache keys on the route.')
@@ -159,7 +159,7 @@ test('callout: the headline under the answer, with what needs the person or the 
 test('replace mode swaps the answer for the lists, folds the steps, and expands on demand', async ($, on) => {
   const transcript: SessionMessage[] = []
   const clock = engine(on, transcript)
-  model(on, { progress: ['wire the flag'], blocked: ['pick a default theme'] })
+  model(on, { progress: ['wire the flag'], needs: ['pick a default theme'] })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   transcript.push({ role: 'user', text: 'Ship the toggle', toolUses: [] })
@@ -168,7 +168,7 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   await answerTurn($, 't1', 'Ship the toggle', 'The toggle ships behind a flag.')
 
   // Replace is the default; show what needs the person.
-  await lens($, 'blocked')
+  await lens($, 'needs')
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await pane.find({ key: 'inline', text: /inline: replace/ })).toBeDefined()
 
@@ -197,7 +197,7 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   expect(await opened.find({ key: 'lens-t1' })).toBeDefined()
 
   // With the original showing, the purpose buttons are unselected, dim and inert.
-  for (const id of ['all', 'progress', 'blocked', 'done']) {
+  for (const id of ['all', 'progress', 'needs', 'waiting', 'blocked', 'done']) {
     const button = await opened.find({ key: `ru-t1-${id}` })
     expect(button?.props.variant).toBe('secondary')
     expect(button?.props.dimColor).toBe(true)
@@ -205,7 +205,7 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   await opened.press({ key: 'ru-t1-done' })
   const still = await draw('c2', 'The toggle ships behind a flag.')
   expect(await shows(still, /ships behind a flag/)).toBe(true)
-  expect((await still.find({ key: 'ru-t1-blocked' }))?.props.dimColor).toBe(true)
+  expect((await still.find({ key: 'ru-t1-needs' }))?.props.dimColor).toBe(true)
 
   // The pane's purpose buttons, in the box: they refilter every reply, the chosen one primary.
   await opened.press({ key: 'orig-t1' })
@@ -218,8 +218,8 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
 })
 
 test('reads a digest even when the model fences it, and refuses one with no headline', () => {
-  const fenced = '```json\n{"headline": "Done", "progress": [], "blocked": ["ok?"], "done": ["a", 3]}\n```'
-  expect(parseDigest(fenced)).toEqual({ headline: 'Done', progress: [], blocked: ['ok?'], done: ['a'] })
+  const fenced = '```json\n{"headline": "Done", "progress": [], "needs": ["ok?"], "blocked": ["rate limited"], "done": ["a", 3]}\n```'
+  expect(parseDigest(fenced)).toEqual({ headline: 'Done', progress: [], needs: ['ok?'], waiting: [], blocked: ['rate limited'], done: ['a'] })
   expect(parseDigest('{"progress": []}')).toBeUndefined()
   expect(parseDigest('{"headline": "   ", "progress": ["x"]}')).toBeUndefined()
   expect(parseDigest('not json')).toBeUndefined()
@@ -243,7 +243,7 @@ test('stamps each view with when the original reply was written, not when it was
   const transcript: SessionMessage[] = []
   const written = new Date(2026, 9, 8, 18, 5).getTime()
   const clock = engine(on, transcript, written)
-  model(on, { blocked: ['pick a default theme'] })
+  model(on, { needs: ['pick a default theme'] })
   const stamp = timeOf(written, written)!
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
@@ -326,7 +326,7 @@ test('a model call that rejects ends as an error the next refresh retries, not s
     calls += 1
     if (calls <= 2) throw new Error('transport failed') // the turn's digest and the overview, first time round
     const ask = /<ask>\n(.*)\n/.exec(e.prompt)?.[1] ?? 'session'
-    const text = JSON.stringify({ headline: `Lens headline for ${ask}`, progress: [], blocked: [], done: [] })
+    const text = JSON.stringify({ headline: `Lens headline for ${ask}`, progress: [], needs: [], waiting: [], blocked: [], done: [] })
 
     return { value: { isAnswered: true, text, usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }
   })
@@ -341,4 +341,78 @@ test('a model call that rejects ends as an error the next refresh retries, not s
   await lens($, '')
   const retried = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await shows(retried, /Lens headline for Ship it/)).toBe(true)
+})
+
+test('waiting on others and blocked are lists of their own, kept apart from what needs the person', async ($, on) => {
+  engine(on)
+  model(on, { needs: ['pick a default theme'], waiting: ['session ui/per-14: the identity branch'], blocked: ['API rate limit hit'] })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await answerTurn($, 't1', 'Ship the toggle', 'Waiting on the other session; rate limited.')
+  await lens($, 'all')
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await shows(pane, /⏳ Waiting on others/)).toBe(true)
+  expect(await shows(pane, /⛔ Blocked/)).toBe(true)
+
+  await pane.press({ key: 'u-waiting' })
+  expect(await shows(pane, /session ui\/per-14/)).toBe(true)
+  expect(await shows(pane, /pick a default theme/)).toBe(false)
+  expect(await shows(pane, /API rate limit hit/)).toBe(false)
+
+  await pane.press({ key: 'u-blocked' })
+  expect(await shows(pane, /API rate limit hit/)).toBe(true)
+  expect(await shows(pane, /session ui\/per-14/)).toBe(false)
+  await pane.unmount()
+
+  // The callout's `all` strip flags what needs a look: the person's asks and what is blocked.
+  await lens($, 'all')
+  await inlineMode($, 'callout')
+  const reply = await $.ui.mount({ plugin: 'lens', surface: 'desktop', component: 'AssistantMessage', requestId: 'm1', props: { text: 'Waiting on the other session; rate limited.', isFirstOfReply: true } })
+  expect(await shows(reply, /✋ pick a default theme/)).toBe(true)
+  expect(await shows(reply, /⛔ API rate limit hit/)).toBe(true)
+  expect(await shows(reply, /per-14/)).toBe(false)
+})
+
+test('a failed digest offers a retry, inline and in the pane', async ($, on) => {
+  const clock = engine(on)
+  let failing = true
+  on('model.complete', ($, e) => {
+    if (failing) return { value: { isAnswered: false, reason: 'rate_limited' } }
+    const ask = /<ask>\n(.*)\n/.exec(e.prompt)?.[1] ?? 'session'
+    const text = JSON.stringify({ headline: `Lens headline for ${ask}`, progress: [], needs: [], waiting: [], blocked: [], done: [] })
+
+    return { value: { isAnswered: true, text, usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } }
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await answerTurn($, 't1', 'Ship it', 'The toggle shipped behind a flag.')
+  const draw = (requestId: string) =>
+    $.ui.mount({ plugin: 'lens', surface: 'desktop', component: 'AssistantMessage', requestId, props: { text: 'The toggle shipped behind a flag.', isFirstOfReply: true } })
+
+  await draw('a')
+  await clock.advance(1000)
+  const failed = await draw('b')
+  expect(await shows(failed, /couldn't summarize/)).toBe(true)
+  // The timer leaves a failed digest alone: only the button retries it.
+  await clock.advance(5000)
+  expect(await shows(await draw('c'), /couldn't summarize/)).toBe(true)
+
+  failing = false
+  await failed.press({ key: 'retry-t1' })
+  const fixed = await draw('d')
+  expect(await shows(fixed, /Lens headline for Ship it/)).toBe(true)
+  expect(await fixed.find({ key: 'retry-t1' })).toBeUndefined()
+
+  // The pane: the overview fails, then its retry button fills it.
+  failing = true
+  await answerTurn($, 't2', 'Now the docs', 'Docs updated.')
+  await lens($, '')
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await pane.find({ key: 'retry-overview' })).toBeDefined()
+  expect(await pane.find({ key: 'retry-turn' })).toBeDefined()
+  failing = false
+  await pane.press({ key: 'retry-turn' })
+  expect(await shows(pane, /Lens headline for Now the docs/)).toBe(true)
+  await pane.press({ key: 'retry-overview' })
+  expect(await pane.find({ key: 'retry-overview' })).toBeUndefined()
 })
