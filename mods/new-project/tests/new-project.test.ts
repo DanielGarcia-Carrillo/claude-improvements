@@ -1,6 +1,15 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
+import type { Answers } from '../scripts/compose.ts'
+import {
+  AnswersError,
+  kickoffFor,
+  missingKickoff,
+  parseAnswers,
+  parseKickoff,
+} from '../scripts/compose.ts'
+
 const SKILL_BODY = '# Bootstrap a new project'
 
 // Stands in for the engine beneath the hook: a file system that holds the
@@ -70,4 +79,97 @@ test("leaves other skills, and another plugin's new-project, alone", async ($, o
   expect(elsewhere.text).toBe(SKILL_BODY)
   expect(namesake.text).toBe(SKILL_BODY)
   expect(asked).toEqual([])
+})
+
+const KICKOFF = `# Kickoff questions
+
+## Every project
+
+| Question | Decides |
+|---|---|
+| What is it, in one sentence, and who uses it? | README opening |
+| Public or private repo? | CI minutes |
+
+## Web apps
+
+| Question | Decides |
+|---|---|
+| Does it need to work offline? | Service worker strategy |
+
+## Rust tools
+
+| Question | Decides |
+|---|---|
+| CLI, library, or both? | Workspace shape |
+
+## After the answers
+
+1. Pick the baseline.
+`
+
+function webAnswers(overrides: Record<string, unknown> = {}): Answers {
+  return parseAnswers({
+    stack: 'web',
+    name: "Dan's Trips",
+    slug: 'dans-trips',
+    description: 'Plans trips offline.',
+    summary: 'Plans trips offline for travellers.',
+    issues: 'GitHub Issues',
+    merging: 'Daniel merges',
+    kickoff: [
+      { question: 'What is it, in one sentence, and who uses it?', answer: 'A trip planner' },
+      { question: 'public or private   repo?', answer: 'Private', assumed: true },
+      { question: 'Does it need to work offline?', answer: 'Yes' },
+    ],
+    architecture: [{ choice: 'Styling', line: 'StyleX' }],
+    alternatives: [{ option: 'SSR', why: 'No SEO' }],
+    consequences: 'Nothing to host.',
+    ...overrides,
+  })
+}
+
+function problemsOf(raw: unknown): readonly string[] {
+  try {
+    parseAnswers(raw)
+  } catch (error) {
+    if (error instanceof AnswersError) return error.problems
+    throw error
+  }
+  return []
+}
+
+test('reports every answer problem at once', async () => {
+  const problems = problemsOf({ stack: 'rust', name: 'Fn', slug: 'fn', kickoff: [] })
+  expect(problems.some(p => p.includes('Rust keyword'))).toBe(true)
+  expect(problems.some(p => p.startsWith('`repository`'))).toBe(true)
+  expect(problems.some(p => p.startsWith('`summary`'))).toBe(true)
+  expect(problems.some(p => p.startsWith('`kickoff`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), slug: 'Trip_Planner' }).some(p => p.startsWith('`slug`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), name: 'A <b>' }).some(p => p.startsWith('`name`'))).toBe(true)
+  expect(problemsOf(webAnswers())).toEqual([])
+})
+
+test('every kickoff question of the stack needs an answer', async () => {
+  const sections = kickoffFor(parseKickoff(KICKOFF), 'web')
+  expect(sections.map(s => s.title)).toEqual(['Every project', 'Web apps'])
+  expect(missingKickoff(webAnswers(), sections)).toEqual([])
+
+  const short = webAnswers({ kickoff: [{ question: 'Public or private repo?', answer: 'Public' }] })
+  const missing = missingKickoff(short, sections)
+  expect(missing.length).toBe(2)
+  expect(missing[0]).toContain('"What is it, in one sentence, and who uses it?" (Every project)')
+})
+
+test("refuses answers the new repo's placeholder check would fail on", async () => {
+  const problems = problemsOf({
+    ...webAnswers(),
+    name: 'Replace Me Later',
+    followUps: ['Replace-me tokens in docs'],
+    kickoff: [{ question: 'Public or private repo?', answer: 'replace_me' }],
+  })
+  expect(problems).toEqual([
+    '`name` "Replace Me Later" reads as a template placeholder to the new repo\'s CI; reword it.',
+    '`kickoff[0].answer` "replace_me" reads as a template placeholder to the new repo\'s CI; reword it.',
+    '`followUps[0]` "Replace-me tokens in docs" reads as a template placeholder to the new repo\'s CI; reword it.',
+  ])
 })
