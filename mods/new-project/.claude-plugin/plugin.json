@@ -1,0 +1,17 @@
+{
+  "name": "new-project",
+  "version": "0.1.0",
+  "description": "/new-project bootstraps a repository from the claude-improvements baselines: asks the kickoff questions, copies the web or Rust template, writes CLAUDE.md and the stack ADR, then installs and runs verify",
+  "author": {
+    "name": "Daniel Garcia Carrillo"
+  },
+  "license": "MIT",
+  "userConfig": {
+    "baselines": {
+      "type": "string",
+      "title": "Baselines folder",
+      "description": "The baselines folder of a claude-improvements checkout (it holds general/kickoff.md). Leave empty when the mod runs from that checkout",
+      "default": ""
+    }
+  }
+}
