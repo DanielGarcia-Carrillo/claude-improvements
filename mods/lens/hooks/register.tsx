@@ -24,6 +24,7 @@ const views = atom({ plugin: 'lens', key: 'views' } as const, {})
 const isOpen = atom({ plugin: 'lens', key: 'isOpen' } as const, false)
 const inline = atom({ plugin: 'lens', key: 'inline' } as const, 'replace')
 const expanded = atom({ plugin: 'lens', key: 'expanded' } as const, [])
+const lensed = atom({ plugin: 'lens', key: 'lensed' } as const, [])
 
 const MODES: InlineMode[] = ['off', 'callout', 'replace']
 // Sessions from before the third mode stored this as a boolean.
@@ -196,6 +197,22 @@ async function backfill($: EngineInterface) {
 const toggleExpanded = ($: EngineInterface, id: string) =>
   update($, expanded, ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id].slice(-200)))
 
+// An inline reply draws its original until the person asks for a list; only then is it sorted.
+const setLensed = ($: EngineInterface, id: string, isOn: boolean) =>
+  update($, lensed, ids => (isOn ? (ids.includes(id) ? ids : [...ids, id].slice(-200)) : ids.filter(x => x !== id)))
+
+// A purpose button on a reply: show that list, sorting the reply first if it isn't yet
+// (an error from before is retried).
+async function pickPurpose($: EngineInterface, id: string, u: Purpose) {
+  await update($, purpose, () => u)
+  await setLensed($, id, true)
+  const list = await read($, turns)
+  const i = list.findIndex(t => t.id === id)
+  const turn = list[i]
+  if (turn === undefined) return
+  await generate($, viewKey(id), turnRequest(turn, contextFor(list, await read($, views), i)))
+}
+
 export const register: Register = on => {
   // The turn in flight; a reload mid-turn loses it, which only drops that turn's file list.
   let prompt = ''
@@ -241,10 +258,11 @@ export const register: Register = on => {
     if (turn === undefined) return next(e) // still streaming, or from before the lens
 
     const isEnd = endsAnswer(turn, e.props.text)
-    const isExpanded = (await read($, expanded)).includes(turn.id)
+    const isPicked = (await read($, lensed)).includes(turn.id)
     const p = await read($, purpose)
     const view = (await read($, views))[viewKey(turn.id)]
-    if (view === undefined) wanted.add(turn.id)
+    // Callout sorts every reply as it is drawn; replace waits for the person to pick a list.
+    if (view === undefined && mode === 'callout') wanted.add(turn.id)
     const d = view?.digest
     const { Box, Text, Button, Markdown } = $.ui.resolve(e)
     const label = PURPOSES.find(x => x.id === p)?.label ?? p
@@ -288,8 +306,9 @@ export const register: Register = on => {
     }
 
     // Replace: the steps between tool calls fold to one dim line each. The answer
-    // is one box in every state (sorting, the lists, the original), so
-    // nothing around it moves as it fills in or flips; only its body changes.
+    // is one box in every state (the original, sorting, the lists), so nothing
+    // around it moves as it fills in or flips; only its body changes. It starts as
+    // the original, and the model is called only once a list is picked.
     if (!isEnd) {
       return (
         <Text dimColor wrap="truncate-end">
@@ -297,44 +316,41 @@ export const register: Register = on => {
         </Text>
       )
     }
-    const isOriginal = isExpanded || d === undefined
+    const isLens = isPicked && d !== undefined
 
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1} rowGap={1}>
         <Box columnGap={2} alignItems="center">
           <Text bold color={color}>
-            ◆ Lens · {d === undefined || isExpanded ? 'original' : label}
+            ◆ Lens · {isLens ? label : 'original'}
           </Text>
           {when !== undefined && <Text dimColor>{when}</Text>}
           <Box flexShrink={1} flexGrow={1}>
-            {d === undefined && <Text dimColor>{status}</Text>}
+            {isPicked && d === undefined && <Text dimColor>{status}</Text>}
           </Box>
           {d !== undefined && (
-            <Button key={`orig-${turn.id}`} label={isExpanded ? 'show lens view' : 'show original'} onPress={() => toggleExpanded($, turn.id)} />
+            <Button key={`orig-${turn.id}`} label={isLens ? 'show original' : 'show lens view'} onPress={() => setLensed($, turn.id, !isLens)} />
           )}
           {openButton}
         </Box>
         {/* The pane's purpose buttons, here too: they refilter every reply at once. */}
         <Box flexWrap="wrap" columnGap={1} rowGap={1} alignItems="center">
           {PURPOSES.map(x => (
-            // While the original shows, the lists are not on screen: no choice is
-            // highlighted and the buttons draw dim and do nothing (Button has no disabled).
             <Button
               key={`ru-${turn.id}-${x.id}`}
-              variant={!isOriginal && x.id === p ? 'primary' : 'secondary'}
-              dimColor={isOriginal}
+              variant={isPicked && x.id === p ? 'primary' : 'secondary'}
               label={x.label}
-              onPress={() => (isOriginal ? undefined : update($, purpose, () => x.id))}
+              onPress={() => pickPurpose($, turn.id, x.id)}
             />
           ))}
         </Box>
-        {isOriginal ? (
-          <Markdown text={e.props.text} />
-        ) : (
+        {isLens ? (
           <Box flexDirection="column" rowGap={1}>
             {heading($, e, 'headline', d.headline, 20, 'text', columns)}
             {sections($, e, d, p, 16, columns)}
           </Box>
+        ) : (
+          <Markdown text={e.props.text} />
         )}
       </Box>
     )

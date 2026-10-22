@@ -28,11 +28,14 @@ The `inline` button cycles three modes. Replace is the default:
 - **off**: replies draw as usual.
 - **callout**: a strip under each answer shows the headline, the list counts
   and anything that needs you, plus `open in lens ›`.
-- **replace**: each answer becomes one box. It holds the headline and the
-  lists, the purpose buttons, `show original` and `open in lens ›`. The box
-  stays the same size and place whether it is still sorting, showing the lists
-  or showing the original, so the transcript doesn't jump. Text Claude wrote
-  between tool calls folds to its first line.
+- **replace**: each answer becomes one box that starts as the original, with
+  the purpose buttons and `open in lens ›`. Nothing is sent to Haiku until you
+  click a list (`all`, `in progress`, `needs you` or `done`); the box then
+  shows `sorting…` and swaps in the headline and that list. `show original`
+  and `show lens view` flip between the two. The box stays the same size and
+  place whether it is showing the original, sorting or showing the lists, so
+  the transcript doesn't jump. Text Claude wrote between tool calls folds to
+  its first line.
 
 ### In the side pane
 
@@ -51,9 +54,11 @@ inline mode, `o` toggles the original, and `k`/`j`/`l` move between turns.
 
 - **Display only.** Replace mode changes what you see, never what Claude
   reads or what the transcript file stores.
-- **Cost.** One Haiku call per turn when you first view it, at most three at a
-  time, plus one for the session overview after each new turn while the pane
-  is open.
+- **Cost.** One Haiku call per turn when you first ask to see it sorted: by
+  clicking a list on a reply in replace mode, opening the pane, or showing it
+  in callout mode (callout sorts every reply as it is drawn, at most three at
+  a time). While the pane is open, one more call for the session overview
+  after each new turn.
 - **Earlier turns.** When the lens loads (a resumed session, or the mod
   added mid-session), it rebuilds the last 10 turns already in the
   transcript. Those turns have no timestamp, because the conversation API
