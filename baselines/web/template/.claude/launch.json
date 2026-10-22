@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec pnpm run dev --port \"$PORT\" --strictPort"],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "preview",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec pnpm run preview --port \"$PORT\" --strictPort"],
+      "port": 4173,
+      "autoPort": true
+    },
+    {
+      "name": "storybook",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec pnpm run storybook -p \"$PORT\" --exact-port"],
+      "port": 6006,
+      "autoPort": true
+    }
+  ]
+}

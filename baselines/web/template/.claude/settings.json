@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./.dev.vars*)",
+      "Bash(git commit --no-verify *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(wrangler deploy *)",
+      "Bash(pnpm exec wrangler deploy *)",
+      "Bash(pnpm wrangler deploy *)",
+      "Bash(npx wrangler deploy *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-deploy.ts" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/after-edit.ts" }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/before-stop.ts", "timeout": 300 }
+        ]
+      }
+    ]
+  }
+}
