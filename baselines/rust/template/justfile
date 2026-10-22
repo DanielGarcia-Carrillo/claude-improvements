@@ -1,0 +1,45 @@
+# `just verify` runs everything CI runs. Run it before every handoff.
+# Tools come from mise.toml (`mise install`), Rust from rust-toolchain.toml.
+
+# Warnings fail the build here and in CI, without the cache misses that
+# RUSTFLAGS=-D warnings causes. Local `cargo build` stays warn-only.
+export CARGO_BUILD_WARNINGS := "deny"
+
+verify: fmt-check lint test doc deny shear
+
+fmt-check:
+    cargo fmt --all --check
+
+lint: no-allow lints-inherited
+    cargo clippy --workspace --all-targets --all-features --locked
+
+# Every crate takes the workspace lints. One without `[lints] workspace = true`
+# would build with rustc's defaults, and nothing else would notice.
+lints-inherited:
+    @for f in crates/*/Cargo.toml; do awk '/^\[lints\]/ { t = 1; next } /^\[/ { t = 0 } t && /^workspace *= *true/ { ok = 1 } END { exit !ok }' "$f" || { echo "$f needs [lints] workspace = true" >&2; exit 1; }; done
+
+# No #[allow] in our source, including one that silences allow_attributes.
+no-allow:
+    @if git grep -nE '#!?\[(.*[(, ])?allow\(' -- '*.rs'; then echo 'Use #[expect(lint, reason = "…")], not #[allow].' >&2; exit 1; fi
+
+test:
+    cargo nextest run --workspace --all-features --locked
+    cargo test --workspace --all-features --locked --doc
+
+doc:
+    cargo doc --workspace --no-deps --all-features --locked
+
+deny:
+    cargo deny --locked check
+
+shear:
+    cargo shear
+
+# Apply every machine fix: clippy suggestions, then formatting.
+fix:
+    cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
+    cargo fmt --all
+
+# Review changed snapshots. Never edit .snap files by hand.
+snapshots:
+    cargo insta review

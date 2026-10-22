@@ -1,0 +1,13 @@
+# Rust itself comes from rust-toolchain.toml through rustup. These are the
+# tools `just verify` runs, pinned so every checkout and CI agree.
+[tools]
+just = "1.59.0"
+cargo-insta = "1.49.0"
+"aqua:nextest-rs/nextest/cargo-nextest" = "0.9.148"
+"aqua:EmbarkStudios/cargo-deny" = "0.20.2"
+"cargo:cargo-shear" = "1.14.0"
+
+[settings]
+# A global `rust = "stable"` in mise exports RUSTUP_TOOLCHAIN, which beats
+# rust-toolchain.toml in every repo. Reading the file here makes it win again.
+idiomatic_version_file_enable_tools = ["rust"]

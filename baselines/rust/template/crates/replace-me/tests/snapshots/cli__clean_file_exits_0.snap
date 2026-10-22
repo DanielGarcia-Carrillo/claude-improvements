@@ -1,0 +1,16 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/narrow.txt
+    - "--max-width"
+    - "20"
+---
+success: true
+exit_code: 0
+----- stdout -----
+no lines over 20 characters
+
+----- stderr -----

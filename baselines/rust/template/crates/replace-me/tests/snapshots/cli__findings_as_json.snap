@@ -1,0 +1,34 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/wide.txt
+    - "--max-width"
+    - "20"
+    - "--json"
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "ok": true,
+  "data": {
+    "command": "check",
+    "path": "tests/fixtures/wide.txt",
+    "max_width": 20,
+    "findings": [
+      {
+        "line": 2,
+        "width": 31
+      },
+      {
+        "line": 4,
+        "width": 38
+      }
+    ]
+  }
+}
+
+----- stderr -----

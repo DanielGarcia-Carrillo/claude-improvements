@@ -1,0 +1,18 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/wide.txt
+    - "--max-width"
+    - "20"
+---
+success: false
+exit_code: 1
+----- stdout -----
+tests/fixtures/wide.txt:2: 31 characters, limit 20
+tests/fixtures/wide.txt:4: 38 characters, limit 20
+2 lines over 20 characters
+
+----- stderr -----

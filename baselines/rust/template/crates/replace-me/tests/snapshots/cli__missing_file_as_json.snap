@@ -1,0 +1,25 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/missing.txt
+    - "--json"
+---
+success: false
+exit_code: 2
+----- stdout -----
+{
+  "ok": false,
+  "error": {
+    "code": "input.unreadable",
+    "message": "cannot read tests/fixtures/missing.txt",
+    "hint": "check the path; a relative path is resolved from the current directory",
+    "causes": [
+      "No such file or directory (os error 2)"
+    ]
+  }
+}
+
+----- stderr -----

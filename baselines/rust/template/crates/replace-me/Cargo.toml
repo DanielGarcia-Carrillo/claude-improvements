@@ -1,0 +1,23 @@
+[package]
+name = "replace-me"
+description = "Reports lines wider than a limit."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+replace-me-core.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+insta-cmd.workspace = true
+
+[lints]
+workspace = true
