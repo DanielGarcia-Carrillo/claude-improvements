@@ -3,7 +3,7 @@
 // heading styles. The SVG is drawn as an image, so it carries its own colours
 // for light and dark and wraps its own lines.
 
-// Four hues, none shared: one per list, whose colour means the same everywhere,
+// Six hues, none shared: one per list, whose colour means the same everywhere,
 // and the lens's own for its frames. `mid` reads on either theme and colours
 // borders and text; `light` and `dark` are the headings' shades.
 export const PALETTE = {
@@ -11,6 +11,8 @@ export const PALETTE = {
   // the lists
   blue: { mid: '#3b82f6', light: '#1d4ed8', dark: '#93b4fd' },
   amber: { mid: '#f59e0b', light: '#b45309', dark: '#fcd34d' },
+  teal: { mid: '#14b8a6', light: '#0f766e', dark: '#5eead4' },
+  red: { mid: '#ef4444', light: '#b91c1c', dark: '#fca5a5' },
   green: { mid: '#22c55e', light: '#15803d', dark: '#86efac' },
   // the lens
   violet: { mid: '#a855f7', light: '#7e22ce', dark: '#d8b4fe' },

@@ -1,7 +1,8 @@
 # lens
 
-Sorts each of Claude's replies into three lists, **in progress**, **needs
-you** and **done**, under a one-line headline. You see where the work stands
+Sorts each of Claude's replies into five lists, **in progress**, **needs
+you**, **waiting on others**, **blocked** and **done**, under a one-line
+headline. You see where the work stands
 without reading the whole reply. The idea comes from Amelia Wattenberger's
 [fish-eye essay](https://wattenberger.com/thoughts/fish-eye/): show the part
 you're looking at in detail, with the context around it summarised.
@@ -11,11 +12,19 @@ you're looking at in detail, with the context around it summarised.
 After each main-loop turn, Haiku reads your prompt and Claude's final answer
 and returns a headline plus up to five items per list:
 
-- **In progress**: work started but not finished, or next steps Claude said it would take.
-- **Needs you**: questions Claude asked, choices it offered, approvals or actions it requested.
+- **In progress**: work started but not finished, or next steps Claude said
+  it would take itself.
+- **Needs you**: only what you personally have to do: questions Claude asked
+  you, choices it offered, approvals or actions it requested of you.
+- **Waiting on others**: work waiting on someone other than you or Claude.
+  Each item names who, as specifically as the reply allows (a session, agent,
+  branch, PR, CI run or person). A task handed to another session goes here,
+  even when you're the one relaying it.
+- **Blocked**: obstacles that are nobody's task: rate or usage limits, failing
+  tools or services, denied permissions, missing access.
 - **Done**: what this turn finished.
 
-One call covers all three lists, so switching between them never calls the
+One call covers all five lists, so switching between them never calls the
 model again. Digests are cached per turn for the session.
 
 Every view is stamped with when Claude finished the original reply (with the
@@ -27,7 +36,7 @@ The `inline` button cycles three modes. Replace is the default:
 
 - **off**: replies draw as usual.
 - **callout**: a strip under each answer shows the headline, the list counts
-  and anything that needs you, plus `open in lens ›`.
+  anything that needs you and anything blocked, plus `open in lens ›`.
 - **replace**: each answer becomes one box. It holds the headline and the
   lists, the purpose buttons, `show original` and `open in lens ›`. The box
   stays the same size and place whether it is still sorting, showing the lists
@@ -36,16 +45,26 @@ The `inline` button cycles three modes. Replace is the default:
 
 ### In the side pane
 
-`/lens [all|progress|blocked|done]` opens a pane with:
+`/lens [all|progress|needs|waiting|blocked|done]` opens a pane with:
 
 - **Session so far**: what's still open after the latest turn, and what got
   done across the session.
 - **The focused turn**: the turn in full, with `original` to swap in Claude's
   reply.
-- **Nearby turns**: as headlines, with `✋ n` when they're waiting on you.
+- **Nearby turns**: as headlines, with `✋ n` when they're waiting on you and
+  `⛔ n` when they're blocked.
 
-Keys while the pane has focus: `a`/`1`/`2`/`3` choose the list, `n` cycles the
+Keys while the pane has focus: `a`/`1`–`5` choose the list, `r` retries the
+focused turn's summary, `n` cycles the
 inline mode, `o` toggles the original, and `k`/`j`/`l` move between turns.
+
+### When a summary fails
+
+A summary that fails (the model call errors or times out, or its answer can't
+be read) shows `↻`, inline and in the pane, next to the error. Inline
+replies never retry on their own, so a rate limit isn't hammered; the pane
+retries what it shows each time it refreshes. A summary still `sorting…`
+after 75 seconds was lost (a reload mid-call, say) and gets the button too.
 
 ## Notes
 

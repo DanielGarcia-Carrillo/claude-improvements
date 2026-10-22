@@ -1,4 +1,4 @@
-export type Bucket = 'progress' | 'blocked' | 'done'
+export type Bucket = 'progress' | 'needs' | 'waiting' | 'blocked' | 'done'
 
 export type Purpose = 'all' | Bucket
 
@@ -16,10 +16,11 @@ export type Turn = {
   at?: number
 }
 
-/** A turn (or the session) sorted: a headline and what is in progress, needs the person, or got done. */
+/** A turn (or the session) sorted: a headline and what is in progress, needs the person, waits on others, is blocked, or got done. */
 export type Digest = { headline: string } & Record<Bucket, string[]>
 
-export type View = { status: 'pending' | 'done' | 'error'; text: string; digest?: Digest }
+/** `since`: when a pending call started, so one lost to a reload can be retried. */
+export type View = { status: 'pending' | 'done' | 'error'; text: string; digest?: Digest; since?: number }
 
 declare module 'claude-code' {
   interface PluginState {
