@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "ESNext.Temporal", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "vite-plugin-pwa/react"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src"],
+  // The service worker runs in a different global scope; tsconfig.sw.json
+  // checks it against the WebWorker library instead of the DOM.
+  "exclude": ["src/sw.ts"]
+}
