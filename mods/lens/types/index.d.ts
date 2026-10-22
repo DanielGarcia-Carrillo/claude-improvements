@@ -32,6 +32,8 @@ declare module 'claude-code' {
       isOpen: boolean
       inline: InlineMode
       expanded: string[]
+      /** Turns whose inline reply the person asked to see sorted. */
+      lensed: string[]
     }
   }
 }

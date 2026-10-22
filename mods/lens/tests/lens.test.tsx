@@ -156,10 +156,10 @@ test('callout: the headline under the answer, with what needs the person or the 
   expect(await step.find({ key: 'lens-t2' })).toBeUndefined()
 })
 
-test('replace mode swaps the answer for the lists, folds the steps, and expands on demand', async ($, on) => {
+test('replace mode draws the original, sorts only once a list is picked, and flips back', async ($, on) => {
   const transcript: SessionMessage[] = []
   const clock = engine(on, transcript)
-  model(on, { progress: ['wire the flag'], needs: ['pick a default theme'] })
+  const asked = model(on, { progress: ['wire the flag'], needs: ['pick a default theme'] })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   transcript.push({ role: 'user', text: 'Ship the toggle', toolUses: [] })
@@ -167,8 +167,7 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   transcript.push({ role: 'assistant', text: 'The toggle ships behind a flag.', toolUses: [] })
   await answerTurn($, 't1', 'Ship the toggle', 'The toggle ships behind a flag.')
 
-  // Replace is the default; show what needs the person.
-  await lens($, 'needs')
+  // Replace is the default.
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await pane.find({ key: 'inline', text: /inline: replace/ })).toBeDefined()
 
@@ -178,43 +177,47 @@ test('replace mode swaps the answer for the lists, folds the steps, and expands 
   const step = await draw('a', 'Reading Settings.tsx first.\nThen the tests.')
   expect(await shows(step, /^· Reading Settings\.tsx first\.$/)).toBe(true)
 
-  await clock.advance(1000)
+  // The original, with the lists on offer and no model call made for them.
   const answer = await draw('b', 'The toggle ships behind a flag.')
-  expect(await shows(answer, /Lens · needs you/)).toBe(true)
-  expect(await shows(answer, /pick a default theme/)).toBe(true)
-  expect(await shows(answer, /wire the flag/)).toBe(false)
-  expect(await shows(answer, /ships behind a flag/)).toBe(false)
+  await clock.advance(2000)
+  expect(asked.length).toBe(0)
+  expect(await shows(answer, /Lens · original/)).toBe(true)
+  expect(await shows(answer, /ships behind a flag/)).toBe(true)
+  expect(await answer.find({ key: 'orig-t1' })).toBeUndefined()
+  for (const id of ['all', 'progress', 'needs', 'waiting', 'blocked', 'done']) {
+    expect((await answer.find({ key: `ru-t1-${id}` }))?.props.variant).toBe('secondary')
+  }
 
-  expect(await shows(answer, /Lens headline for Ship the toggle/)).toBe(true)
+  // Picking a list sorts the reply, once, and shows that list in place of the original.
+  await answer.press({ key: 'ru-t1-needs' })
+  expect(asked.length).toBe(1)
+  const sorted = await draw('c', 'The toggle ships behind a flag.')
+  expect(await shows(sorted, /Lens · needs you/)).toBe(true)
+  expect(await shows(sorted, /Lens headline for Ship the toggle/)).toBe(true)
+  expect(await shows(sorted, /pick a default theme/)).toBe(true)
+  expect(await shows(sorted, /wire the flag/)).toBe(false)
+  expect(await shows(sorted, /ships behind a flag/)).toBe(false)
+  expect((await sorted.find({ key: 'ru-t1-needs' }))?.props.variant).toBe('primary')
 
   // Flipping keeps the box and its header; only the body and the button's label change.
-  await answer.press({ key: 'orig-t1' })
-  const opened = await draw('c', 'The toggle ships behind a flag.')
+  await sorted.press({ key: 'orig-t1' })
+  const opened = await draw('d', 'The toggle ships behind a flag.')
   expect(await shows(opened, /Lens · original/)).toBe(true)
   expect(await shows(opened, /ships behind a flag/)).toBe(true)
   expect(await shows(opened, /pick a default theme/)).toBe(false)
   expect(await opened.find({ key: 'orig-t1', text: /show lens view/ })).toBeDefined()
   expect(await opened.find({ key: 'lens-t1' })).toBeDefined()
-
-  // With the original showing, the purpose buttons are unselected, dim and inert.
-  for (const id of ['all', 'progress', 'needs', 'waiting', 'blocked', 'done']) {
-    const button = await opened.find({ key: `ru-t1-${id}` })
-    expect(button?.props.variant).toBe('secondary')
-    expect(button?.props.dimColor).toBe(true)
-  }
-  await opened.press({ key: 'ru-t1-done' })
-  const still = await draw('c2', 'The toggle ships behind a flag.')
-  expect(await shows(still, /ships behind a flag/)).toBe(true)
-  expect((await still.find({ key: 'ru-t1-needs' }))?.props.dimColor).toBe(true)
-
-  // The pane's purpose buttons, in the box: they refilter every reply, the chosen one primary.
   await opened.press({ key: 'orig-t1' })
+  expect(await shows(await draw('e', 'The toggle ships behind a flag.'), /pick a default theme/)).toBe(true)
+
+  // Another list refilters from the same digest.
   await opened.press({ key: 'ru-t1-progress' })
-  const progress = await draw('d', 'The toggle ships behind a flag.')
+  const progress = await draw('f', 'The toggle ships behind a flag.')
   expect(await shows(progress, /Lens · in progress/)).toBe(true)
   expect(await shows(progress, /wire the flag/)).toBe(true)
   expect((await progress.find({ key: 'ru-t1-progress' }))?.props.variant).toBe('primary')
   expect((await progress.find({ key: 'ru-t1-all' }))?.props.variant).toBe('secondary')
+  expect(asked.length).toBe(1)
 })
 
 test('reads a digest even when the model fences it, and refuses one with no headline', () => {
@@ -389,8 +392,8 @@ test('a failed digest offers a retry, inline and in the pane', async ($, on) => 
   const draw = (requestId: string) =>
     $.ui.mount({ plugin: 'lens', surface: 'desktop', component: 'AssistantMessage', requestId, props: { text: 'The toggle shipped behind a flag.', isFirstOfReply: true } })
 
-  await draw('a')
-  await clock.advance(1000)
+  // Picking a list asks for the digest; it fails.
+  await (await draw('a')).press({ key: 'ru-t1-all' })
   const failed = await draw('b')
   expect(await shows(failed, /couldn't summarize/)).toBe(true)
   // The timer leaves a failed digest alone: only the button retries it.
