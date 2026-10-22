@@ -95,13 +95,15 @@ one, else `$TMPDIR`). Every field is a string unless shown otherwise:
 - `architecture` is the 4 to 8 key choices, one line each, from the defaults
   table as changed.
 
-Check the file with `node SCRIPT scaffold --answers FILE --target DIR --dry-run`.
-It reports every problem at once, each naming its fix; fix the file and rerun
-until it passes.
+Check the file with
+`node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES --dry-run`.
+Always pass `--baselines`: the script's own default only holds in a
+claude-improvements checkout, not an installed copy. It reports every problem
+at once, each naming its fix; fix the file and rerun until it passes.
 
 ## 4. Scaffold
 
-`node SCRIPT scaffold --answers FILE --target DIR` copies
+`node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES` copies
 `general/files/` and the stack's `template/`, renames the placeholders (each
 spells "replace me": web `replace-me`, `Replace Me`, `ReplaceMe` and the
 `Replace me: …` description; Rust the `replace-me` crates, folders and
