@@ -12,7 +12,7 @@ under Rolldown.
 |---|---|---|
 | Before launch | With an API Worker: Workers Logs and Issues (`"observability": { "enabled": true, "issues": { "enabled": true } }` and `"upload_source_maps": true` in `wrangler.jsonc`). Free, no bundle cost | `tracing` to stderr with `RUST_LOG` (already in the template) |
 | At launch | Sentry for browser errors only, loaded lazily and tunnelled through your own Worker; Cloudflare Web Analytics for traffic and Web Vitals | `human-panic` once binaries are released: a local crash report, nothing sent |
-| On a specific question | PostHog (cookieless) for funnels, retention or replay; `web-vitals` beaconed to Workers Analytics Engine for per-route vitals that ad blockers can't drop; OpenTelemetry export to Axiom or Honeycomb for longer Worker retention | Opt-in telemetry only, recorded in an ADR, off by default |
+| On a specific question | PostHog (cookieless) for funnels, retention or replay; `web-vitals` beaconed to Workers Analytics Engine for per-route vitals that ad blockers can't drop; OpenTelemetry export to Axiom or Honeycomb for longer Worker retention. Each is an ADR, with a privacy review | Opt-in telemetry only, recorded in an ADR, off by default |
 
 ## The options
 

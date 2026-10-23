@@ -1,7 +1,7 @@
 # Visual regression (exploration)
 
-Status: **built-in screenshot assertions for now; a dedicated in-house tool
-is planned.** Checked on 2026-10-20.
+Status: **PR screenshots for now; a dedicated in-house tool is planned.**
+Checked on 2026-10-20.
 
 ## The plan
 

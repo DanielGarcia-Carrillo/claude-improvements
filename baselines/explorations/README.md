@@ -10,7 +10,7 @@ need a line live in the stack READMEs' "Instead, when" columns
 |---|---|---|
 | [Renovate](renovate/README.md) | Dependabot | Dependabot can't handle pnpm 12 lockfiles, or hand-bumping `mise.toml` keeps getting missed |
 | [UI primitives](ui-primitives.md) | Native elements | A project needs a widget the platform lacks (menu, combobox, date picker); Astryx re-evaluated and not adopted |
-| [Visual regression](visual-regression.md) | Built-in screenshot assertions | The in-house visual regression tool has a usable release |
+| [Visual regression](visual-regression.md) | PR screenshots | The in-house visual regression tool has a usable release |
 | [Blacksmith](blacksmith.md) | GitHub-hosted runners | A private repo pays for Actions minutes: pilot one repo in an organisation on Team, then set `CI_RUNNER` for the rest |
 | [Observability](observability.md) | Nothing in the browser; Workers Logs and Issues once there is an API Worker | Launch: Sentry for browser errors (lazy, tunnelled) and Cloudflare Web Analytics |
 | [tsrs](tsrs.md) | TypeScript 7's `tsc` | It has a stable release against TypeScript 7.1 and a project's typecheck gets slow |
