@@ -34,7 +34,8 @@ every handoff and never hand off red.
   `Add offline banner (PER-12)`. A refactor and a behaviour change are
   separate commits.
 - **PRs**: one branch each, title carries the key, body has the `Linear:`
-  (or `Closes #n`) line and how it was verified ([template](.github/pull_request_template.md)).
+  (or `Closes #n`) line, how it was verified and, for a visible change, a
+  representative screenshot ([template](.github/pull_request_template.md)).
   Open as draft. <Who may push, mark ready and merge.>
 - **Provenance**: whatever an agent posts to a service (PR bodies, review
   replies, issue comments, chat messages) ends with a line naming the agent,
@@ -48,8 +49,10 @@ every handoff and never hand off red.
 
 1. Read the issue and any ADR it touches. Ask before building if the
    acceptance criteria are unclear.
-2. If the change is awkward in the current shape, refactor first: tests
-   green, separate commit (ideally a separate PR).
+2. If the change is awkward in the current shape, refactor first, in a
+   separate commit (ideally a separate PR) where the existing tests pass with
+   their assertions unchanged. Rewriting or removing tests comes after, in
+   its own change.
 3. Make the change with its tests. A bug fix starts with a test that
    reproduces it.
 4. Run verify. Fix every failure at its cause. Never silence a lint, skip a

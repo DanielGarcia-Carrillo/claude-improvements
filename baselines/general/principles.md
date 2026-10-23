@@ -76,7 +76,11 @@ code) or removes a choice nobody should be making by hand.
 - **Refactor before behaviour changes.** When a change is awkward, first land
   a pure refactor that keeps every test green, then the behaviour change on
   top. Two commits at least, ideally two PRs. Reviewers can then read the
-  behaviour change on its own.
+  behaviour change on its own. The refactor keeps the existing tests and
+  their assertions (only imports may move): their passing unchanged is what
+  shows nothing broke. Rewriting or deleting tests, even the fragile ones
+  that prompted the refactor, belongs to the follow-up, which says why they
+  had to go.
 - **Small PRs.** One issue per branch, one branch per PR, stacked when they
   depend on each other. Aim for a diff a reviewer reads in one sitting
   (a few hundred lines of non-generated change). Split by layer or by
@@ -90,12 +94,18 @@ code) or removes a choice nobody should be making by hand.
   suit parsers and pure transforms. Write no production or test code for
   states the types rule out; if a state seems possible, make it
   unrepresentable instead.
+- **A UI has visual regression tests.** Behaviour tests stay green while a
+  layout breaks; screenshots compared with `main`'s catch it. The
+  [web baseline](../web/README.md) and
+  [explorations/visual-regression.md](../explorations/visual-regression.md)
+  say how.
 - **Tests are production code.** Same naming, typing and review bar. Shared
   setup lives in fixtures, builders and page objects, not copy-paste. A test
   states one behaviour and fails with a message that says which.
 - **Decisions are written down.** A choice that shapes the codebase (a
   framework, a storage format, a public contract) gets an ADR in
-  `docs/adr/NNNN-<slug>.md`: context, decision, alternatives, consequences.
+  `docs/adr/NNNN-<slug>.md`: context, decision, alternatives, consequences,
+  and a Mermaid diagram when it changes structure, a flow or a state machine.
   Supersede with a new record rather than editing an accepted one.
   [`files/docs/adr/0000-template.md`](files/docs/adr/0000-template.md) is the
   shape.

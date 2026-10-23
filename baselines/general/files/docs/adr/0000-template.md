@@ -13,6 +13,17 @@ Facts with dates where they will age (versions, prices, support tables).
 
 What we will do, stated so an agent can follow it without reading the rest.
 
+When the decision changes structure, data flow, a boundary, a sequence or a
+state machine, draw it in Mermaid (`flowchart`, `sequenceDiagram`,
+`stateDiagram-v2`); GitHub renders it and review diffs it as text. Leave it
+out when there is nothing to draw, such as a formatter choice.
+
+```mermaid
+flowchart LR
+  client[Client] -->|request| api[API]
+  api --> store[(Store)]
+```
+
 ## Alternatives considered
 
 - **<Option>**: why not, in one or two lines.

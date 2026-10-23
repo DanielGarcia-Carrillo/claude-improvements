@@ -1,8 +1,9 @@
 # Architecture decision records
 
-One file per decision: context, decision, alternatives, consequences
-([template](0000-template.md)). Numbers are stable. Supersede a decision
-with a new record rather than editing an accepted one.
+One file per decision: context, decision, alternatives, consequences, and
+a Mermaid diagram where one helps ([template](0000-template.md)). Numbers
+are stable. Supersede a decision with a new record rather than editing an
+accepted one.
 
 | # | Decision |
 |---|---|

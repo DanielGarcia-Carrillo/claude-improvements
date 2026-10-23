@@ -51,9 +51,9 @@ Each stack README ends with its sources, and
   so Claude Code does not load them as instructions while working in this
   repo. The templates' `.claude/settings.json` and workflows are inert here
   for the same reason: only a repo root's copies take effect.
-- Both templates passed their full verify from a fresh copy on 2026-10-20
-  (web: `pnpm verify`, 20 unit and story tests plus 5 end-to-end; Rust:
-  `just verify`, 8 tests plus doctests, cargo-deny, cargo-shear). Re-run
+- Both templates passed their full verify from a fresh copy on 2026-10-23
+  (web: `pnpm verify`, 47 unit and story tests plus 7 end-to-end; Rust:
+  `just verify`, 19 tests plus a doctest, cargo-deny, cargo-shear). Re-run
   that check when changing a template: copy it to a scratch directory,
   install, verify.
 - Versions, prices and "still beta" notes are dated. When a decision rests
