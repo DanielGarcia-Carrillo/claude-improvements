@@ -265,6 +265,43 @@ test('renames the Rust crates, folders and identifiers', async () => {
   expect(leftoverPlaceholders([cli, core, snapshot, manifest])).toEqual([])
 })
 
+test('answers holding $ patterns land as written', async () => {
+  // A replacement string would turn these into `$`, the match, or the text before or after it.
+  const name = "Save $$ $& $` $'"
+  const description = "Costs $$, $& or $` and $' at most."
+  const web = webAnswers({ name, shortName: "$' $$", description })
+  const vite = renameFile(
+    {
+      path: 'vite.config.ts',
+      text: "name: 'Replace Me',\nshort_name: 'ReplaceMe',\ndescription: 'Replace me: a one-line description',",
+    },
+    web,
+  )
+  // Each holds a single quote, so takes double quotes.
+  expect(vite.text).toBe(`name: "${name}",\nshort_name: "$' $$",\ndescription: "${description}",`)
+  const html = renameFile(
+    {
+      path: 'index.html',
+      text: '<meta name="description" content="Replace me: a one-line description" />\n<title>Replace Me</title>',
+    },
+    web,
+  )
+  expect(html.text).toBe(
+    "<meta name=\"description\" content=\"Costs $$, $&amp; or $` and $' at most.\" />\n<title>Save $$ $&amp; $` $'</title>",
+  )
+  expect(leftoverPlaceholders([vite, html])).toEqual([])
+
+  for (const repository of ['https://example.com/r/$$-tool', 'https://example.com/r/$&-tool', "https://example.com/r/$'-tool"]) {
+    const rust = parseAnswers({ ...webAnswers(), stack: 'rust', slug: 'line-width', repository })
+    const manifest = renameFile(
+      { path: 'Cargo.toml', text: 'repository = "https://github.com/replace-me-owner/replace-me"\nname = "replace-me"' },
+      rust,
+    )
+    expect(manifest.text).toBe(`repository = "${repository}"\nname = "line-width"`)
+    expect(leftoverPlaceholders([manifest])).toEqual([])
+  }
+})
+
 test('flags every spelling of the placeholder that no rename covers', async () => {
   const answers = webAnswers()
   const files = [
