@@ -159,20 +159,26 @@ export function rustStableVersion(manifest: string): string {
 }
 
 /**
- * Pins the toolchain file's channel to `version`, and the workspace's
- * `rust-version` to its minor: a binary-only tool's MSRV is the pinned
- * channel. Throws when either line has moved, so a bump never half lands.
+ * Pins the toolchain file's channel to `version`. The workspace's
+ * `rust-version` moves to its minor only while it equals the old channel's:
+ * a binary-only tool's MSRV is the pinned channel, but an older one, such as
+ * a published library's, was set on purpose and stays. Throws when either
+ * line has moved, so a bump never half lands.
  */
 export function pinRust(files: { toolchain: string; cargo: string }, version: string) {
-  const minor = version.split('.').slice(0, 2).join('.')
-  const pin = (text: string, key: string, value: string, file: string) => {
-    const line = new RegExp(`^${key} = "[^"]*"`, 'm')
-    if (!line.test(text)) throw new Error(`${file} has no \`${key} = "…"\` line to bump.`)
-    return text.replace(line, `${key} = "${value}"`)
+  const minor = (release: string) => release.split('.').slice(0, 2).join('.')
+  const line = (key: string) => new RegExp(`^${key} = "([^"]*)"`, 'm')
+  const current = (text: string, key: string, file: string) => {
+    const value = line(key).exec(text)?.[1]
+    if (value === undefined) throw new Error(`${file} has no \`${key} = "…"\` line to bump.`)
+    return value
   }
+  const channel = current(files.toolchain, 'channel', 'rust-toolchain.toml')
+  const msrv = current(files.cargo, 'rust-version', 'Cargo.toml')
+  const pin = (text: string, key: string, value: string) => text.replace(line(key), `${key} = "${value}"`)
   return {
-    toolchain: pin(files.toolchain, 'channel', version, 'rust-toolchain.toml'),
-    cargo: pin(files.cargo, 'rust-version', minor, 'Cargo.toml'),
+    toolchain: pin(files.toolchain, 'channel', version),
+    cargo: msrv === minor(channel) ? pin(files.cargo, 'rust-version', minor(version)) : files.cargo,
   }
 }
 

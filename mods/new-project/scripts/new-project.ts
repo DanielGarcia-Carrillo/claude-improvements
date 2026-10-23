@@ -2,7 +2,7 @@
  * /new-project's hands. Node 23.6 or later runs it as is.
  *
  *   node new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run]
- *   node new-project.ts setup DIR [--keep-versions]
+ *   node new-project.ts setup DIR [--stack web|rust] [--keep-versions]
  *
  * `scaffold` checks the answers against the baselines, then copies
  * `general/files/` and the stack's `template/` into DIR (new, or empty but
@@ -12,7 +12,10 @@
  *
  * `setup` installs the stack's toolchain and dependencies in DIR, takes new
  * majors (`--keep-versions` skips that, after reverting one that broke), and
- * runs its verify command, stopping at the first step that fails.
+ * runs its verify command, stopping at the first step that fails. `--stack`
+ * names the stack; without it, setup infers it from package.json or
+ * Cargo.toml, and refuses a folder that holds both (a Rust tool with an npm
+ * wrapper does).
  */
 import { spawnSync } from 'node:child_process'
 import {
@@ -222,15 +225,26 @@ function scaffold(options: { answers: string; target: string; baselines: string;
   console.log(
     [
       `Scaffolded the ${stack} baseline into ${target}: ${plan.length} paths, ${git}.`,
-      `Next: node ${shellQuote(join(HERE, 'new-project.ts'))} setup ${shellQuote(target)}`,
+      `Next: node ${shellQuote(join(HERE, 'new-project.ts'))} setup ${shellQuote(target)} --stack ${stack}`,
     ].join('\n'),
   )
 }
 
-function stackOf(dir: string): Stack {
-  const found = (Object.keys(STACKS) as Stack[]).filter(stack => existsSync(join(dir, STACKS[stack].marker)))
-  if (found.length !== 1)
-    throw new UsageError(`${dir} holds ${found.length === 0 ? 'neither' : 'both'} package.json and Cargo.toml; which baseline is it?`)
+/** The stack `--stack` names, once `dir` holds its marker; without it, the one stack whose marker `dir` holds. */
+function stackOf(dir: string, named: string | undefined): Stack {
+  const stacks = Object.keys(STACKS) as Stack[]
+  if (named !== undefined) {
+    const stack = stacks.find(s => s === named)
+    if (stack === undefined) throw new UsageError(`--stack must be ${stacks.join(' or ')}, not "${named}".`)
+    const { marker } = STACKS[stack]
+    if (!existsSync(join(dir, marker)))
+      throw new UsageError(`--stack ${stack} needs ${marker}, which ${dir} does not hold; name the folder scaffold wrote and its stack.`)
+    return stack
+  }
+  const found = stacks.filter(stack => existsSync(join(dir, STACKS[stack].marker)))
+  if (found.length === 0) throw new UsageError(`${dir} holds neither package.json nor Cargo.toml; name the folder scaffold wrote.`)
+  if (found.length > 1)
+    throw new UsageError(`${dir} holds both package.json and Cargo.toml; pass --stack rust or --stack web to name its baseline.`)
   return found[0] as Stack
 }
 
@@ -253,8 +267,9 @@ function bumpMiseTools(dir: string): string | undefined {
 }
 
 /**
- * Pins rust-toolchain.toml and `rust-version` to the current stable, then
- * installs it as CI does. Resolves with what went wrong, if anything.
+ * Pins rust-toolchain.toml to the current stable, and `rust-version` with it
+ * when it tracks the channel, then installs it as CI does. Resolves with what
+ * went wrong, if anything.
  */
 async function bumpRustToolchain(dir: string): Promise<string | undefined> {
   let version: string
@@ -287,9 +302,9 @@ const BUMPS = {
   'rust-toolchain': 'pin rust-toolchain.toml to the current stable',
 } as const
 
-async function setup(dirArgument: string, keepVersions: boolean): Promise<number> {
+async function setup(dirArgument: string, named: string | undefined, keepVersions: boolean): Promise<number> {
   const dir = resolve(expandHome(dirArgument))
-  const stack = stackOf(dir)
+  const stack = stackOf(dir, named)
   const { manifests, verify } = STACKS[stack]
   const steps: readonly Step[] = STACKS[stack].steps
   const readManifests = () => manifests.map(path => readFileSync(join(dir, path), 'utf8'))
@@ -345,6 +360,7 @@ async function main(argv: string[]): Promise<number> {
       target: { type: 'string' },
       baselines: { type: 'string', default: BESIDE_THE_MOD },
       'dry-run': { type: 'boolean', default: false },
+      stack: { type: 'string' },
       'keep-versions': { type: 'boolean', default: false },
     },
   })
@@ -362,9 +378,9 @@ async function main(argv: string[]): Promise<number> {
   if (command === 'setup') {
     const [dir] = positionals
     if (dir === undefined) throw new UsageError('setup needs the new repo folder: setup DIR.')
-    return setup(dir, values['keep-versions'])
+    return setup(dir, values.stack, values['keep-versions'])
   }
-  throw new UsageError('Usage: new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run] | setup DIR [--keep-versions]')
+  throw new UsageError('Usage: new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run] | setup DIR [--stack web|rust] [--keep-versions]')
 }
 
 try {
