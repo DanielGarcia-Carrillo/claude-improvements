@@ -17,15 +17,15 @@ cleanupOutdatedCaches()
 
 // Take control of open pages as soon as this worker activates. On first
 // install that makes the app offline-ready without a reload; an update only
-// activates once the user accepts it (below), and the page reloads then anyway.
+// activates once the user accepts it (below), and open pages reload then anyway.
 clientsClaim()
 
 // Every in-app navigation gets the precached shell, so the app opens offline.
 // Paths the Worker or Cloudflare answer (the API, /cdn-cgi/) are not the app.
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/api\//, /^\/cdn-cgi\//] }))
 
-// The page asks before a new worker takes over (see UpdatePrompt), so a user
-// never has the app swapped out from under unsaved state.
+// A new worker waits until the user accepts the update in a page (see
+// UpdatePrompt, which says what happens to the app's other open tabs).
 self.addEventListener('message', (event) => {
   const data: unknown = event.data
   if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'SKIP_WAITING') {

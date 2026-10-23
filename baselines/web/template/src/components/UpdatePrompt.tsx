@@ -9,8 +9,12 @@ const UPDATE_CHECK_MS = 60 * 60 * 1000
 
 /**
  * Registers the service worker and, when a new one is waiting, asks before
- * it takes over, so nobody loses unsaved state to a silent reload. The live
- * region is always mounted so screen readers announce the prompt.
+ * it takes over. Accepting reloads every open tab of the app, not just this
+ * one: that is vite-plugin-pwa's default, and it keeps any tab from running
+ * old code against the new precache, which no longer has the old chunks. A
+ * project whose other tabs can hold unsaved state can pass `onNeedReload` to
+ * prompt there instead, and then has to cope with chunks failing to load.
+ * The live region is always mounted so screen readers announce the prompt.
  */
 export function UpdatePrompt() {
   const {
