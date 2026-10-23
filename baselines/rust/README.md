@@ -17,14 +17,14 @@ Versions and statuses were checked on 2026-10-20.
    placeholder spells "replace me": `replace-me` in the crate folders,
    package names, `[workspace.dependencies]`, the CLI test and `repository`
    in `Cargo.toml`, and `replace_me_core` in `use` paths.
-   `git grep -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
+   `git grep --untracked -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
    fails while any remain.
 3. `mise install && cargo generate-lockfile`. Requirements like `"4.6.7"`
    are carets (`^4.6.7`), and the template has no lockfile, so this resolves
    the newest compatible releases.
 4. Take new majors too: set `rust-toolchain.toml` to the current stable
-   (`rustup check`; not `mise up`, which also upgrades and uninstalls global
-   tools), run `cargo upgrade --incompatible` (from cargo-edit),
+   (`rustup check`; not `mise up`, which also upgrades global tools and
+   prunes the versions it replaces), run `cargo upgrade --incompatible` (from cargo-edit),
    then `just verify`. If a major breaks verify, revert that one and note it
    in the stack ADR. Commit `Cargo.lock`: this is a binary.
 5. Build `CLAUDE.md` from [`CLAUDE.template.md`](../general/CLAUDE.template.md)

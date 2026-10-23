@@ -3,8 +3,16 @@
   "permissions": {
     "deny": [
       "Bash(git commit --no-verify *)",
+      "Bash(git commit * --no-verify)",
+      "Bash(git commit * --no-verify *)",
+      "Bash(git commit -n*)",
       "Bash(git push --force *)",
+      "Bash(git push * --force)",
+      "Bash(git push * --force *)",
       "Bash(git push -f *)",
+      "Bash(git push * -f)",
+      "Bash(git push * -f *)",
+      "Bash(git push * +*)",
       "Bash(cargo publish *)"
     ]
   },

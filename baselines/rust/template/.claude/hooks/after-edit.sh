@@ -4,6 +4,7 @@
 set -euo pipefail
 
 file=$(jq -r '.tool_input.file_path // empty')
-case "$file" in
-  "$CLAUDE_PROJECT_DIR"/*.rs) rustfmt --config-path "$CLAUDE_PROJECT_DIR/rustfmt.toml" "$file" ;;
+# On Windows the path arrives with backslashes, even under Git Bash.
+case "${file//\\//}" in
+  "${CLAUDE_PROJECT_DIR//\\//}"/*.rs) rustfmt --config-path "$CLAUDE_PROJECT_DIR/rustfmt.toml" "$file" ;;
 esac
