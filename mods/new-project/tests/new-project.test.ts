@@ -152,6 +152,10 @@ test('reports every answer problem at once', async () => {
   // A quote or backslash would break Cargo.toml's quoted `repository`.
   for (const repository of ['https://github.com/o/r"bad', 'https://github.com/o/r\\x'])
     expect(problemsOf({ ...webAnswers(), repository }).some(p => p.startsWith('`repository`'))).toBe(true)
+  // URL characters that spell no URL with a host.
+  for (const repository of ['https://?', 'https://'])
+    expect(problemsOf({ ...webAnswers(), repository }).some(p => p.startsWith('`repository`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), repository: 'https://github.com/owner/name' })).toEqual([])
   expect(problemsOf(webAnswers())).toEqual([])
 })
 

@@ -220,9 +220,12 @@ export function parseAnswers(raw: unknown): Answers {
   const consequences = text('consequences')
 
   const repository = text('repository', stack !== 'rust')
-  // URL characters only: the value lands inside a quoted TOML string.
-  if (repository !== undefined && !/^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(repository))
-    problems.push('`repository` must be an https URL, such as https://github.com/owner/name, without quotes, backslashes or spaces.')
+  // URL characters only: the value lands inside a quoted TOML string. They
+  // also spell non-URLs such as `https://?`, so it must parse, with a host.
+  const isUrl = (url: string) =>
+    /^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(url) && URL.canParse(url) && new URL(url).hostname !== ''
+  if (repository !== undefined && !isUrl(repository))
+    problems.push('`repository` must be an https URL with a host, such as https://github.com/owner/name, without quotes, backslashes or spaces.')
 
   const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer'])
   const changed = list<ChangedDefault>('changed', ['area', 'to', 'why'], true)
