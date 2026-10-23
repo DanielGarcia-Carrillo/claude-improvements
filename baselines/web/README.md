@@ -116,9 +116,10 @@ for an ADR, not a default), TanStack Pacer (beta; a debounce plus
    `export type AppType = typeof routes`: the client only infers routes it
    can see in that type.
    Start it with `secureHeaders()` (`_headers` never applies to Worker
-   responses), `bodyLimit({ maxSize: 64 * 1024 })`, `csrf()` and a
-   rate-limit check (`await env.API_LIMIT.limit({ key })`, keyed by user or
-   IP). Authenticate before touching D1, R2, KV or AI, and send
+   responses), `bodyLimit({ maxSize: 64 * 1024 })`, `csrf()` and a rate
+   limit: `const { success } = await env.API_LIMIT.limit({ key })`, keyed by
+   user or IP, answering 429 when `success` is false. Authenticate before
+   touching D1, R2, KV or AI, and send
    `Cache-Control: no-store` on authenticated responses.
 3. In `wrangler.jsonc` add `"main": "worker/index.ts"`,
    `"assets": { …, "run_worker_first": ["/api/*"] }`, and the guards a
@@ -154,7 +155,9 @@ per-subset CSS, and importing the package emits every subset into the
 precache, so declare the Latin file yourself in `src/index.css`. One
 `@font-face` for `'<Family> Variable'`, whose `src` is
 `url('@fontsource-variable/<family>/files/<family>-latin-wght-normal.woff2')`
-(Vite resolves the package path), and one for a metric-matched
+(Vite resolves the package path) and whose `font-weight` is the family's
+weight range (`100 900` for Inter; without it, bold is synthesised from the
+regular weight). Then one for a metric-matched
 `'<Family> Fallback'` (`src: local('Arial')` with `size-adjust` and
 `ascent-override`). Put both first in `font.body` in `tokens.stylex.ts`.
 `woff2` is already in the precache glob, so the font works offline.
