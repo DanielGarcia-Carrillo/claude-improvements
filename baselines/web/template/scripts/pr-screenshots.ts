@@ -136,7 +136,11 @@ function section({ changes, removed, mainExists, commit }: ReturnType<typeof pub
     `<img src="${server}/${repo}/blob/${commit}/${path}?raw=true" alt="${alt}" width="360">`
   const lines = ['## Screenshots', '']
   if (changes.length === 0) {
-    lines.push(`No visual changes against \`main\` at \`${sha}\`.`)
+    lines.push(
+      removed.length > 0
+        ? `No remaining capture differs from \`main\` at \`${sha}\`.`
+        : `No visual changes against \`main\` at \`${sha}\`.`,
+    )
   } else {
     lines.push(
       `${changes.length} ${changes.length === 1 ? 'capture differs' : 'captures differ'} from \`main\` at \`${sha}\` ` +
