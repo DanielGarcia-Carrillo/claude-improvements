@@ -1,0 +1,26 @@
+node_modules/
+dist/
+storybook-static/
+coverage/
+*.tsbuildinfo
+
+# Playwright and Vitest output, and `pnpm screenshots`
+screenshots/
+test-results/
+playwright-report/
+blob-report/
+.vitest/
+.vitest-attachments/
+
+# TanStack Router plugin scratch space
+.tanstack/
+
+# Cloudflare local state and local secrets (Vite and Wrangler both read .env)
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+
+.DS_Store

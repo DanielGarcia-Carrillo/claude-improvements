@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "replace-me",
+  "compatibility_date": "2026-10-20",
+  // Static assets only. To add an API, add "main": "worker/index.ts" (Hono)
+  // and "run_worker_first": ["/api/*"]; see the web baseline README.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+}

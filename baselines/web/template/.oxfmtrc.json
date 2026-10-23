@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "semi": false,
+  "singleQuote": true,
+  "sortImports": {},
+  "sortPackageJson": true,
+  "ignorePatterns": ["dist", "storybook-static", "pnpm-lock.yaml", "src/routeTree.gen.ts"]
+}

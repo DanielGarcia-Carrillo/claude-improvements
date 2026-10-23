@@ -1,0 +1,25 @@
+# Read by Cloudflare at deploy time and never served, so it must stay out of
+# the precache (vite.config.ts lists precached extensions explicitly).
+# `vite preview` applies the `/*` block as well, so the e2e tests run under
+# this policy and fail on any violation (tests/e2e/fixtures.ts).
+
+/sw.js
+  Cache-Control: no-cache
+
+# Revalidated rather than `immutable`: StyleX can change a chunk without
+# changing its hashed name (facebook/stylex#1918). Return to
+# `public, max-age=31536000, immutable` once a StyleX release fixes it.
+/assets/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Same-origin everything. A third-party script, font or API needs its origin
+# added to the matching directive. COOP same-origin breaks sign-in popups; use
+# same-origin-allow-popups if one needs window.opener.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
