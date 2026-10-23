@@ -141,7 +141,13 @@ export default defineConfig(({ mode }) => ({
     projects: [
       {
         // A test that asserts nothing fails rather than passing vacuously.
-        test: { name: 'unit', environment: 'node', include: ['src/**/*.test.ts'], expect: { requireAssertions: true } },
+        // Hook tests run each hook as Claude Code would, with node and a payload.
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['src/**/*.test.ts', '.claude/hooks/**/*.test.ts'],
+          expect: { requireAssertions: true },
+        },
       },
       {
         // Every story renders in a real browser, runs its play function and
