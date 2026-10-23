@@ -108,6 +108,8 @@ An agent arriving cold must be able to find, without asking:
 - the commands (install, dev, verify, release) and which one gates a handoff;
 - where issues are filed, how branches, commits and PRs name them, and who
   merges;
+- how text an agent writes (commits, PRs, comments, messages) names the
+  agent that wrote it;
 - the definition of done (verify green, tests added, docs and ADRs updated);
 - the architectural choices and where their records are;
 - the traps: things that look safe and are not, each with its reason.

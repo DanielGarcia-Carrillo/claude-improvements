@@ -13,3 +13,5 @@ Linear: <!-- PER-12 https://linear.app/... With GitHub Issues, make this line "C
 ## Notes for review
 
 <!-- Departures from the issue, follow-ups filed, risky spots. Delete if none. -->
+
+<!-- Written by an agent? End with a line naming it, such as "🤖 Generated with [Claude Code](https://claude.com/claude-code)". -->

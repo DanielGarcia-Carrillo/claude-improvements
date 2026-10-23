@@ -36,6 +36,10 @@ every handoff and never hand off red.
 - **PRs**: one branch each, title carries the key, body has the `Linear:`
   (or `Closes #n`) line and how it was verified ([template](.github/pull_request_template.md)).
   Open as draft. <Who may push, mark ready and merge.>
+- **Provenance**: whatever an agent posts to a service (PR bodies, review
+  replies, issue comments, chat messages) ends with a line naming the agent,
+  such as `🤖 Generated with [Claude Code](https://claude.com/claude-code)`,
+  and its commits carry its `Co-Authored-By:` trailer.
 - **Done** means: verify green; tests cover the new behaviour; an ADR is
   added or superseded if a decision changed; this file is updated if a
   command, convention or trap changed.
