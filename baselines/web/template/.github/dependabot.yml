@@ -1,0 +1,28 @@
+# Dependabot keeps npm packages and the SHA-pinned Actions current.
+# Known gaps: pnpm is documented only up to v10 (this repo uses 12), and
+# mise.toml isn't read, so bump Node there by hand. Renovate covers both; see
+# baselines/explorations/renovate in claude-improvements.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # A new release waits three days before Dependabot proposes it.
+    cooldown:
+      default-days: 3
+    groups:
+      non-major:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ['*']
