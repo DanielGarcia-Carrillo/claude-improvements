@@ -14,3 +14,7 @@ them.
 - Push or open a PR only when Daniel asks. Never push to `main` directly.
 - Mods live under `mods/<name>/`. Before opening a PR, run
   `claude plugin validate mods/<name>` and `claude plugin test mods/<name>`.
+- `baselines/` holds starting points for new projects (principles, kickoff
+  questions, agent-file skeletons, web and Rust templates); start at
+  [baselines/README.md](baselines/README.md). After changing a template,
+  copy it to a scratch directory and run its verify command there.
