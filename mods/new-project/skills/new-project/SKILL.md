@@ -139,16 +139,19 @@ Read the new CLAUDE.md and adapt it, keeping it short:
 
 ## 6. Set up and verify
 
-Run `node SCRIPT setup DIR` in the background: it takes minutes. It runs
-`mise trust` and `mise install`, takes new majors, and verifies:
+Run `node SCRIPT setup DIR --stack STACK` in the background, STACK being the
+baseline from step 2 (`web` or `rust`): it takes minutes. Always pass
+`--stack`: a Rust tool with an npm wrapper holds both package.json and
+Cargo.toml, and setup won't guess between them. It runs `mise trust` and
+`mise install`, takes new majors, and verifies:
 
 - web: moves mise.toml's pins to their latest releases (what the README's
   `mise up --bump` means, without touching global tools or uninstalling old
   versions), `pnpm install`, `pnpm up --latest`, Playwright's Chromium and
   WebKit, `pnpm format`, `pnpm verify`;
-- Rust: pins `rust-toolchain.toml` (and `rust-version`) to the current stable,
-  `cargo generate-lockfile`, `cargo upgrade --incompatible`,
-  `cargo fmt --all`, `just verify`.
+- Rust: pins `rust-toolchain.toml` to the current stable (and `rust-version`,
+  unless step 5 set an older MSRV), `cargo generate-lockfile`,
+  `cargo upgrade --incompatible`, `cargo fmt --all`, `just verify`.
 
 Each pnpm, cargo and just command goes through `mise exec` so the pinned tools
 win, and the run stops at the first failure. It lists the version lines the majors changed. Don't run
