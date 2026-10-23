@@ -39,14 +39,17 @@ function bashCommand(payload: unknown): string {
 
 /**
  * Whether the call is a dry run. Wrangler parses flags with yargs, which reads
- * `--dry-run=false`, `--dry-run false` and a later `--no-dry-run` as off, so
- * only the last such flag counts and only an unqualified or `true` one is on.
+ * `--dry-run=false`, `--dry-run false` (quoted or not) and a later
+ * `--no-dry-run` as off, so only the last such flag counts and only an
+ * unqualified or `true` one is on.
  */
 function isDryRun(args: string): boolean {
-  const flags = [...args.matchAll(/(?:^|\s)(--no-dry-run|--dry-run(?:=(\S*)|\s+(true|false)(?=\s|$))?)(?=\s|$)/g)]
+  const flags = [
+    ...args.matchAll(/(?:^|\s)(--no-dry-run|--dry-run(?:=(\S*)|\s+(["']?)(true|false)\3(?=\s|$))?)(?=\s|$)/g),
+  ]
   const last = flags.at(-1)
   if (last === undefined || last[1] === '--no-dry-run') return false
-  return (last[2] ?? last[3] ?? 'true') === 'true'
+  return (last[2] ?? last[4] ?? 'true') === 'true'
 }
 
 /** Every value given to `--env`/`-e` in `args`. */
@@ -65,7 +68,10 @@ function refuse(why: string): never {
   process.exit(2)
 }
 
-for (const line of bashCommand(JSON.parse(readFileSync(0, 'utf8'))).split('\n')) {
+// Bash joins a line ending in a backslash to the next, so `wrangler \` then
+// `deploy` is one call.
+const command = bashCommand(JSON.parse(readFileSync(0, 'utf8'))).replaceAll(/\\\r?\n/g, '')
+for (const line of command.split('\n')) {
   for (const match of line.matchAll(CHANGES_PRODUCTION)) {
     const subcommand = (match[1] ?? '').replace(/\s+/g, ' ')
     const args = match[2] ?? ''
