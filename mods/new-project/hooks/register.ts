@@ -42,7 +42,7 @@ export async function locateBaselines($: EngineInterface, configured: string): P
 }
 
 const isOwnSkill = ($: EngineInterface, skill: string, path: string | undefined) =>
-  (skill === SKILL || skill.endsWith(`:${SKILL}`)) && (path === undefined || path.startsWith(`${$.plugin.root}/`))
+  (skill === SKILL || skill === `${$.plugin.name}:${SKILL}`) && (path === undefined || path.startsWith(`${$.plugin.root}/`))
 
 /**
  * Tells /new-project where the baselines are, or, when they cannot be found,
