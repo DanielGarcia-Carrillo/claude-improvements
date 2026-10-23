@@ -64,8 +64,9 @@ export type Step = { run: readonly string[]; isMajor?: true } | { bump: 'mise-to
 
 /**
  * What each baseline needs here. `install` and `verify` mirror the "Using it"
- * steps of `baselines/<stack>/README.md`; `steps` is the same run, through
- * `mise exec` so the pinned tools win over whatever is on PATH, and after
+ * steps of `baselines/<stack>/README.md`; `steps` is the same run, with its
+ * pnpm, cargo and just commands through `mise exec` so the pinned tools win
+ * over whatever is on PATH, and after
  * `mise trust`, which a fresh checkout needs before mise reads its config
  * without asking. Majors come before anything is built on the old versions,
  * and Playwright's browsers after them, so they match the Playwright that
@@ -193,7 +194,7 @@ export function parseAnswers(raw: unknown): Answers {
   if (stack !== 'web' && stack !== 'rust') problems.push('`stack` must be "web" or "rust".')
 
   const name = text('name')
-  if (name !== undefined && /[<>{}"\\\n]/.test(name))
+  if (name !== undefined && /[<>{}"\\\r\n]/.test(name))
     problems.push('`name` cannot hold < > { } " \\ or a line break: it lands in HTML, JSX and string literals.')
 
   const slug = text('slug')
@@ -205,11 +206,11 @@ export function parseAnswers(raw: unknown): Answers {
     problems.push(`\`slug\` "${slug}" is a Rust keyword or sysroot crate; pick another name.`)
 
   const shortName = text('shortName', true)
-  if (shortName !== undefined && (shortName.length > SHORT_NAME_MAX || /[<>{}"\\\n]/.test(shortName)))
+  if (shortName !== undefined && (shortName.length > SHORT_NAME_MAX || /[<>{}"\\\r\n]/.test(shortName)))
     problems.push(`\`shortName\` must be at most ${SHORT_NAME_MAX} characters, without < > { } " or \\.`)
 
   const description = text('description')
-  if (description !== undefined && /[<>\\\n]/.test(description))
+  if (description !== undefined && /[<>\\\r\n]/.test(description))
     problems.push('`description` is one sentence without < > \\ or a line break: it lands in HTML and the manifest.')
 
   const summary = text('summary')
@@ -219,8 +220,9 @@ export function parseAnswers(raw: unknown): Answers {
   const consequences = text('consequences')
 
   const repository = text('repository', stack !== 'rust')
-  if (repository !== undefined && !/^https:\/\/\S+$/.test(repository))
-    problems.push('`repository` must be an https URL, such as https://github.com/owner/name.')
+  // URL characters only: the value lands inside a quoted TOML string.
+  if (repository !== undefined && !/^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(repository))
+    problems.push('`repository` must be an https URL, such as https://github.com/owner/name, without quotes, backslashes or spaces.')
 
   const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer'])
   const changed = list<ChangedDefault>('changed', ['area', 'to', 'why'], true)
