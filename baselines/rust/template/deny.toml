@@ -33,7 +33,8 @@ multiple-versions = "warn"
 wildcards = "deny"
 allow-wildcard-paths = true
 
-# Every dependency is declared once in [workspace.dependencies].
+# A crate two members use is declared once, in [workspace.dependencies].
+# `just deps-inherited` holds every member to that, one at a time.
 [bans.workspace-dependencies]
 duplicates = "deny"
 include-path-dependencies = true

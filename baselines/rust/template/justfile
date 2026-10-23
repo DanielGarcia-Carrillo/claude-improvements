@@ -10,13 +10,19 @@ verify: fmt-check deny lint test doc shear
 fmt-check:
     cargo fmt --all --check
 
-lint: no-allow lints-inherited
+lint: no-allow lints-inherited deps-inherited
     cargo clippy --workspace --all-targets --all-features --locked
 
 # Every crate takes the workspace lints. One without `[lints] workspace = true`
 # would build with rustc's defaults, and nothing else would notice.
 lints-inherited:
     @for f in crates/*/Cargo.toml; do awk '/^\[lints\]/ { t = 1; next } /^\[/ { t = 0 } t && /^workspace *= *true/ { ok = 1 } END { exit !ok }' "$f" || { echo "$f needs [lints] workspace = true" >&2; exit 1; }; done
+
+# Every member takes each dependency from [workspace.dependencies], so its
+# version is set in one place. cargo-deny only catches a crate two members
+# declare; this catches one a member declares by itself.
+deps-inherited:
+    @for f in crates/*/Cargo.toml; do awk -v f="$f" '/^\[/ { t = /^\[(target\..+\.)?(dev-|build-)?dependencies\]$/; next } t && /^[A-Za-z0-9_-]/ && !/workspace *= *true/ { print f ": `" $0 "`: declare it in the root [workspace.dependencies] and use `" $1 ".workspace = true`" > "/dev/stderr"; bad = 1 } END { exit bad }' "$f" || exit 1; done
 
 # No #[allow] in our source, including one that silences allow_attributes.
 # --no-index also reads untracked files and works outside a git repo; a grep
