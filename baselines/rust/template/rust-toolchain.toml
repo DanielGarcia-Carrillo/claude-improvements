@@ -1,0 +1,6 @@
+# rustup installs exactly this toolchain in every checkout and in CI
+# (`rustup toolchain install` reads this file). Dependabot bumps it.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

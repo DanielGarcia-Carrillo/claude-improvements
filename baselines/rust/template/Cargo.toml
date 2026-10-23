@@ -1,0 +1,88 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# The oldest compiler this builds on (its MSRV, minimum supported Rust
+# version). A binary-only tool can match the pinned toolchain. A published
+# library should sit two or three releases behind it, with an MSRV job in CI.
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/replace-me-owner/replace-me"
+publish = false
+
+# Every crate, first-party ones included, is declared once here; members say
+# `foo.workspace = true` and may only add features. cargo-deny enforces it.
+[workspace.dependencies]
+replace-me-core = { path = "crates/replace-me-core", version = "0.1.0" }
+
+clap = { version = "4.6.7", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+insta-cmd = "0.7.0"
+proptest = "1.12.0"
+
+# Lints are the cheapest way to steer an agent: each one names the problem
+# and usually the fix. Override in a crate with #[expect(lint, reason = "…")]:
+# an expectation that stops being needed warns. allow_attributes rejects
+# #[allow]; `just lint` and CI also reject the text `allow(` in an attribute,
+# because an #![allow] of that lint would otherwise switch it off. (It can't
+# be "forbid": clap's derives emit #[allow(clippy::restriction)].)
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+unused_lifetimes = "warn"
+redundant_lifetimes = "warn"
+redundant_imports = "warn"
+trivial_numeric_casts = "warn"
+unit_bindings = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+# Doc comments are part of the contract: a broken link or a stray backtick
+# fails `cargo doc` like any other warning.
+[workspace.lints.rustdoc]
+missing_crate_level_docs = "warn"
+unescaped_backticks = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Pedantic lints that cost more churn than they catch (uv, ruff and oxc agree).
+must_use_candidate = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+struct_excessive_bools = "allow"
+# Restriction lints, each aimed at a failure mode agents fall into.
+unwrap_used = "warn"
+todo = "warn"
+unimplemented = "warn"
+get_unwrap = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+exit = "warn"
+let_underscore_must_use = "warn"
+unused_result_ok = "warn"
+map_err_ignore = "warn"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+undocumented_unsafe_blocks = "warn"
+clone_on_ref_ptr = "warn"
+iter_over_hash_type = "warn"
+
+[profile.release]
+# Integer overflow panics in release too, instead of wrapping silently. A CLI
+# loses next to nothing; a wrapped count would be a wrong answer.
+overflow-checks = true
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

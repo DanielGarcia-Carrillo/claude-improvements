@@ -1,0 +1,13 @@
+# msrv comes from `rust-version` in Cargo.toml; don't repeat it here.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+# Set to true once a crate is published: renames then need a semver bump.
+avoid-breaking-exported-api = false
+
+# Repo-specific "use this instead" rules. Each failure names the replacement,
+# which is exactly what an agent needs. Add one whenever a trap recurs.
+disallowed-methods = [
+  { path = "std::env::set_current_dir", reason = "process-global state; pass paths explicitly" },
+]

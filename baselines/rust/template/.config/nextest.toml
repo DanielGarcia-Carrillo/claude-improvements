@@ -1,0 +1,14 @@
+[profile.default]
+# A hung test is killed after two minutes instead of stalling an agent.
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[profile.ci]
+fail-fast = false
+failure-output = "immediate-final"
+retries = 2
+# A test that passes only on retry is reported and still fails the run.
+flaky-result = "fail"
+
+[profile.ci.junit]
+# target/nextest/ci/junit.xml: CI's slowest-tests summary reads it.
+path = "junit.xml"

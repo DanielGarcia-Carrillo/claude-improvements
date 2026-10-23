@@ -1,0 +1,6 @@
+# `edition` matters when an editor or hook runs `rustfmt file.rs` directly,
+# which otherwise assumes 2015. Import grouping options are nightly-only.
+edition = "2024"
+style_edition = "2024"
+use_field_init_shorthand = true
+use_try_shorthand = true

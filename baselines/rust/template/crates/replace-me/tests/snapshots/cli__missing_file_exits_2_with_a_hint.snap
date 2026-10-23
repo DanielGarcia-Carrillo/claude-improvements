@@ -1,0 +1,16 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/missing.txt
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+error: cannot read tests/fixtures/missing.txt
+  caused by: No such file or directory (os error 2)
+  hint: check the path; a relative path is resolved from the current directory
