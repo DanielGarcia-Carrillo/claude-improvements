@@ -50,10 +50,10 @@ Versions and statuses were checked on 2026-10-20.
 | CLI | clap 4 derive; `--json` prints exactly one envelope; exit 0 / 1 findings / 2 error | Agents and scripts parse stdout and branch on codes |
 | Logging | `tracing` to stderr, `RUST_LOG` filter | stdout stays the result |
 | Tests | nextest (+ `cargo test --doc`), insta-cmd CLI snapshots, proptest | Fast, isolated, contract-shaped; flaky tests fail even when a retry passes |
-| Supply chain | cargo-deny (licences, bans, sources; advisories on main and weekly), cargo-shear | Unused and duplicate dependencies fail; a new advisory doesn't block an unrelated PR |
-| Tasks | `just` | One `just verify` that mirrors CI |
-| Tools | mise pins just, nextest, cargo-deny, cargo-shear, cargo-insta | Same versions locally and in CI |
-| CI | GitHub Actions, SHA-pinned; `rustup toolchain install` reads the toolchain file; Swatinem/rust-cache; taiki-e/install-action | Linux only by default; add macOS and Windows test legs only for tools shipped there |
+| Supply chain | cargo-deny (licences, bans, sources; advisories on main and weekly, or `just deny-all`), cargo-shear | Unused and duplicate dependencies fail; a new advisory doesn't block an unrelated PR |
+| Tasks | `just` | One `just verify` that runs the checks PR CI runs |
+| Tools | mise pins just, nextest, cargo-deny, cargo-shear, cargo-insta as prebuilt binaries; CI installs them from the same `mise.toml` | Same versions locally and in CI, and no tool compiles from source |
+| CI | GitHub Actions, SHA-pinned; `rustup toolchain install` reads the toolchain file; Swatinem/rust-cache; jdx/mise-action for the tools | Linux only by default; add macOS and Windows test legs only for tools shipped there |
 
 ## Add when needed
 

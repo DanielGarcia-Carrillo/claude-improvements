@@ -7,7 +7,7 @@ and delete these comments.
 ## Commands
 
 ```bash
-just verify                              # fmt, clippy, tests, docs, deny, shear: the gate
+just verify                              # fmt, deny, clippy, tests, docs, shear: the gate
 cargo nextest run -p replace-me-core NAME  # narrowest test first, then widen
 just fix                                 # clippy --fix, then rustfmt
 just snapshots                           # review changed insta snapshots
@@ -62,5 +62,6 @@ with `--release` unless asked: it is slow and nothing here needs it.
   instead of `RUSTFLAGS=-D warnings`, which throws away the build cache.
 - **nextest does not run doctests.** `just test` runs `cargo test --doc`
   after it; keep both.
-- **Advisories run on main and weekly, not on PRs**, so a fresh RUSTSEC
-  entry shows up as a red main build, not on your branch.
+- **Advisories run on main and weekly, not on PRs or in `just verify`**, so
+  a fresh RUSTSEC entry shows up as a red main build, not on your branch.
+  `just deny-all` checks them now.

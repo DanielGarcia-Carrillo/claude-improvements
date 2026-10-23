@@ -41,17 +41,18 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: cargo-deny,cargo-shear,just@1.59.0
-          fallback: none
+      # The tools at mise.toml's versions, so CI and every checkout run the
+      # same ones.
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
       - run: cargo fmt --all --check
+      # Bans, licences and sources, as `just verify` checks them. It compiles
+      # nothing, so it runs before clippy.
+      - run: just deny
       # Source checks no lint can express: no #[allow], every crate on the
       # workspace lints. The justfile holds them, so CI and local agree.
       - run: just no-allow lints-inherited
       - run: cargo clippy --workspace --all-targets --all-features --locked
       - run: cargo doc --workspace --no-deps --all-features --locked
-      - run: cargo deny --locked check bans licenses sources
       - run: cargo shear
 
   test:
@@ -66,10 +67,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: cargo-nextest
-          fallback: none
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
       # --timings writes target/cargo-timings/cargo-timing.html: compile time
       # per crate, for the crates this run rebuilt.
       - run: cargo nextest run --workspace --all-features --locked --profile ci --timings
@@ -105,10 +103,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
-        with:
-          tool: cargo-deny
-          fallback: none
+      # cargo-deny reads the crate graph through cargo, which needs the toolchain.
+      - run: rustup toolchain install
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
       - run: cargo deny --locked check advisories
 
   # The one required status check.
