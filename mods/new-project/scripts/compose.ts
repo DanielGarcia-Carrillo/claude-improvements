@@ -393,22 +393,24 @@ const RUST = {
   repository: 'https://github.com/replace-me-owner/replace-me',
 }
 
+// The renames here replace through functions: a replacement string would
+// expand an answer's `$&`, `$'` or `$$`.
 function renameWeb(file: TemplateFile, answers: Answers): TemplateFile {
   if (file.text === undefined) return file
   const shortName = answers.shortName ?? defaultShortName(answers.name)
   let text = file.text
   if (/\.[cm]?tsx?$/.test(file.path)) {
     text = text
-      .replaceAll(`'${WEB.description}'`, tsString(answers.description))
-      .replaceAll(`'${WEB.shortName}'`, tsString(shortName))
-      .replaceAll(`'${WEB.name}'`, tsString(answers.name))
-      .replaceAll(`>${WEB.name}<`, `>${htmlText(answers.name)}<`)
+      .replaceAll(`'${WEB.description}'`, () => tsString(answers.description))
+      .replaceAll(`'${WEB.shortName}'`, () => tsString(shortName))
+      .replaceAll(`'${WEB.name}'`, () => tsString(answers.name))
+      .replaceAll(`>${WEB.name}<`, () => `>${htmlText(answers.name)}<`)
   } else if (file.path.endsWith('.html')) {
     text = text
-      .replaceAll(`>${WEB.name}<`, `>${htmlText(answers.name)}<`)
-      .replaceAll(`"${WEB.description}"`, `"${htmlAttribute(answers.description)}"`)
+      .replaceAll(`>${WEB.name}<`, () => `>${htmlText(answers.name)}<`)
+      .replaceAll(`"${WEB.description}"`, () => `"${htmlAttribute(answers.description)}"`)
   } else if (/\.jsonc?$/.test(file.path)) {
-    text = text.replaceAll(`"${WEB.slug}"`, JSON.stringify(answers.slug))
+    text = text.replaceAll(`"${WEB.slug}"`, () => JSON.stringify(answers.slug))
   }
   return { ...file, text }
 }
@@ -427,9 +429,9 @@ function renameRust(file: TemplateFile, answers: Answers): TemplateFile {
   // `replace_me` is an identifier (`replace_me_core`, the CLI test's
   // `replace_me()`); `replace-me` is a crate's or the binary's name.
   const text = file.text
-    .replaceAll(RUST.repository, answers.repository ?? '')
-    .replaceAll(RUST.snake, answers.slug.replaceAll('-', '_'))
-    .replaceAll(RUST.slug, answers.slug)
+    .replaceAll(RUST.repository, () => answers.repository ?? '')
+    .replaceAll(RUST.snake, () => answers.slug.replaceAll('-', '_'))
+    .replaceAll(RUST.slug, () => answers.slug)
   return { path, text }
 }
 
