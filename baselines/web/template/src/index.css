@@ -1,0 +1,12 @@
+/*
+ * The only hand-written stylesheet. StyleX appends every extracted rule to
+ * this file at build time, so the entry must import it. Everything else is
+ * styled with StyleX in components.
+ */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+}
