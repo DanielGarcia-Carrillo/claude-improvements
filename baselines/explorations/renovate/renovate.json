@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "groupName": "non-major"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "actions"
+    },
+    {
+      "matchManagers": ["mise"],
+      "groupName": "toolchain"
+    }
+  ]
+}
