@@ -10,7 +10,7 @@
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { after, test } from 'node:test'
@@ -127,4 +127,15 @@ test('a target inside another git repository is refused', () => {
   const result = dryRun(join(outer, 'nested'), BASELINES)
   assert.equal(result.status, 1)
   assert.match(result.stderr, /inside the git repository/)
+})
+
+test('a baseline folder that is a link is refused before anything is written', () => {
+  const copy = baselinesCopy('linked')
+  const outside = join(scratch, 'outside')
+  mkdirSync(outside)
+  rmSync(join(copy, 'general/files/docs'), { recursive: true })
+  symlinkSync(outside, join(copy, 'general/files/docs'))
+  const result = dryRun(join(scratch, 'linked-target'), copy)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /links docs; scaffold would write docs\/adr\/0001-stack\.md through it/)
 })

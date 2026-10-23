@@ -392,9 +392,17 @@ test('setup takes majors only in the steps marked so', async () => {
     expect(steps.map(label).some(step => step.startsWith('mise up'))).toBe(false)
   }
   const web = (STACKS.web.steps as readonly Step[]).map(label)
-  expect(web.indexOf('mise-tools') < web.indexOf('mise exec -- pnpm install')).toBe(true)
+  // Each pair must be present, in this order.
+  const order = (...picks: ((step: string) => boolean)[]) => web.filter(step => picks.some(pick => pick(step)))
+  expect(order(s => s === 'mise-tools', s => s === 'mise exec -- pnpm install')).toEqual([
+    'mise-tools',
+    'mise exec -- pnpm install',
+  ])
   // Browsers come after the majors, so they match the Playwright that stays.
-  expect(web.indexOf('mise exec -- pnpm up --latest') < web.findIndex(s => s.includes('playwright install'))).toBe(true)
+  expect(order(s => s === 'mise exec -- pnpm up --latest', s => s.includes('playwright install'))).toEqual([
+    'mise exec -- pnpm up --latest',
+    'mise exec -- pnpm exec playwright install chromium webkit',
+  ])
 })
 
 const TEMPLATE = `<!--

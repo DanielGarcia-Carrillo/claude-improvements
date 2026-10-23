@@ -180,6 +180,11 @@ function scaffold(options: { answers: string; target: string; baselines: string;
   ]
   const overwritten = [...generated.map(file => file.path), 'AGENTS.md'].filter(path => byPath.has(path))
   if (overwritten.length > 0) throw new Error(`The baseline already ships ${overwritten.join(', ')}; scaffold would overwrite it.`)
+  // A linked folder would carry every write beneath it to wherever it points.
+  const links = files.filter(file => file.link !== undefined).map(file => file.path)
+  const through = [...files, ...generated].filter(file => links.some(link => file.path.startsWith(`${link}/`)))
+  if (through.length > 0)
+    throw new Error(`The baseline links ${links.join(', ')}; scaffold would write ${through.map(f => f.path).join(', ')} through it.`)
   const leftovers = leftoverPlaceholders([...files, ...generated])
   if (leftovers.length > 0) throw new Error(leftovers.join('\n'))
 
