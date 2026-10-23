@@ -146,6 +146,12 @@ test('reports every answer problem at once', async () => {
   expect(problems.some(p => p.startsWith('`kickoff`'))).toBe(true)
   expect(problemsOf({ ...webAnswers(), slug: 'Trip_Planner' }).some(p => p.startsWith('`slug`'))).toBe(true)
   expect(problemsOf({ ...webAnswers(), name: 'A <b>' }).some(p => p.startsWith('`name`'))).toBe(true)
+  // A carriage return would break the generated TypeScript string literal.
+  expect(problemsOf({ ...webAnswers(), name: 'A\rB' }).some(p => p.startsWith('`name`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), description: 'One\rtwo.' }).some(p => p.startsWith('`description`'))).toBe(true)
+  // A quote or backslash would break Cargo.toml's quoted `repository`.
+  for (const repository of ['https://github.com/o/r"bad', 'https://github.com/o/r\\x'])
+    expect(problemsOf({ ...webAnswers(), repository }).some(p => p.startsWith('`repository`'))).toBe(true)
   expect(problemsOf(webAnswers())).toEqual([])
 })
 
