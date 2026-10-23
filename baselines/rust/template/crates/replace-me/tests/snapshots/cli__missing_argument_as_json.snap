@@ -1,0 +1,22 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - "--json"
+---
+success: false
+exit_code: 2
+----- stdout -----
+{
+  "ok": false,
+  "error": {
+    "code": "usage.invalid",
+    "message": "the following required arguments were not provided:\n  <PATH>",
+    "hint": "Usage: replace-me check --json <PATH>\n\nFor more information, try '--help'.",
+    "causes": []
+  }
+}
+
+----- stderr -----

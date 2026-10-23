@@ -1,0 +1,25 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/narrow.txt
+    - "--max-width"
+    - nope
+    - "--json"
+---
+success: false
+exit_code: 2
+----- stdout -----
+{
+  "ok": false,
+  "error": {
+    "code": "usage.invalid",
+    "message": "invalid value 'nope' for '--max-width <MAX_WIDTH>': invalid digit found in string",
+    "hint": "For more information, try '--help'.",
+    "causes": []
+  }
+}
+
+----- stderr -----

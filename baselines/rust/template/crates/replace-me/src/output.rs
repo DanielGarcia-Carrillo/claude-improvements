@@ -1,12 +1,14 @@
 //! The CLI contract, and the only module that prints.
 //!
 //! - **stdout** carries the result: text, or with `--json` exactly one JSON
-//!   document, `{"ok": true, "data": …}` or `{"ok": false, "error": …}`.
+//!   document, `{"ok": true, "data": …}` or `{"ok": false, "error": …}`, even
+//!   when the arguments don't parse. `--help` and `--version` print text.
 //! - **stderr** carries logs, and errors in text mode.
-//! - **Exit codes**: 0 clean, 1 findings reported, 2 usage or input error
-//!   (clap also exits 2 on bad arguments). A panic exits 101 and is a bug.
-//! - **Error codes** (`error.code`) come from `replace_me_core::Error::code` and
-//!   never change meaning.
+//! - **Exit codes**: 0 clean, 1 findings reported, 2 usage or input error.
+//!   A panic exits 101 and is a bug.
+//! - **Error codes** (`error.code`) come from `replace_me_core::Error::code`,
+//!   plus `usage.invalid` for arguments that don't parse, and never change
+//!   meaning.
 //! - **Human output escapes control characters** in anything that came from
 //!   input, such as a file name, so it can't drive the terminal. JSON needs
 //!   nothing extra: `serde_json` escapes them.
@@ -20,10 +22,15 @@ use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use clap::error::ErrorKind;
 use replace_me_core::{Error, Finding};
 use serde::{Serialize, Serializer};
 
-#[derive(Debug, Clone, Copy)]
+/// `error.code` for arguments clap rejects. Core errors bring their own codes;
+/// this one belongs to the CLI.
+const USAGE_INVALID: &str = "usage.invalid";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Format {
     Human,
     Json,
@@ -136,6 +143,47 @@ pub(crate) fn emit(format: Format, result: Result<Outcome, Error>) -> ExitCode {
                 message: error.to_string(),
                 hint: error.hint(),
                 causes: causes(&error),
+            };
+            print_json(
+                &Failure {
+                    ok: false,
+                    error: body,
+                },
+                Exit::Error,
+            )
+        }
+    }
+}
+
+/// Reports arguments clap couldn't parse, which includes asking for help or
+/// the version. Those, and any error without `--json`, print as clap prints
+/// them (exit 0 for help and version, 2 otherwise). With `--json`, an error is
+/// a document like any other.
+pub(crate) fn emit_parse_error(format: Format, error: &clap::Error) -> ExitCode {
+    match (format, error.kind()) {
+        (Format::Human, _)
+        | (
+            Format::Json,
+            ErrorKind::DisplayHelp
+            | ErrorKind::DisplayVersion
+            | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand,
+        ) => error.exit(),
+        (Format::Json, _) => {
+            // clap renders "error: " and what's wrong, a blank line, then any
+            // tip, the usage line and a pointer to --help: the first paragraph
+            // is the message and the rest the hint. Rendering drops the colour.
+            let rendered = error.render().to_string();
+            let text = rendered.trim();
+            let text = text.strip_prefix("error:").map_or(text, str::trim_start);
+            let (message, hint) = text.split_once("\n\n").map_or(
+                (text, "run with --help to see the arguments"),
+                |(message, rest)| (message, rest.trim()),
+            );
+            let body = ErrorBody {
+                code: USAGE_INVALID,
+                message: message.to_owned(),
+                hint,
+                causes: Vec::new(),
             };
             print_json(
                 &Failure {

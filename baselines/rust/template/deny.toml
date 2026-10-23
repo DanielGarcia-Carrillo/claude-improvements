@@ -1,6 +1,7 @@
 # cargo-deny: licences, advisories, duplicate and wildcard dependencies,
-# registries. `just deny` runs everything; CI runs advisories on main and on
-# a schedule only, so a new advisory never fails an unrelated PR.
+# registries. `just deny` (part of `just verify`) and PR CI check all but
+# advisories; CI checks those on main and weekly, so a new advisory never
+# fails an unrelated PR. `just deny-all` checks everything now.
 
 [graph]
 all-features = true
@@ -38,8 +39,11 @@ duplicates = "deny"
 include-path-dependencies = true
 unused = "deny"
 
-# Build scripts and proc-macros run on every build, including the clippy run
-# in the Stop hook. Refuse crates that ship executables or scripts to run.
+# Crates may have build scripts and proc-macros, and many need them. This
+# refuses crates that ship prebuilt executables or interpreted scripts for a
+# build script or proc-macro to run. It audits the lock file; it is not a
+# sandbox: rust-analyzer and `cargo build` run a new dependency's build script
+# before any check does.
 [bans.build]
 executables = "deny"
 interpreted = "deny"

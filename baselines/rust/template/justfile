@@ -1,11 +1,11 @@
-# `just verify` runs everything CI runs. Run it before every handoff.
+# `just verify` runs the checks CI runs on a PR. Run it before every handoff.
 # Tools come from mise.toml (`mise install`), Rust from rust-toolchain.toml.
 
 # Warnings fail the build here and in CI, without the cache misses that
 # RUSTFLAGS=-D warnings causes. Local `cargo build` stays warn-only.
 export CARGO_BUILD_WARNINGS := "deny"
 
-verify: fmt-check lint test doc deny shear
+verify: fmt-check deny lint test doc shear
 
 fmt-check:
     cargo fmt --all --check
@@ -31,7 +31,13 @@ test:
 doc:
     cargo doc --workspace --no-deps --all-features --locked
 
+# What PR CI checks. It compiles nothing, so verify runs it before clippy.
+# Advisories wait for main and the weekly run, so a new one doesn't fail an
+# unrelated change; `just deny-all` checks them now.
 deny:
+    cargo deny --locked check bans licenses sources
+
+deny-all:
     cargo deny --locked check
 
 shear:

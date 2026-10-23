@@ -1,0 +1,25 @@
+---
+source: crates/replace-me/tests/cli.rs
+info:
+  program: replace-me
+  args:
+    - check
+    - tests/fixtures/narrow.txt
+    - "--max-widht"
+    - "20"
+    - "--json"
+---
+success: false
+exit_code: 2
+----- stdout -----
+{
+  "ok": false,
+  "error": {
+    "code": "usage.invalid",
+    "message": "unexpected argument '--max-widht' found",
+    "hint": "tip: a similar argument exists: '--max-width'\n\nUsage: replace-me check --max-width <MAX_WIDTH> <PATH>\n\nFor more information, try '--help'.",
+    "causes": []
+  }
+}
+
+----- stderr -----
