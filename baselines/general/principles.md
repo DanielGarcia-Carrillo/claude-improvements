@@ -117,3 +117,21 @@ An agent arriving cold must be able to find, without asking:
 The [`CLAUDE.template.md`](CLAUDE.template.md) is the skeleton. Anything the
 toolchain can enforce goes in a hook, lint or test instead, with the agent
 file pointing at it.
+
+## Sources
+
+- **A check the agent can run**: Claude Code's
+  [best practices](https://code.claude.com/docs/en/best-practices). Without
+  one, "looks done" is the agent's only signal that it has finished.
+- **Rule of three**: popularised by Martin Fowler's *Refactoring*, which
+  credits Don Roberts
+  ([summary](https://en.wikipedia.org/wiki/Rule_of_three_(computer_programming))).
+- **Make invalid states unrepresentable**: Yaron Minsky,
+  [Effective ML Revisited](https://blog.janestreet.com/effective-ml-revisited/).
+- **Parse at the boundary**: Alexis King,
+  [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).
+- **ADRs**: Michael Nygard,
+  [Documenting Architecture Decisions](https://www.cognitect.com/blog/2011/11/15/documenting-architecture-decisions).
+- **The agent file**: the [AGENTS.md](https://agents.md/) format. Here it is
+  kept as `CLAUDE.md`, with `AGENTS.md` symlinked to it, so Claude Code and
+  other agents read the same file.

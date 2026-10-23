@@ -32,6 +32,19 @@ strict, local, fast checks whose failures say how to fix them.
    it is set globally; see [Git identity](general/infra.md#git-identity).
 6. Run the verify command green before the first commit.
 
+## Where it started
+
+Two pages set the starting points:
+- Christoph Nakazawa's
+  [Fastest Frontend Tooling](https://cpojer.net/posts/fastest-frontend-tooling),
+  for the web toolchain;
+- Microsoft's
+  [Pragmatic Rust Guidelines](https://microsoft.github.io/rust-guidelines/guidelines/checklist/index.html),
+  for Rust.
+
+Each stack README ends with its sources, and
+[principles.md](general/principles.md#sources) credits the ideas it borrows.
+
 ## Conventions in this folder
 
 - Agent files are named `*.template.md` and `*.stack.md`, never `CLAUDE.md`,
