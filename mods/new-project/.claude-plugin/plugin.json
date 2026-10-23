@@ -10,7 +10,7 @@
     "baselines": {
       "type": "string",
       "title": "Baselines folder",
-      "description": "The baselines folder of a claude-improvements checkout (it holds general/kickoff.md). Leave empty when the mod runs from that checkout",
+      "description": "The baselines folder of a claude-improvements checkout (it holds general/kickoff.md), as an absolute path or one starting with ~/. Leave empty when the mod runs from that checkout",
       "default": ""
     }
   }
