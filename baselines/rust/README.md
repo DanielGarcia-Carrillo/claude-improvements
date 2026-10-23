@@ -24,9 +24,11 @@ Versions and statuses were checked on 2026-10-20.
    the newest compatible releases.
 4. Take new majors too: set `rust-toolchain.toml` to the current stable
    (`rustup check`; not `mise up`, which also upgrades global tools and
-   prunes the versions it replaces), run `cargo upgrade --incompatible` (from cargo-edit),
-   then `just verify`. If a major breaks verify, revert that one and note it
-   in the stack ADR. Commit `Cargo.lock`: this is a binary.
+   prunes the versions it replaces), run
+   `mise exec cargo:cargo-edit@latest -- cargo upgrade --incompatible` (mise
+   fetches cargo-edit for that one run), then `just verify`. If a major
+   breaks verify, revert that one and note it in the stack ADR. Commit
+   `Cargo.lock`: this is a binary.
 5. Build `CLAUDE.md` from [`CLAUDE.template.md`](../general/CLAUDE.template.md)
    plus [`CLAUDE.stack.md`](CLAUDE.stack.md); `ln -s CLAUDE.md AGENTS.md`.
 6. Point agents at Microsoft's

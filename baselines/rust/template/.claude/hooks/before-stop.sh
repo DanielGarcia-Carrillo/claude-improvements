@@ -8,7 +8,9 @@
 set -uo pipefail
 
 payload=$(cat)
-cd "$CLAUDE_PROJECT_DIR"
+# The payload's cwd follows Claude into a worktree; CLAUDE_PROJECT_DIR stays
+# on the main checkout.
+cd "$(jq -r --arg dir "$CLAUDE_PROJECT_DIR" '.cwd // $dir' <<<"$payload")" || exit 0
 [ -z "$(git status --porcelain)" ] && exit 0
 
 if ! output=$(CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features --message-format short 2>&1); then
