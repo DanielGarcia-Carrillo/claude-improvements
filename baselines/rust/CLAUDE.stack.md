@@ -25,8 +25,8 @@ with `--release` unless asked: it is slow and nothing here needs it.
   logic goes in core with unit tests; the binary only wires it up.
 - **Dependencies** are declared once in the root `[workspace.dependencies]`
   and used as `foo.workspace = true`. A new dependency is a decision: justify
-  it in the commit. `cargo shear` and cargo-deny fail on unused or duplicate
-  declarations.
+  it in the commit. `cargo shear`, cargo-deny and `just deps-inherited` fail
+  on unused, duplicate or member-only declarations.
 - **No panics in non-test code.** No `unwrap`, `todo!`, `unimplemented!`;
   encode the constraint in a type, or return an error. `expect("why this
   can't fail")` only for true invariants.

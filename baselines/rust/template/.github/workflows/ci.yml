@@ -49,8 +49,9 @@ jobs:
       # nothing, so it runs before clippy.
       - run: just deny
       # Source checks no lint can express: no #[allow], every crate on the
-      # workspace lints. The justfile holds them, so CI and local agree.
-      - run: just no-allow lints-inherited
+      # workspace lints and dependencies. The justfile holds them, so CI and
+      # local agree.
+      - run: just no-allow lints-inherited deps-inherited
       - run: cargo clippy --workspace --all-targets --all-features --locked
       - run: cargo doc --workspace --no-deps --all-features --locked
       - run: cargo shear
