@@ -15,6 +15,8 @@ goes.
   `general/kickoff.md`, else ask the user where the baselines folder is.
 - **SCRIPT** is `${CLAUDE_PLUGIN_ROOT}/scripts/new-project.ts`. It needs Node
   23.6 or later (`node --version`).
+- Single-quote each path you put in a command below: a folder the user
+  names may hold spaces.
 
 ## 1. Ask the kickoff, in one batch
 
@@ -26,8 +28,11 @@ Send one message holding every question, then stop and wait for the reply.
 Don't use AskUserQuestion: it takes four questions and the batch is longer.
 
 - **Setup** first: display name; slug (lowercase words joined by hyphens: the
-  package, Worker or crate name); target folder (new or empty; recommend
-  `<parent of the current repo>/<slug>` unless the brief names one); for web,
+  package, Worker or crate name); target folder (new or empty, and outside any git repository; recommend
+  `<parent of the main checkout>/<slug>` unless the brief names one, where
+  the main checkout is the parent of
+  `git rev-parse --path-format=absolute --git-common-dir`, so a worktree
+  session doesn't pick a folder inside the repo); for web,
   a short name of at most 12 characters for the installed app; for Rust, the
   repository URL (`https://github.com/<owner>/<slug>`; `gh api user --jq .login`
   gives the owner).
@@ -109,8 +114,9 @@ spells "replace me": web `replace-me`, `Replace Me`, `ReplaceMe` and the
 `Replace me: …` description; Rust the `replace-me` crates, folders and
 packages, `replace_me` identifiers and `repository`), writes CLAUDE.md with
 AGENTS.md linked to it, `docs/adr/0001-stack.md` and README.md, and runs
-`git init`. It writes nothing unless every check passes, and refuses an answer
-that reads as a placeholder (the new repo's CI would fail on it).
+`git init`. It writes nothing unless every check passes, refuses a target
+inside another git repository, and refuses an answer that reads as a
+placeholder (the new repo's CI would fail on it).
 
 ## 5. Finish what needs judgment
 
@@ -140,8 +146,8 @@ Run `node SCRIPT setup DIR` in the background: it takes minutes. It runs
   `cargo generate-lockfile`, `cargo upgrade --incompatible`,
   `cargo fmt --all`, `just verify`.
 
-Every step goes through `mise exec` so the pinned tools win, and the run stops
-at the first failure. It lists the version lines the majors changed. Don't run
+Each pnpm, cargo and just command goes through `mise exec` so the pinned tools
+win, and the run stops at the first failure. It lists the version lines the majors changed. Don't run
 `mise up` yourself: it upgrades the user's global tools too.
 
 On a failure, read the output and fix the cause in the new repo, then rerun
