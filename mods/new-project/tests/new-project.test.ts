@@ -1,18 +1,24 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import type { Answers } from '../scripts/compose.ts'
+import type { Answers, Step } from '../scripts/compose.ts'
 import {
   AnswersError,
+  bumpMiseToml,
+  changedLines,
   composeAgentFile,
   kickoffFor,
   leftoverPlaceholders,
+  misePins,
   missingKickoff,
   parseAnswers,
   parseDefaults,
   parseKickoff,
+  pinRust,
   renameFile,
   renderAdr,
+  rustStableVersion,
+  STACKS,
   tsString,
   unknownAreas,
 } from '../scripts/compose.ts'
@@ -336,6 +342,75 @@ test("refuses answers the new repo's placeholder check would fail on", async () 
     '`followUps[0]` "Replace-me tokens in docs" reads as a template placeholder to the new repo\'s CI; reword it.',
   ])
 })
+
+test('pins Rust to the current stable and reports what a bump changed', async () => {
+  const manifest = '[pkg.cargo]\nversion = "0.100.0 (abc 2026-10-13)"\n\n[pkg.rust]\nversion = "1.100.2 (58cf8f9c3 2026-10-13)"\n'
+  expect(rustStableVersion(manifest)).toBe('1.100.2')
+  expect(() => rustStableVersion('[pkg.cargo]\nversion = "1"')).toThrow('no [pkg.rust] version')
+
+  const toolchain = '[toolchain]\nchannel = "1.99.1"\ncomponents = ["rustfmt", "clippy"]\n'
+  const cargo = '[workspace.package]\nedition = "2024"\nrust-version = "1.99"\n'
+  const pinned = pinRust({ toolchain, cargo }, '1.100.2')
+  expect(pinned.toolchain).toBe('[toolchain]\nchannel = "1.100.2"\ncomponents = ["rustfmt", "clippy"]\n')
+  expect(pinned.cargo).toBe('[workspace.package]\nedition = "2024"\nrust-version = "1.100"\n')
+  // An MSRV behind the channel was chosen, as a published library's is, so it stays.
+  const library = cargo.replace('"1.99"', '"1.96"')
+  const kept = pinRust({ toolchain, cargo: library }, '1.100.2')
+  expect(kept.toolchain).toBe(pinned.toolchain)
+  expect(kept.cargo).toBe(library)
+  expect(() => pinRust({ toolchain: '[toolchain]\n', cargo }, '1.100.2')).toThrow('no `channel = "…"` line')
+  expect(() => pinRust({ toolchain, cargo: '[workspace.package]\n' }, '1.100.2')).toThrow('no `rust-version = "…"` line')
+
+  expect(changedLines(cargo, pinned.cargo)).toEqual(['- rust-version = "1.99"', '+ rust-version = "1.100"'])
+  expect(changedLines(cargo, cargo)).toEqual([])
+})
+
+test("bumps mise.toml's pins at their own precision, and nothing else", async () => {
+  const toml = [
+    '# Tools.',
+    '[tools]',
+    'node = "26" # LTS',
+    '"aqua:nextest-rs/nextest/cargo-nextest" = "0.9.148"',
+    'rust = "stable"',
+    '',
+    '[settings]',
+    'jobs = "4"',
+  ].join('\n')
+  expect(misePins(toml)).toEqual([
+    { tool: 'node', version: '26' },
+    { tool: 'aqua:nextest-rs/nextest/cargo-nextest', version: '0.9.148' },
+  ])
+  const bumped = bumpMiseToml(toml, { node: '28.1.0', 'aqua:nextest-rs/nextest/cargo-nextest': '0.10.2', jobs: '9' })
+  expect(bumped).toBe(toml.replace('"26"', '"28"').replace('"0.9.148"', '"0.10.2"'))
+  expect(bumpMiseToml(toml, {})).toBe(toml)
+})
+
+test('setup takes majors only in the steps marked so', async () => {
+  const label = (step: Step) => ('run' in step ? step.run.join(' ') : step.bump)
+  for (const stack of ['web', 'rust'] as const) {
+    const steps: readonly Step[] = STACKS[stack].steps
+    const majors = steps.filter(step => step.isMajor === true).map(label)
+    const kept = steps.filter(step => step.isMajor !== true).map(label)
+    expect(majors.length).toBe(2)
+    expect(kept[0]).toBe('mise trust')
+    expect(kept.at(-1)?.endsWith(STACKS[stack].verify)).toBe(true)
+    // `mise up` reaches the global config's tools and uninstalls old versions.
+    expect(steps.map(label).some(step => step.startsWith('mise up'))).toBe(false)
+  }
+  const web = (STACKS.web.steps as readonly Step[]).map(label)
+  // Each pair must be present, in this order.
+  const order = (...picks: ((step: string) => boolean)[]) => web.filter(step => picks.some(pick => pick(step)))
+  expect(order(s => s === 'mise-tools', s => s === 'mise exec -- pnpm install')).toEqual([
+    'mise-tools',
+    'mise exec -- pnpm install',
+  ])
+  // Browsers come after the majors, so they match the Playwright that stays.
+  expect(order(s => s === 'mise exec -- pnpm up --latest', s => s.includes('playwright install'))).toEqual([
+    'mise exec -- pnpm up --latest',
+    'mise exec -- pnpm exec playwright install chromium webkit',
+  ])
+})
+
 const TEMPLATE = `<!--
 Skeleton instructions.
 -->

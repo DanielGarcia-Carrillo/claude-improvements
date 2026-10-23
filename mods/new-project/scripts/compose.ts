@@ -113,6 +113,85 @@ export const STACKS = {
   },
 } as const satisfies Record<Stack, { steps: readonly Step[]; manifests: readonly string[] } & Record<string, unknown>>
 
+// A mise.toml table heading, and a `[tools]` line pinned to a version number.
+const TOML_TABLE = /^\s*\[([^\]]+)\]/
+const MISE_PIN = /^(\s*"?([^"=\s]+)"?\s*=\s*)"(\d+(?:\.\d+)*)"(.*)$/
+
+/** Each line of a mise.toml, with its pin when it is one under `[tools]`. */
+function miseLines(text: string) {
+  let isTools = false
+  return text.split('\n').map(line => {
+    const table = TOML_TABLE.exec(line)
+    if (table) isTools = table[1]?.trim() === 'tools'
+    const [, prefix = '', tool = '', version = '', rest = ''] = (isTools && MISE_PIN.exec(line)) || []
+    return { line, pin: tool === '' ? undefined : { prefix, tool, version, rest } }
+  })
+}
+
+/** The tools a mise.toml pins to a version number: `node = "26"`. */
+export function misePins(text: string): { tool: string; version: string }[] {
+  return miseLines(text).flatMap(({ pin }) => (pin === undefined ? [] : [{ tool: pin.tool, version: pin.version }]))
+}
+
+/**
+ * The mise.toml with each pin moved to its tool's latest release, at the
+ * pin's own precision, as `mise up --bump` writes it: `26` stays a major.
+ */
+export function bumpMiseToml(text: string, latest: Readonly<Record<string, string>>): string {
+  return miseLines(text)
+    .map(({ line, pin }) => {
+      const release = pin === undefined ? undefined : latest[pin.tool]
+      if (pin === undefined || release === undefined) return line
+      const bumped = release.split('.').slice(0, pin.version.split('.').length).join('.')
+      return `${pin.prefix}"${bumped}"${pin.rest}`
+    })
+    .join('\n')
+}
+
+/** Where rustup's stable channel says which release it is. */
+export const RUST_STABLE_MANIFEST = 'https://static.rust-lang.org/dist/channel-rust-stable.toml'
+
+/** The release the stable channel manifest names: `1.99.1`. */
+export function rustStableVersion(manifest: string): string {
+  const version = /^\[pkg\.rust\]\nversion = "(\d+\.\d+\.\d+) /m.exec(manifest)?.[1]
+  if (version === undefined) throw new Error(`${RUST_STABLE_MANIFEST} has no [pkg.rust] version; has its format changed?`)
+  return version
+}
+
+/**
+ * Pins the toolchain file's channel to `version`. The workspace's
+ * `rust-version` moves to its minor only while it equals the old channel's:
+ * a binary-only tool's MSRV is the pinned channel, but an older one, such as
+ * a published library's, was set on purpose and stays. Throws when either
+ * line has moved, so a bump never half lands.
+ */
+export function pinRust(files: { toolchain: string; cargo: string }, version: string) {
+  const minor = (release: string) => release.split('.').slice(0, 2).join('.')
+  const line = (key: string) => new RegExp(`^${key} = "([^"]*)"`, 'm')
+  const current = (text: string, key: string, file: string) => {
+    const value = line(key).exec(text)?.[1]
+    if (value === undefined) throw new Error(`${file} has no \`${key} = "…"\` line to bump.`)
+    return value
+  }
+  const channel = current(files.toolchain, 'channel', 'rust-toolchain.toml')
+  const msrv = current(files.cargo, 'rust-version', 'Cargo.toml')
+  const pin = (text: string, key: string, value: string) => text.replace(line(key), `${key} = "${value}"`)
+  return {
+    toolchain: pin(files.toolchain, 'channel', version),
+    cargo: msrv === minor(channel) ? pin(files.cargo, 'rust-version', minor(version)) : files.cargo,
+  }
+}
+
+/** The lines a step changed in a file, `-` before and `+` after, for undoing one major. */
+export function changedLines(before: string, after: string): string[] {
+  const old = before.split('\n')
+  const now = after.split('\n')
+  return [
+    ...old.filter(line => !now.includes(line)).map(line => `- ${line.trim()}`),
+    ...now.filter(line => !old.includes(line)).map(line => `+ ${line.trim()}`),
+  ]
+}
+
 const EVERY_PROJECT = 'Every project'
 const SHORT_NAME_MAX = 12
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
