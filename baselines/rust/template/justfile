@@ -19,8 +19,10 @@ lints-inherited:
     @for f in crates/*/Cargo.toml; do awk '/^\[lints\]/ { t = 1; next } /^\[/ { t = 0 } t && /^workspace *= *true/ { ok = 1 } END { exit !ok }' "$f" || { echo "$f needs [lints] workspace = true" >&2; exit 1; }; done
 
 # No #[allow] in our source, including one that silences allow_attributes.
+# --no-index also reads untracked files and works outside a git repo; a grep
+# error (status 2 or more) fails the recipe rather than passing it.
 no-allow:
-    @if git grep -nE '#!?\[(.*[(, ])?allow\(' -- '*.rs'; then echo 'Use #[expect(lint, reason = "…")], not #[allow].' >&2; exit 1; fi
+    @git grep --no-index --exclude-standard -nE '#!?\[(.*[(, ])?allow\(' -- '*.rs'; s=$?; if [ "$s" -eq 0 ]; then echo 'Use #[expect(lint, reason = "…")], not #[allow].' >&2; exit 1; fi; [ "$s" -eq 1 ]
 
 test:
     cargo nextest run --workspace --all-features --locked

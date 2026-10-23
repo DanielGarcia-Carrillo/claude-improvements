@@ -10,6 +10,8 @@
 //! - **Human output escapes control characters** in anything that came from
 //!   input, such as a file name, so it can't drive the terminal. JSON needs
 //!   nothing extra: `serde_json` escapes them.
+//! - **Paths that aren't valid Unicode** appear with U+FFFD in place of the
+//!   bad bytes, in both formats, so `--json` always prints its document.
 #![expect(
     clippy::print_stdout,
     clippy::print_stderr,
@@ -18,11 +20,11 @@
 
 use std::error::Error as _;
 use std::iter;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use replace_me_core::{Error, Finding};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Format {
@@ -35,6 +37,7 @@ pub(crate) enum Format {
 #[serde(tag = "command", rename_all = "snake_case")]
 pub(crate) enum Outcome {
     Check {
+        #[serde(serialize_with = "lossy_path")]
         path: PathBuf,
         max_width: usize,
         findings: Vec<Finding>,
@@ -114,13 +117,13 @@ pub(crate) fn emit(format: Format, result: Result<Outcome, Error>) -> ExitCode {
             outcome.print_human();
             outcome.exit().into()
         }
-        (Format::Json, Ok(outcome)) => {
-            print_json(&Success {
+        (Format::Json, Ok(outcome)) => print_json(
+            &Success {
                 ok: true,
                 data: &outcome,
-            });
-            outcome.exit().into()
-        }
+            },
+            outcome.exit(),
+        ),
         (Format::Human, Err(error)) => {
             eprintln!("error: {}", terminal_safe(&error.to_string()));
             for cause in causes(&error) {
@@ -136,13 +139,21 @@ pub(crate) fn emit(format: Format, result: Result<Outcome, Error>) -> ExitCode {
                 hint: error.hint(),
                 causes: causes(&error),
             };
-            print_json(&Failure {
-                ok: false,
-                error: body,
-            });
-            Exit::Error.into()
+            print_json(
+                &Failure {
+                    ok: false,
+                    error: body,
+                },
+                Exit::Error,
+            )
         }
     }
+}
+
+/// Serialises a path as a string, lossily, so a path that isn't valid
+/// Unicode can't fail the whole document.
+fn lossy_path<S: Serializer>(path: &Path, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&path.to_string_lossy())
 }
 
 /// The error's source chain, outermost first, without the error itself.
@@ -167,11 +178,18 @@ fn terminal_safe(text: &str) -> String {
     safe
 }
 
-fn print_json(value: &impl Serialize) {
+/// Prints `value` and returns `exit`, or exits 2 if it can't be encoded: a
+/// caller must never see a clean exit with no document.
+fn print_json(value: &impl Serialize, exit: Exit) -> ExitCode {
     match serde_json::to_string_pretty(value) {
-        Ok(json) => println!("{json}"),
-        // Only a path that isn't valid Unicode can get here.
-        Err(error) => eprintln!("error: could not encode the result as JSON: {error}"),
+        Ok(json) => {
+            println!("{json}");
+            exit.into()
+        }
+        Err(error) => {
+            eprintln!("error: could not encode the result as JSON: {error}");
+            Exit::Error.into()
+        }
     }
 }
 
@@ -190,5 +208,24 @@ mod tests {
     #[test]
     fn ordinary_text_is_unchanged() {
         assert_eq!(terminal_safe("dir/é file.txt"), "dir/é file.txt");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_path_that_isnt_unicode_still_encodes() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt as _;
+
+        let outcome = Outcome::Check {
+            path: PathBuf::from(OsStr::from_bytes(b"bad\xff.txt")),
+            max_width: 100,
+            findings: Vec::new(),
+        };
+        let json = serde_json::to_string(&Success {
+            ok: true,
+            data: &outcome,
+        })
+        .expect("a lossy path always encodes");
+        assert!(json.contains("\"path\":\"bad\u{fffd}.txt\""), "{json}");
     }
 }
