@@ -99,6 +99,10 @@ one, else `$TMPDIR`). Every field is a string unless shown otherwise:
   for later is a `followUps` entry.
 - `architecture` is the 4 to 8 key choices, one line each, from the defaults
   table as changed.
+- `alternatives` is at least one option considered and not taken, with why;
+  they become the ADR's "Alternatives considered".
+- `changed` and `followUps` may be empty or left out. Every other list needs
+  at least one entry, and no string in an entry may be blank.
 
 Check the file with
 `node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES --dry-run`.
