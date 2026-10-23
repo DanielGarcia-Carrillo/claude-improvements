@@ -126,6 +126,8 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
  */
 export const PLACEHOLDER = /replace[-_ ]?me(?:[^a-z]|$)/i
 export const PLACEHOLDER_EXEMPT = '.github/workflows/ci.yml'
+/** The one line of PLACEHOLDER_EXEMPT that spells the placeholder: the comment naming what its step looks for. */
+const PLACEHOLDER_EXEMPT_LINE = /^\s*# Template placeholders all spell "replace me"/
 
 // A Rust slug becomes a function name in the CLI test and a crate name, so
 // it cannot be a keyword or shadow a sysroot crate.
@@ -443,16 +445,17 @@ export function renameFile(file: TemplateFile, answers: Answers): TemplateFile {
  */
 export function leftoverPlaceholders(files: readonly TemplateFile[]): string[] {
   const teach = 'teach renameFile in compose.ts this use'
-  return files
-    .filter(file => file.path !== PLACEHOLDER_EXEMPT)
-    .flatMap(file => [
-      ...(PLACEHOLDER.test(file.path) ? [`${file.path}: the path still holds a template placeholder; ${teach}.`] : []),
-      ...(file.text ?? '')
-        .split('\n')
-        .flatMap((line, i) =>
-          PLACEHOLDER.test(line) ? [`${file.path}:${i + 1} still holds a template placeholder: ${line.trim()} (${teach})`] : [],
-        ),
-    ])
+  const isExempt = (path: string, line: string) => path === PLACEHOLDER_EXEMPT && PLACEHOLDER_EXEMPT_LINE.test(line)
+  return files.flatMap(file => [
+    ...(PLACEHOLDER.test(file.path) ? [`${file.path}: the path still holds a template placeholder; ${teach}.`] : []),
+    ...(file.text ?? '')
+      .split('\n')
+      .flatMap((line, i) =>
+        PLACEHOLDER.test(line) && !isExempt(file.path, line)
+          ? [`${file.path}:${i + 1} still holds a template placeholder: ${line.trim()} (${teach})`]
+          : [],
+      ),
+  ])
 }
 
 const COMMENT = /<!--[\s\S]*?-->\n*/g
@@ -463,7 +466,9 @@ function fragmentSections(fragment: string): Map<string, string> {
   let heading: string | undefined
   let body: string[] = []
   const flush = () => {
-    if (heading !== undefined) sections.set(heading, body.join('\n').trim())
+    if (heading === undefined) return
+    if (sections.has(heading)) throw new Error(`The stack fragment has two "## ${heading}" sections; merge them.`)
+    sections.set(heading, body.join('\n').trim())
   }
   for (const line of fragment.replace(COMMENT, '').split('\n')) {
     const match = /^## (.+)$/.exec(line)
