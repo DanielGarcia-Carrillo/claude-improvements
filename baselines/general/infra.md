@@ -38,9 +38,10 @@ production, so production deploys only from CI on `main`:
   `delete` and `secret put` unless it names a non-production `--env`.
 - **Previews:** `wrangler preview` (Wrangler 4.135+) gives a branch its own
   Preview with its own variables, secrets and bindings, configured in a
-  `previews` block. Previews don't inherit production settings, so a branch
-  can't write to production data. Bind them to separate D1, KV or R2
-  resources: those are shared unless you do. `wrangler versions upload
+  `previews` block. Previews don't inherit production settings: a Preview has
+  only the bindings its `previews` block names. Point those at separate D1,
+  KV or R2 resources; a Preview bound to production's database writes to it.
+  `wrangler versions upload
   --preview-alias <branch>` is fine for a static-only Worker, but a version
   carries production's bindings. Both kinds of URL are public; put Cloudflare
   Access in front of them.

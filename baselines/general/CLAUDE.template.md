@@ -34,7 +34,7 @@ every handoff and never hand off red.
   `Add offline banner (PER-12)`. A refactor and a behaviour change are
   separate commits.
 - **PRs**: one branch each, title carries the key, body has the `Linear:`
-  line and how it was verified ([template](.github/pull_request_template.md)).
+  (or `Closes #n`) line and how it was verified ([template](.github/pull_request_template.md)).
   Open as draft. <Who may push, mark ready and merge.>
 - **Done** means: verify green; tests cover the new behaviour; an ADR is
   added or superseded if a decision changed; this file is updated if a

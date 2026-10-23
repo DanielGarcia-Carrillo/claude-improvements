@@ -1,6 +1,6 @@
 <!-- Title: imperative summary ending with the issue key, e.g. "Add offline banner (PER-12)" -->
 
-Linear: <!-- PER-12 https://linear.app/... -->
+Linear: <!-- PER-12 https://linear.app/... With GitHub Issues, make this line "Closes #12". -->
 
 ## What and why
 

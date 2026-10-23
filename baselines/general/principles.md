@@ -40,7 +40,9 @@ code) or removes a choice nobody should be making by hand.
 
 - **Native first in the browser.** Every dependency ships to every user, so
   the platform wins when it covers the need: `Intl`, `Temporal`,
-  `structuredClone`, `fetch`, `URLPattern`. No lodash-style grab bags.
+  `structuredClone`, `fetch`, `URLPattern`. Where a supported browser lacks
+  one, polyfill it there only (in 2026-10, `Temporal` in Safari and
+  `URLPattern` before Safari 26). No lodash-style grab bags.
 - **In Rust, the bar is different.** A crate costs build time and supply-chain
   risk rather than download size, and `std` is small on purpose: regexes,
   serialisation, argument parsing and error types live in crates (`regex`,
