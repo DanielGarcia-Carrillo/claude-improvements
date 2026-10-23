@@ -133,7 +133,7 @@ function publish(store: string): ReturnType<typeof stage> & { commit: string } {
 
 function section({ changes, removed, mainExists, commit }: ReturnType<typeof publish>): string {
   const image = (path: string, alt: string) =>
-    `<img src="${server}/${repo}/blob/${commit}/${path}?raw=true" alt="${alt}" width="360">`
+    `<img src="${server}/${repo}/blob/${commit}/${path.split('/').map(encodeURIComponent).join('/')}?raw=true" alt="${alt}" width="360">`
   const lines = ['## Screenshots', '']
   if (changes.length === 0) {
     lines.push(
