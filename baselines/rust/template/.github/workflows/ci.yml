@@ -1,0 +1,139 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, so a new security advisory surfaces even when nothing merges.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # Warnings fail the build, the same as `just verify` sets locally.
+  CARGO_BUILD_WARNINGS: deny
+  RUST_BACKTRACE: 1
+
+# Every job runs on GitHub-hosted Ubuntu unless the CI_RUNNER repository
+# variable names another runner label (e.g. blacksmith-2vcpu-ubuntu-2404 on a
+# private repo). Deleting the variable moves CI back, with no commit.
+jobs:
+  lint:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Template placeholders all spell "replace me"; fail until they're filled.
+      - name: No template placeholders left
+        run: if git grep -niE 'replace[-_ ]?me([^a-z]|$)' -- ':!.github/workflows/ci.yml'; then echo '::error::Replace the template placeholders listed above.'; exit 1; fi
+      # Installs the channel and components from rust-toolchain.toml.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The tools at mise.toml's versions, so CI and every checkout run the
+      # same ones.
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: cargo fmt --all --check
+      # Bans, licences and sources, as `just verify` checks them. It compiles
+      # nothing, so it runs before clippy.
+      - run: just deny
+      # Source checks no lint can express: no #[allow], every crate on the
+      # workspace lints and dependencies. The justfile holds them, so CI and
+      # local agree.
+      - run: just no-allow lints-inherited deps-inherited
+      - run: cargo clippy --workspace --all-targets --all-features --locked
+      - run: cargo doc --workspace --no-deps --all-features --locked
+      - run: cargo shear
+
+  test:
+    # Add macos-latest and windows-latest only for tools shipped there.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      # --timings writes target/cargo-timings/cargo-timing.html: compile time
+      # per crate, for the crates this run rebuilt.
+      - run: cargo nextest run --workspace --all-features --locked --profile ci --timings
+      - run: cargo test --workspace --all-features --locked --doc
+      - name: Slowest tests
+        if: ${{ !cancelled() && hashFiles('target/nextest/ci/junit.xml') != '' }}
+        shell: python3 {0}
+        run: |
+          import os, xml.etree.ElementTree as ET
+          cases = ET.parse('target/nextest/ci/junit.xml').iter('testcase')
+          top = sorted(cases, key=lambda c: float(c.get('time', 0)), reverse=True)[:10]
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('### Slowest tests\n\n| Seconds | Test |\n|---:|---|\n')
+              for c in top:
+                  f.write(f"| {float(c.get('time', 0)):.2f} | `{c.get('classname')} {c.get('name')}` |\n")
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-timings
+          path: |
+            target/cargo-timings/cargo-timing.html
+            target/nextest/ci/junit.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # A new RUSTSEC advisory should not fail an unrelated PR, so advisories run
+  # on main and on the weekly schedule only.
+  advisories:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # cargo-deny reads the crate graph through cargo, which needs the toolchain.
+      - run: rustup toolchain install
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: cargo deny --locked check advisories
+
+  # The one required status check.
+  ci:
+    if: ${{ always() }}
+    needs: [lint, test]
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
+    # Read-only access to this run's own job and step timings.
+    permissions:
+      actions: read
+    steps:
+      # The ten slowest steps of the run, in the run's summary page. It never
+      # fails the required check, even if the API call does.
+      - name: Slowest steps
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo '### Slowest steps'
+            echo
+            echo '| Seconds | Job | Step |'
+            echo '|---:|---|---|'
+            gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+              --jq '.jobs[] | .name as $j | .steps[]? | select(.started_at and .completed_at)
+                    | [((.completed_at | fromdate) - (.started_at | fromdate)), $j, .name] | @tsv' \
+              | sort -rn | head -10 | awk -F'\t' '{printf "| %d | %s | %s |\n", $1, $2, $3}'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1

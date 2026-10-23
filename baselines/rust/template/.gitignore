@@ -1,4 +1,5 @@
 /target
 *.pending-snap
 *.snap.new
+/.claude/worktrees/
 .DS_Store

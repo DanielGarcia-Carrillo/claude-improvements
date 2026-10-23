@@ -1,0 +1,34 @@
+# Dependabot keeps crates, the Rust toolchain and the SHA-pinned Actions
+# current. Known gap: mise.toml isn't read, so bump just, nextest, cargo-deny,
+# cargo-shear and cargo-insta there by hand. Renovate covers it; see
+# baselines/explorations/renovate in claude-improvements.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # A new release waits three days before Dependabot proposes it.
+    cooldown:
+      default-days: 3
+    groups:
+      non-major:
+        update-types: [minor, patch]
+
+  - package-ecosystem: rust-toolchain
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ['*']
