@@ -38,6 +38,15 @@ test(
   },
 )
 
+test('a relative baselines option is refused', { options: { baselines: 'src/baselines' } }, async ($, on) => {
+  const disk = engine(on)
+  disk.baselinesAt = 'src/baselines'
+  const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
+  expect(result.text).toContain('cannot find the project baselines')
+  expect(result.text).toContain('must be absolute')
+  expect(disk.asked).toEqual([])
+})
+
 test('missing baselines replace the skill with how to fix it', { options: { baselines: '/nowhere' } }, async ($, on) => {
   engine(on)
   const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })

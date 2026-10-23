@@ -20,7 +20,8 @@ export function normalisePath(path: string): string {
 /**
  * The baselines folder: the `baselines` option when set, else the folder two
  * above the mod, where it sits in claude-improvements. An installed copy of
- * the mod has no such neighbour, so it needs the option.
+ * the mod has no such neighbour, so it needs the option. A relative option is
+ * refused: it would depend on whichever project the session opened.
  */
 export async function locateBaselines($: EngineInterface, configured: string): Promise<Located> {
   let dir: string
@@ -31,7 +32,10 @@ export async function locateBaselines($: EngineInterface, configured: string): P
   } else {
     const home = (await $.env.get('HOME')) ?? ''
     const path = configured.trim().replace(/^~(?=\/|$)/, home)
-    dir = path.startsWith('/') ? normalisePath(path) : path
+    if (!path.startsWith('/')) {
+      return { dir: path, source: 'the `baselines` option (it must be absolute or start with `~/`)', isFound: false }
+    }
+    dir = normalisePath(path)
     source = 'the `baselines` option'
   }
   return { dir, source, isFound: await $.fs.exists(`${dir}/${MARKER}`) }
