@@ -10,8 +10,10 @@ development, and it is meant to become the default for pixel diffs in these
 baselines: deterministic comparisons, `main` commits as baselines, a compact
 per-PR summary. Until it reaches a usable release, the template has no
 screenshot assertions: its PR screenshots job (below) shows reviewers what
-changed. Adopting the tool means replacing that job, and any screenshot
-assertions a project has added.
+changed. Adopting the tool replaces any screenshot assertions a project
+has added, but not the PR screenshots: whatever does the diffing, a PR that
+changes the UI shows representative screenshots in its description. The
+job stays unless the tool's PR summary includes them.
 
 ## Until then
 
@@ -43,5 +45,6 @@ assertions a project has added.
 ## Revisit when
 
 The in-house tool has a release that covers Playwright captures and stories;
-then replace the template's PR screenshots job, and any screenshot
-assertions, with it.
+then make it the pixel-diff check in place of any screenshot assertions.
+Keep the PR screenshots job unless the tool's PR summary shows the
+screenshots itself.
