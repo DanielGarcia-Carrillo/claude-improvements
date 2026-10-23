@@ -270,8 +270,11 @@ test('flags every spelling of the placeholder that no rename covers', async () =
   const files = [
     renameFile({ path: 'docs/notes.md', text: 'Welcome.\nWelcome to Replace Me.' }, answers),
     { path: 'src/replace_me.ts', text: 'export const replaceMe = 1' },
-    // The CI step that looks for placeholders holds the pattern itself.
-    { path: '.github/workflows/ci.yml', text: "git grep -niE 'replace[-_ ]?me([^a-z]|$)'" },
+    // The comment on the CI step that looks for placeholders spells one; only that line is exempt.
+    {
+      path: '.github/workflows/ci.yml',
+      text: `# Template placeholders all spell "replace me"; fail until they're filled.\nrun: git grep -niE 'replace[-_ ]?me([^a-z]|$)'\nrun: cargo build -p replace-me`,
+    },
     // Neither "replacement" nor "replace memory" is a placeholder.
     { path: 'README.md', text: 'The replacement. Replace memory.' },
   ]
@@ -279,6 +282,7 @@ test('flags every spelling of the placeholder that no rename covers', async () =
     'docs/notes.md:2 still holds a template placeholder: Welcome to Replace Me. (teach renameFile in compose.ts this use)',
     'src/replace_me.ts: the path still holds a template placeholder; teach renameFile in compose.ts this use.',
     'src/replace_me.ts:1 still holds a template placeholder: export const replaceMe = 1 (teach renameFile in compose.ts this use)',
+    '.github/workflows/ci.yml:3 still holds a template placeholder: run: cargo build -p replace-me (teach renameFile in compose.ts this use)',
   ])
 })
 
@@ -355,6 +359,9 @@ test('builds CLAUDE.md from the skeleton and the stack fragment', async () => {
 test('a skeleton or fragment that drifted fails loudly', async () => {
   const noTraps = FRAGMENT.replace(/## Traps[\s\S]*$/, '')
   expect(() => composeAgentFile(TEMPLATE, noTraps, webAnswers())).toThrow('no "## Traps" section')
+  expect(() => composeAgentFile(TEMPLATE, `${FRAGMENT}\n## Commands\n\nMore.\n`, webAnswers())).toThrow(
+    'two "## Commands" sections',
+  )
   expect(() => composeAgentFile(`${TEMPLATE}\n<New placeholder>\n`, FRAGMENT, webAnswers())).toThrow('<New placeholder>')
   expect(() => composeAgentFile(TEMPLATE.replace('<Project name>', 'X'), FRAGMENT, webAnswers())).toThrow(
     'no longer holds <Project name>',
