@@ -10,7 +10,7 @@
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { after, test } from 'node:test'
@@ -67,6 +67,20 @@ function leftovers(repo: string): string {
 
 const read = (repo: string, path: string) => readFileSync(join(repo, path), 'utf8')
 
+/** A copy of the baselines to alter, without build output. */
+function baselinesCopy(name: string): string {
+  const copy = join(scratch, name)
+  cpSync(BASELINES, copy, { recursive: true, filter: source => !/\/(node_modules|target|dist)(\/|$)/.test(source) })
+  return copy
+}
+
+/** Scaffold's dry run of the web stack into `target`. */
+function dryRun(target: string, baselines: string) {
+  const answers = join(scratch, 'web.json')
+  writeFileSync(answers, JSON.stringify(answersFor('web')))
+  return run('node', [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', baselines, '--dry-run'], scratch)
+}
+
 test('the web template scaffolds with no placeholder left', () => {
   const repo = scaffold('web')
   assert.equal(leftovers(repo), '')
@@ -88,4 +102,29 @@ test('the Rust template scaffolds with no placeholder left', () => {
   assert.match(read(repo, 'crates/line-width/src/cli.rs'), /use line_width_core::/)
   assert.match(read(repo, 'crates/line-width/tests/cli.rs'), /fn line_width\(\) -> Command/)
   assert.match(read(repo, 'CLAUDE.md'), /cargo nextest run -p line-width-core/)
+})
+
+test('baselines checked out with CRLF line endings scaffold too', () => {
+  const copy = baselinesCopy('crlf')
+  for (const path of ['general/kickoff.md', 'general/CLAUDE.template.md', 'web/README.md', 'web/CLAUDE.stack.md'])
+    writeFileSync(join(copy, path), read(copy, path).replaceAll('\n', '\r\n'))
+  const result = dryRun(join(scratch, 'crlf-target'), copy)
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('a baseline that ships AGENTS.md is refused before anything is written', () => {
+  const copy = baselinesCopy('agents')
+  writeFileSync(join(copy, 'general/files/AGENTS.md'), '# Agents\n')
+  const result = dryRun(join(scratch, 'agents-target'), copy)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /already ships AGENTS\.md/)
+})
+
+test('a target inside another git repository is refused', () => {
+  const outer = join(scratch, 'outer')
+  mkdirSync(outer)
+  assert.equal(run('git', ['init', '-q'], outer).status, 0)
+  const result = dryRun(join(outer, 'nested'), BASELINES)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /inside the git repository/)
 })
