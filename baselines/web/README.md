@@ -51,7 +51,7 @@ Versions and statuses were checked on 2026-10-20.
 | Contrast | APCA via `colorjs.io` in a unit test | Fails the build with the pair and its Lc. `apca-w3`'s licence restricts shipping it | — |
 | Icons | Lucide (`lucide-react`) | ISC, about 1,900 icons, per-icon imports; `aria-hidden` unless labelled | Tabler for breadth; `unplugin-icons` for several sets |
 | Fonts | System stack in the template | Neutral starting point | Self-host one Latin-only variable family from `@fontsource-variable` (about 20–50 KB) and precache it once the design has a typeface |
-| PWA | vite-plugin-pwa 2 with Workbox 7, `injectManifest`, `registerType: 'prompt'` | The worker is source (`src/sw.ts`) built from Workbox modules, ready for custom handlers; updates wait for consent | `generateSW` (Workbox writes the whole worker from config) when it will only ever precache, fall back to the shell and cache by URL pattern. Serwist, a maintained Workbox fork, if Workbox stalls: its last release was 7.4.1 in 2026-05 |
+| PWA | vite-plugin-pwa 2 with Workbox 7, `injectManifest`, `registerType: 'prompt'` | The worker is source (`src/sw.ts`) built from Workbox modules, ready for custom handlers; updates wait for consent | `generateSW` (Workbox writes the whole worker from config) when it will only ever precache, fall back to the shell and cache by URL pattern. Serwist (`@serwist/vite`), a maintained Workbox fork, if Workbox stalls. Workbox's last release was 7.4.1 in 2026-05; Serwist's was 9.5.13 in 2026-10 |
 | Server state | TanStack Query v5 (add when there are requests) | Caching, retries, offline mutation queue | — |
 | Client state | Jotai 3, installed | Atoms beside the feature instead of prop drilling or context; derived state without a store | — |
 | Requests | Hono RPC + Zod 4 (`zod/mini` in the client) | Typed client with no codegen, native to Workers | oRPC when an OpenAPI contract is needed; `openapi-fetch` for third-party APIs |
@@ -61,7 +61,7 @@ Versions and statuses were checked on 2026-10-20.
 | End to end | Playwright 1.64: page objects via fixtures, shared constants, axe fixture, aria snapshots, reduced motion | Real production build, Chromium and WebKit, offline check | — |
 | Accessibility checks | axe with WCAG A/AA rules only, `color-contrast` off, one config in `tests/axe.ts` | Best-practice rules are noise in isolated stories; WCAG 2 contrast conflicts with APCA and is axe's usual flaky rule | — |
 | PR screenshots | CI captures every story and every screen in `paths` (both browsers), compares them byte for byte with `main`'s captures, and puts the ones that differ in the PR description, before and after | A reviewer sees a visual change without checking out the branch. Images live on an orphan `screenshots` branch, so a private repo's stay private | — |
-| Visual regression | Built-in screenshot assertions for now (Playwright `toHaveScreenshot`, Vitest `toMatchScreenshot` on stories), baselines generated only in CI or a pinned Docker image | No service, no account; pinning the environment is what keeps pixels stable | A dedicated, agent-oriented visual regression tool is in development and is meant to replace this; see [explorations/visual-regression](../explorations/visual-regression.md) |
+| Visual regression | None in the template beyond the PR screenshots above. A project that needs pixel assertions uses the built-in ones (Playwright `toHaveScreenshot`, Vitest `toMatchScreenshot` on stories), with baselines generated only in CI or a pinned Docker image | No service, no account; pinning the environment is what keeps pixels stable | A dedicated, agent-oriented visual regression tool is in development and is meant to take over pixel diffs, while PRs keep their screenshots; see [explorations/visual-regression](../explorations/visual-regression.md) |
 | Hosting | Cloudflare Workers static assets | Free static hosting, one deploy for app and API | See [infra.md](../general/infra.md) |
 | Security headers | A strict same-origin CSP, COOP, CORP and HSTS in `public/_headers`; `vite preview` applies them and every e2e test fails on a CSP violation | StyleX emits a CSS file and Vite no inline scripts, so the policy needs no `unsafe-inline` | Trusted Types once a default policy covers the service worker's registration |
 | Deploy | CI's `deploy` job on `main`, its token in a `production` environment limited to `main` | No other branch's workflow can read the token, and it never shares a runner with the test run | — |
@@ -111,7 +111,10 @@ for an ADR, not a default), TanStack Pacer (beta; a debounce plus
 1. `pnpm add hono zod @hono/standard-validator` and
    `pnpm add -D @cloudflare/vite-plugin`.
 2. Write `worker/index.ts` exporting a Hono app with routes under `/api`,
-   validated with `@hono/standard-validator`, and `export type AppType`.
+   validated with `@hono/standard-validator`. Chain the routes in one
+   expression (`const routes = app.get(…).post(…)`) and
+   `export type AppType = typeof routes`: the client only infers routes it
+   can see in that type.
    Start it with `secureHeaders()` (`_headers` never applies to Worker
    responses), `bodyLimit({ maxSize: 64 * 1024 })`, `csrf()` and a
    rate-limit check (`await env.API_LIMIT.limit({ key })`, keyed by user or
@@ -146,7 +149,12 @@ client state: atoms live beside the feature that owns them, and
 
 ### Add a typeface
 
-`pnpm add @fontsource-variable/<family>`, import only the Latin subset in
-`main.tsx`, and put the family first in `font.body` in `tokens.stylex.ts`
-with a metric-matched fallback (`size-adjust`, `ascent-override`). `woff2`
-is already in the precache glob, so the font works offline.
+`pnpm add @fontsource-variable/<family>`. Variable packages ship no
+per-subset CSS, and importing the package emits every subset into the
+precache, so declare the Latin file yourself in `src/index.css`. One
+`@font-face` for `'<Family> Variable'`, whose `src` is
+`url('@fontsource-variable/<family>/files/<family>-latin-wght-normal.woff2')`
+(Vite resolves the package path), and one for a metric-matched
+`'<Family> Fallback'` (`src: local('Arial')` with `size-adjust` and
+`ascent-override`). Put both first in `font.body` in `tokens.stylex.ts`.
+`woff2` is already in the precache glob, so the font works offline.

@@ -19,8 +19,22 @@ function editedFile(payload: unknown): string | undefined {
   return typeof input.file_path === 'string' ? input.file_path : undefined
 }
 
-const file = editedFile(JSON.parse(readFileSync(0, 'utf8')))
-const root = process.env['CLAUDE_PROJECT_DIR'] ?? process.cwd()
+/**
+ * The checkout Claude is working in. The payload's `cwd` follows Claude into a
+ * worktree; `CLAUDE_PROJECT_DIR` stays on the main checkout.
+ */
+function checkout(payload: unknown): string {
+  const cwd =
+    typeof payload === 'object' && payload !== null && 'cwd' in payload && typeof payload.cwd === 'string'
+      ? payload.cwd
+      : (process.env['CLAUDE_PROJECT_DIR'] ?? process.cwd())
+  const top = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' })
+  return top.status === 0 ? top.stdout.trim() : cwd
+}
+
+const payload: unknown = JSON.parse(readFileSync(0, 'utf8'))
+const file = editedFile(payload)
+const root = checkout(payload)
 if (!file || relative(root, file).startsWith('..')) process.exit(0)
 
 const run = (args: string[]) => spawnSync('pnpm', ['exec', ...args], { cwd: root, encoding: 'utf8' })

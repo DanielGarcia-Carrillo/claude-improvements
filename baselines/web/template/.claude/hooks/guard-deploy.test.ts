@@ -24,12 +24,21 @@ describe('guard-deploy', () => {
     'wrangler deploy --dry-run; wrangler deploy',
     'pnpm wrangler versions upload && pnpm wrangler versions deploy',
     'echo $(wrangler deploy)',
+    // yargs reads all of these as a real deploy.
+    'wrangler deploy --dry-run=false',
+    'wrangler deploy --dry-run false',
+    'wrangler deploy --dry-run --no-dry-run',
+    // The shell decides these, so they may be production.
+    'wrangler deploy --env "$TARGET"',
+    'wrangler deploy --env=$(cat env)',
   ])('blocks %s', (command) => {
     expect(verdict(command)).toBe(2)
   })
 
   it.each([
     'wrangler deploy --dry-run',
+    'wrangler deploy --dry-run=true',
+    'wrangler deploy --dry-run --outdir dist',
     'wrangler deploy --env staging',
     'wrangler deploy --env staging 2>&1 | tee deploy.log',
     'wrangler deploy --env staging && wrangler deploy --env qa',
