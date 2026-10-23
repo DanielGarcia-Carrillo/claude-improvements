@@ -116,6 +116,7 @@ export const STACKS = {
 const EVERY_PROJECT = 'Every project'
 const SHORT_NAME_MAX = 12
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
+const DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * Every template placeholder spells "replace me". This is the pattern of the
@@ -125,6 +126,8 @@ const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
  */
 export const PLACEHOLDER = /replace[-_ ]?me(?:[^a-z]|$)/i
 export const PLACEHOLDER_EXEMPT = '.github/workflows/ci.yml'
+/** The one line of PLACEHOLDER_EXEMPT that spells the placeholder: the comment naming what its step looks for. */
+const PLACEHOLDER_EXEMPT_LINE = /^\s*# Template placeholders all spell "replace me"/
 
 // A Rust slug becomes a function name in the CLI test and a crate name, so
 // it cannot be a keyword or shadow a sysroot crate.
@@ -325,4 +328,311 @@ export function missingKickoff(answers: Answers, sections: readonly KickoffSecti
       .filter(question => findAnswer(answers.kickoff, question) === undefined)
       .map(question => `\`kickoff\` has no answer to "${question}" (${section.title}). Copy the question verbatim.`),
   )
+}
+
+/** `[text](target)` becomes `text` unless the target is a full URL, which survives a copy. */
+const keepAbsoluteLinks = (markdown: string) =>
+  markdown.replace(/\[([^\]]+)\]\((?!https?:)[^)]*\)/g, '$1')
+
+/** The defaults table of a stack README: the first table headed `| Area | Default |`. */
+export function parseDefaults(readme: string): Default[] {
+  const lines = readme.split('\n')
+  const start = lines.findIndex(line => {
+    const row = cells(line)
+    return line.startsWith('|') && row[0] === 'Area' && row[1] === 'Default'
+  })
+  if (start < 0) throw new Error('The stack README has no "| Area | Default |" table to record in the ADR.')
+
+  const defaults: Default[] = []
+  for (const line of lines.slice(start + 1)) {
+    if (!line.startsWith('|')) break
+    const row = cells(line)
+    if (isTableRule(row)) continue
+    const [area = '', value = '', why = ''] = row
+    defaults.push({ area: keepAbsoluteLinks(area), value: keepAbsoluteLinks(value), why: keepAbsoluteLinks(why) })
+  }
+  return defaults
+}
+
+/** Changed defaults that name no area of the stack's table, as problems. */
+export function unknownAreas(answers: Answers, defaults: readonly Default[]): string[] {
+  const areas = defaults.map(d => d.area)
+  return answers.changed
+    .filter(change => !areas.includes(change.area))
+    .map(change => `\`changed\` names area "${change.area}", which is not one of: ${areas.join(', ')}.`)
+}
+
+export function defaultShortName(name: string): string {
+  if (name.length <= SHORT_NAME_MAX) return name
+  return (name.split(/\s+/)[0] ?? name).slice(0, SHORT_NAME_MAX)
+}
+
+/** A string literal as oxfmt writes it: single quotes unless the text holds more of them than double. */
+export function tsString(value: string): string {
+  const singles = value.split("'").length - 1
+  const doubles = value.split('"').length - 1
+  const quote = singles > doubles ? '"' : "'"
+  return `${quote}${value.replaceAll('\\', '\\\\').replaceAll(quote, `\\${quote}`)}${quote}`
+}
+
+const htmlText = (value: string) => value.replaceAll('&', '&amp;')
+const htmlAttribute = (value: string) => htmlText(value).replaceAll('"', '&quot;')
+
+/** The web template's placeholders, as `baselines/web/README.md` lists them. */
+const WEB = {
+  slug: 'replace-me',
+  name: 'Replace Me',
+  shortName: 'ReplaceMe',
+  description: 'Replace me: a one-line description',
+}
+
+/** The Rust template's placeholders, as `baselines/rust/README.md` lists them. */
+const RUST = {
+  slug: 'replace-me',
+  snake: 'replace_me',
+  repository: 'https://github.com/replace-me-owner/replace-me',
+}
+
+// The renames here replace through functions: a replacement string would
+// expand an answer's `$&`, `$'` or `$$`.
+function renameWeb(file: TemplateFile, answers: Answers): TemplateFile {
+  if (file.text === undefined) return file
+  const shortName = answers.shortName ?? defaultShortName(answers.name)
+  let text = file.text
+  if (/\.[cm]?tsx?$/.test(file.path)) {
+    text = text
+      .replaceAll(`'${WEB.description}'`, () => tsString(answers.description))
+      .replaceAll(`'${WEB.shortName}'`, () => tsString(shortName))
+      .replaceAll(`'${WEB.name}'`, () => tsString(answers.name))
+      .replaceAll(`>${WEB.name}<`, () => `>${htmlText(answers.name)}<`)
+  } else if (file.path.endsWith('.html')) {
+    text = text
+      .replaceAll(`>${WEB.name}<`, () => `>${htmlText(answers.name)}<`)
+      .replaceAll(`"${WEB.description}"`, () => `"${htmlAttribute(answers.description)}"`)
+  } else if (/\.jsonc?$/.test(file.path)) {
+    text = text.replaceAll(`"${WEB.slug}"`, () => JSON.stringify(answers.slug))
+  }
+  return { ...file, text }
+}
+
+function renameRust(file: TemplateFile, answers: Answers): TemplateFile {
+  const path = file.path
+    .split('/')
+    .map(segment =>
+      segment === RUST.slug || segment.startsWith(`${RUST.slug}-`)
+        ? `${answers.slug}${segment.slice(RUST.slug.length)}`
+        : segment,
+    )
+    .join('/')
+  if (file.text === undefined) return { ...file, path }
+
+  // `replace_me` is an identifier (`replace_me_core`, the CLI test's
+  // `replace_me()`); `replace-me` is a crate's or the binary's name.
+  const text = file.text
+    .replaceAll(RUST.repository, () => answers.repository ?? '')
+    .replaceAll(RUST.snake, () => answers.slug.replaceAll('-', '_'))
+    .replaceAll(RUST.slug, () => answers.slug)
+  return { path, text }
+}
+
+/** Renames one template file's path and placeholders for the answers' stack. */
+export function renameFile(file: TemplateFile, answers: Answers): TemplateFile {
+  return answers.stack === 'web' ? renameWeb(file, answers) : renameRust(file, answers)
+}
+
+/**
+ * Placeholders a rename left behind, as problems: what the new repo's CI
+ * would fail on, plus paths, which it does not read. parseAnswers refuses an
+ * answer that matches, so each one is a use the rename rules here miss.
+ */
+export function leftoverPlaceholders(files: readonly TemplateFile[]): string[] {
+  const teach = 'teach renameFile in compose.ts this use'
+  const isExempt = (path: string, line: string) => path === PLACEHOLDER_EXEMPT && PLACEHOLDER_EXEMPT_LINE.test(line)
+  return files.flatMap(file => [
+    ...(PLACEHOLDER.test(file.path) ? [`${file.path}: the path still holds a template placeholder; ${teach}.`] : []),
+    ...(file.text ?? '')
+      .split('\n')
+      .flatMap((line, i) =>
+        PLACEHOLDER.test(line) && !isExempt(file.path, line)
+          ? [`${file.path}:${i + 1} still holds a template placeholder: ${line.trim()} (${teach})`]
+          : [],
+      ),
+  ])
+}
+
+const COMMENT = /<!--[\s\S]*?-->\n*/g
+
+/** The `##` sections of a stack fragment, by heading, comments dropped. */
+function fragmentSections(fragment: string): Map<string, string> {
+  const sections = new Map<string, string>()
+  let heading: string | undefined
+  let body: string[] = []
+  const flush = () => {
+    if (heading === undefined) return
+    if (sections.has(heading)) throw new Error(`The stack fragment has two "## ${heading}" sections; merge them.`)
+    sections.set(heading, body.join('\n').trim())
+  }
+  for (const line of fragment.replace(COMMENT, '').split('\n')) {
+    const match = /^## (.+)$/.exec(line)
+    if (match) {
+      flush()
+      heading = (match[1] ?? '').trim()
+      body = []
+    } else body.push(line)
+  }
+  flush()
+  return sections
+}
+
+/** `<placeholder>`s outside code and comments. */
+function unfilled(markdown: string): string[] {
+  const prose = markdown
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`\n]*`/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+  return [...prose.matchAll(/<[^<>\n]+>/g)].map(match => match[0])
+}
+
+const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`)
+
+/**
+ * CLAUDE.md: the general skeleton with the stack fragment spliced in at its
+ * markers and every placeholder filled from the answers. Throws when the
+ * skeleton or fragment no longer has a marker or placeholder this expects.
+ */
+export function composeAgentFile(template: string, fragment: string, answers: Answers): string {
+  const stack = STACKS[answers.stack]
+  const renamed = answers.stack === 'rust' ? (renameRust({ path: '', text: fragment }, answers).text ?? '') : fragment
+  const sections = fragmentSections(renamed)
+  const used = new Set<string>()
+
+  // The skeleton opens with instructions for whoever fills it in.
+  let text = template.replace(/^<!--[\s\S]*?-->\n*/, '')
+  text = text.replace(/<!-- stack fragment: ([^>]+?) -->/g, (_marker, name: string) => {
+    const body = sections.get(name)
+    if (body === undefined) throw new Error(`The stack fragment has no "## ${name}" section for CLAUDE.template.md's marker.`)
+    used.add(name)
+    return body
+  })
+  const unused = [...sections.keys()].filter(name => !used.has(name))
+  if (unused.length > 0)
+    throw new Error(`CLAUDE.template.md has no marker for the stack fragment's sections: ${unused.join(', ')}.`)
+
+  const architecture = answers.architecture
+    .map(({ choice, line }) => `- ${choice}: ${sentence(line)} [ADR 0001](docs/adr/0001-stack.md)`)
+    .join('\n')
+  const fills: [string, string][] = [
+    ['<Project name>', answers.name],
+    ['<One paragraph: what it is, who it is for, the one thing it must do well.>', answers.summary],
+    ['`<verify command>`', `\`${stack.verify}\``],
+    ['<Linear team "X", project "Y" | GitHub Issues>', answers.issues],
+    ['<Who may push, mark ready and merge.>', sentence(answers.merging)],
+    ['- <Choice>: <one line>. [ADR 0001](docs/adr/0001-stack.md)', architecture],
+  ]
+  for (const [placeholder, value] of fills) {
+    if (!text.includes(placeholder))
+      throw new Error(`CLAUDE.template.md no longer holds ${placeholder}; update the fills in composeAgentFile.`)
+    text = text.replaceAll(placeholder, () => value)
+  }
+
+  const left = unfilled(text)
+  if (left.length > 0) throw new Error(`CLAUDE.md still has placeholders: ${left.join(', ')}.`)
+  return `${text.replace(/\n{3,}/g, '\n\n').trim()}\n`
+}
+
+const cell = (text: string) => text.replace(/\s*\n\s*/g, ' ').replaceAll(/(?<!\\)\|/g, '\\|')
+
+/** `docs/adr/0001-stack.md`: the kickoff answers and every default kept or changed. */
+export function renderAdr(
+  answers: Answers,
+  input: { date: string; kickoff: readonly KickoffSection[]; defaults: readonly Default[]; baseline: Baseline },
+): string {
+  if (!DATE.test(input.date)) throw new Error(`The ADR date "${input.date}" is not YYYY-MM-DD.`)
+  const stack = STACKS[answers.stack]
+
+  const asked = input.kickoff.flatMap(section => section.questions)
+  const extra = answers.kickoff.filter(a => !asked.some(q => normalise(q) === normalise(a.question)))
+  const rows = [
+    ...asked.map(question => ({ question, found: findAnswer(answers.kickoff, question) })),
+    ...extra.map(found => ({ question: found.question, found })),
+  ].map(({ question, found }) => {
+    const answer = found === undefined ? 'Not asked' : `${found.answer}${found.assumed === true ? ' (assumed)' : ''}`
+    return `| ${cell(question)} | ${cell(answer)} |`
+  })
+
+  const defaults = input.defaults.map(d => {
+    const change = answers.changed.find(c => c.area === d.area)
+    const here = change === undefined ? 'Kept' : `Changed: ${sentence(change.to)} ${sentence(change.why)}`
+    return `| ${cell(d.area)} | ${cell(d.value)} | ${cell(d.why)} | ${cell(here)} |`
+  })
+
+  const source = [
+    `\`baselines/${answers.stack}\``,
+    input.baseline.sha === undefined ? undefined : `at \`${input.baseline.sha}\``,
+    input.baseline.isDirty ? 'with uncommitted changes' : undefined,
+  ]
+    .filter(part => part !== undefined)
+    .join(' ')
+
+  const followUps =
+    answers.followUps.length === 0
+      ? []
+      : ['', 'Follow-ups this leaves:', '', ...answers.followUps.map(f => `- ${sentence(f)}`)]
+
+  return [
+    `# 0001. Stack: the ${answers.stack} baseline`,
+    '',
+    '- Status: accepted',
+    `- Date: ${input.date}`,
+    `- Issue: ${answers.issue ?? 'none'}`,
+    '',
+    '## Context',
+    '',
+    answers.summary,
+    '',
+    'The kickoff questions, answered when the repository was created. "(assumed)" marks a default taken without asking.',
+    '',
+    '| Question | Answer |',
+    '| --- | --- |',
+    ...rows,
+    '',
+    '## Decision',
+    '',
+    `Start from the ${answers.stack} baseline in claude-improvements (${source}): ${stack.shape}. \`${stack.verify}\` is the gate. Its defaults, and what this repo did with each:`,
+    '',
+    '| Area | Default | Why | Here |',
+    '| --- | --- | --- | --- |',
+    ...defaults,
+    '',
+    '## Alternatives considered',
+    '',
+    ...answers.alternatives.map(a => `- **${a.option}**: ${sentence(a.why)}`),
+    '',
+    '## Consequences',
+    '',
+    answers.consequences,
+    ...followUps,
+    '',
+  ].join('\n')
+}
+
+/** A README for people: what it is, and how to get a working checkout. */
+export function renderReadme(answers: Answers): string {
+  const stack = STACKS[answers.stack]
+  return [
+    `# ${answers.name}`,
+    '',
+    sentence(answers.description),
+    '',
+    '## Develop',
+    '',
+    'Set up once (tools come from `mise.toml`):',
+    '',
+    '```bash',
+    stack.install,
+    '```',
+    '',
+    `Then \`${stack.verify}\` runs every check CI runs. [CLAUDE.md](CLAUDE.md) has the commands and conventions, and [docs/adr](docs/adr/README.md) the decisions behind them.`,
+    '',
+  ].join('\n')
 }
