@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  allow_author_approval: false
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: true
+    # This repository uses stacked PRs targeting feature branches as well as main.
+    base_branches:
+      - ".*"
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Follow CLAUDE.md and applicable nested repository instructions.
+        Prioritize concrete bugs, security issues, edge cases, performance costs,
+        and meaningful missing coverage. Explain failure scenarios and distinguish
+        demonstrated problems from hypotheses and style preferences. Keep severity
+        separate from disposition: critical/high findings block; medium findings
+        may be fixed or explicitly deferred with rationale; low/nits are advisory.
+        Review only the PR's scope relative to its actual base branch; stacked PRs
+        must not be asked to include later stack changes or duplicate parent work.
+    - path: "mods/**"
+      instructions: |
+        Check plugin manifests, hook inputs and outputs, shell quoting, error
+        handling, idempotency, portability, and consistency with documented usage.
+        Watch for destructive changes to user configuration and accidental exposure
+        of secrets or personal data. Template code and instructions are shipped
+        behavior: inspect generated projects and placeholder substitution too.
