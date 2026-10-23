@@ -114,6 +114,7 @@ function stage(store: string): { changes: Change[]; removed: string[]; mainExist
 
 /** Commits and pushes the captures, retrying when another run pushed first. Returns the commit. */
 function publish(store: string): ReturnType<typeof stage> & { commit: string } {
+  let lastPush = ''
   for (let attempt = 1; attempt <= 3; attempt++) {
     checkoutLatest(store)
     const staged = stage(store)
@@ -123,11 +124,11 @@ function publish(store: string): ReturnType<typeof stage> & { commit: string } {
       return { ...staged, commit: head.ok ? head.out : '' }
     }
     mustGit(store, 'commit', '-q', '-m', pr === undefined ? `main at ${sha}` : `PR #${pr} at ${sha}`)
-    if (git(store, 'push', '-q', 'origin', `HEAD:refs/heads/${BRANCH}`).ok) {
-      return { ...staged, commit: mustGit(store, 'rev-parse', 'HEAD') }
-    }
+    const push = git(store, 'push', '-q', 'origin', `HEAD:refs/heads/${BRANCH}`)
+    if (push.ok) return { ...staged, commit: mustGit(store, 'rev-parse', 'HEAD') }
+    lastPush = push.out
   }
-  return fail(`couldn't push to the ${BRANCH} branch after three attempts`)
+  return fail(`couldn't push to the ${BRANCH} branch after three attempts:\n${lastPush}`)
 }
 
 function section({ changes, removed, mainExists, commit }: ReturnType<typeof publish>): string {
