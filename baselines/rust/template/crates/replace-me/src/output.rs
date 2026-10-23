@@ -12,13 +12,10 @@
 //!   nothing extra: `serde_json` escapes them.
 //! - **Paths that aren't valid Unicode** appear with U+FFFD in place of the
 //!   bad bytes, in both formats, so `--json` always prints its document.
-#![expect(
-    clippy::print_stdout,
-    clippy::print_stderr,
-    reason = "the CLI's one output module"
-)]
+#![expect(clippy::print_stderr, reason = "the CLI's one output module")]
 
 use std::error::Error as _;
+use std::io::{self, Write};
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -69,7 +66,7 @@ impl Outcome {
         }
     }
 
-    fn print_human(&self) {
+    fn write_human(&self, out: &mut impl Write) -> io::Result<()> {
         match self {
             Self::Check {
                 path,
@@ -78,13 +75,14 @@ impl Outcome {
             } => {
                 let path = terminal_safe(&path.display().to_string());
                 for Finding { line, width } in findings {
-                    println!("{path}:{line}: {width} characters, limit {max_width}");
+                    writeln!(out, "{path}:{line}: {width} characters, limit {max_width}")?;
                 }
                 match findings.len() {
-                    0 => println!("no lines over {max_width} characters"),
-                    1 => println!("1 line over {max_width} characters"),
-                    n => println!("{n} lines over {max_width} characters"),
+                    0 => writeln!(out, "no lines over {max_width} characters")?,
+                    1 => writeln!(out, "1 line over {max_width} characters")?,
+                    n => writeln!(out, "{n} lines over {max_width} characters")?,
                 }
+                out.flush()
             }
         }
     }
@@ -113,10 +111,10 @@ struct ErrorBody<'a> {
 /// Prints the result in the requested format and returns the exit code.
 pub(crate) fn emit(format: Format, result: Result<Outcome, Error>) -> ExitCode {
     match (format, result) {
-        (Format::Human, Ok(outcome)) => {
-            outcome.print_human();
-            outcome.exit().into()
-        }
+        (Format::Human, Ok(outcome)) => finish(
+            outcome.write_human(&mut io::stdout().lock()),
+            outcome.exit(),
+        ),
         (Format::Json, Ok(outcome)) => print_json(
             &Success {
                 ok: true,
@@ -182,14 +180,24 @@ fn terminal_safe(text: &str) -> String {
 /// caller must never see a clean exit with no document.
 fn print_json(value: &impl Serialize, exit: Exit) -> ExitCode {
     match serde_json::to_string_pretty(value) {
-        Ok(json) => {
-            println!("{json}");
-            exit.into()
-        }
+        Ok(json) => finish(writeln!(io::stdout().lock(), "{json}"), exit),
         Err(error) => {
             eprintln!("error: could not encode the result as JSON: {error}");
             Exit::Error.into()
         }
+    }
+}
+
+/// `exit` once the result is written. A reader that stops early (`| head`)
+/// closes the pipe, which isn't an error: exit quietly with the result's
+/// code. Any other write failure exits 2, since the caller has no result.
+fn finish(written: io::Result<()>, exit: Exit) -> ExitCode {
+    match written {
+        Err(error) if error.kind() != io::ErrorKind::BrokenPipe => {
+            eprintln!("error: could not write the result: {error}");
+            Exit::Error.into()
+        }
+        _ => exit.into(),
     }
 }
 
@@ -208,6 +216,18 @@ mod tests {
     #[test]
     fn ordinary_text_is_unchanged() {
         assert_eq!(terminal_safe("dir/é file.txt"), "dir/é file.txt");
+    }
+
+    #[test]
+    fn a_reader_that_stops_early_keeps_the_result_s_exit_code() {
+        let closed = io::Error::from(io::ErrorKind::BrokenPipe);
+        assert_eq!(finish(Err(closed), Exit::Findings), Exit::Findings.into());
+    }
+
+    #[test]
+    fn any_other_write_failure_exits_2() {
+        let full = io::Error::from(io::ErrorKind::StorageFull);
+        assert_eq!(finish(Err(full), Exit::Clean), Exit::Error.into());
     }
 
     #[cfg(unix)]

@@ -22,7 +22,7 @@ lints-inherited:
 # --no-index also reads untracked files and works outside a git repo; a grep
 # error (status 2 or more) fails the recipe rather than passing it.
 no-allow:
-    @git grep --no-index --exclude-standard -nE '#!?\[(.*[(, ])?allow\(' -- '*.rs'; s=$?; if [ "$s" -eq 0 ]; then echo 'Use #[expect(lint, reason = "…")], not #[allow].' >&2; exit 1; fi; [ "$s" -eq 1 ]
+    @git grep --no-index --exclude-standard -nE '#!?\[(.*[(,[:space:]])?allow[[:space:]]*\(' -- '*.rs'; s=$?; if [ "$s" -eq 0 ]; then echo 'Use #[expect(lint, reason = "…")], not #[allow].' >&2; exit 1; fi; [ "$s" -eq 1 ]
 
 test:
     cargo nextest run --workspace --all-features --locked
