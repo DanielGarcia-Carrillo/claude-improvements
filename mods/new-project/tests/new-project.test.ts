@@ -64,7 +64,10 @@ test("leaves other skills, and another plugin's new-project, alone", async ($, o
     text: SKILL_BODY,
     path: '/elsewhere/skills/new-project/SKILL.md',
   })
+  // Another plugin's skill with no file path, such as an inline command.
+  const namesake = await $.skill.prompt({ skill: 'other:new-project', text: SKILL_BODY })
   expect(other.text).toBe('Commit it.')
   expect(elsewhere.text).toBe(SKILL_BODY)
+  expect(namesake.text).toBe(SKILL_BODY)
   expect(asked).toEqual([])
 })
