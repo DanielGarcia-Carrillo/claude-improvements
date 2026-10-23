@@ -6,7 +6,8 @@
  *
  * Each stack is scaffolded into a temporary folder, then checked with the
  * template CI's own placeholder step, so a placeholder the baselines gain
- * without a rename rule fails here first.
+ * without a rename rule fails here first. Setup runs only against a
+ * stand-in mise, so nothing is installed.
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
@@ -138,4 +139,35 @@ test('a baseline folder that is a link is refused before anything is written', (
   const result = dryRun(join(scratch, 'linked-target'), copy)
   assert.equal(result.status, 1)
   assert.match(result.stderr, /links docs; scaffold would write docs\/adr\/0001-stack\.md through it/)
+})
+
+test('setup needs --stack for a folder holding both manifests, and runs the stack named', () => {
+  // A Rust tool with an npm wrapper holds both.
+  const repo = join(scratch, 'both')
+  mkdirSync(repo)
+  writeFileSync(join(repo, 'package.json'), '{}\n')
+  writeFileSync(join(repo, 'Cargo.toml'), '[workspace]\n')
+  // The only mise on PATH logs its calls and fails `mise exec`, the first
+  // step that differs between the stacks.
+  const bin = join(scratch, 'bin')
+  const calls = join(scratch, 'mise-calls')
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'mise'), `#!/bin/sh\necho "$*" >> '${calls}'\n[ "$1" != exec ]\n`, { mode: 0o755 })
+  const setup = (...options: string[]) =>
+    spawnSync(process.execPath, [SCRIPT, 'setup', repo, ...options], { encoding: 'utf8', env: { ...process.env, PATH: bin } })
+
+  const inferred = setup()
+  assert.equal(inferred.status, 1)
+  assert.match(inferred.stderr, /holds both package\.json and Cargo\.toml; pass --stack rust or --stack web/)
+  assert.ok(!existsSync(calls), 'setup ran mise before it knew the stack')
+
+  // --keep-versions skips the toolchain bump, which would fetch the stable release.
+  const rust = setup('--stack', 'rust', '--keep-versions')
+  assert.equal(rust.status, 1)
+  assert.match(rust.stderr, /`mise exec -- cargo generate-lockfile` failed/)
+  assert.equal(read(scratch, 'mise-calls'), 'trust\ninstall\nexec -- cargo generate-lockfile\n')
+
+  assert.match(setup('--stack', 'go').stderr, /--stack must be web or rust, not "go"/)
+  rmSync(join(repo, 'package.json'))
+  assert.match(setup('--stack', 'web').stderr, /--stack web needs package\.json/)
 })

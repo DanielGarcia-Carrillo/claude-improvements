@@ -353,7 +353,13 @@ test('pins Rust to the current stable and reports what a bump changed', async ()
   const pinned = pinRust({ toolchain, cargo }, '1.100.2')
   expect(pinned.toolchain).toBe('[toolchain]\nchannel = "1.100.2"\ncomponents = ["rustfmt", "clippy"]\n')
   expect(pinned.cargo).toBe('[workspace.package]\nedition = "2024"\nrust-version = "1.100"\n')
+  // An MSRV behind the channel was chosen, as a published library's is, so it stays.
+  const library = cargo.replace('"1.99"', '"1.96"')
+  const kept = pinRust({ toolchain, cargo: library }, '1.100.2')
+  expect(kept.toolchain).toBe(pinned.toolchain)
+  expect(kept.cargo).toBe(library)
   expect(() => pinRust({ toolchain: '[toolchain]\n', cargo }, '1.100.2')).toThrow('no `channel = "…"` line')
+  expect(() => pinRust({ toolchain, cargo: '[workspace.package]\n' }, '1.100.2')).toThrow('no `rust-version = "…"` line')
 
   expect(changedLines(cargo, pinned.cargo)).toEqual(['- rust-version = "1.99"', '+ rust-version = "1.100"'])
   expect(changedLines(cargo, cargo)).toEqual([])

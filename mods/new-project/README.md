@@ -35,7 +35,9 @@ a first ADR that record why it looks the way it does.
    (mise.toml's pins and npm packages; the Rust toolchain and crates), format what the
    scaffold wrote, then `pnpm verify` or `just verify`. A major that breaks
    verify is reverted and recorded in the ADR, and `--keep-versions` reruns
-   without taking majors again. Claude reports the result and offers the
+   without taking majors again. `--stack web` or `--stack rust` names the
+   baseline, which a folder holding both package.json and Cargo.toml (a Rust
+   tool with an npm wrapper) needs. Claude reports the result and offers the
    first commit. Nothing is pushed.
 
 ## Where the baselines come from
