@@ -6,7 +6,7 @@
  *
  * `scaffold` checks the answers against the baselines, then copies
  * `general/files/` and the stack's `template/` into DIR (new, or empty but
- * for `.git`), renames the placeholders, writes CLAUDE.md with AGENTS.md
+ * for `.git`, and outside any other git repository), renames the placeholders, writes CLAUDE.md with AGENTS.md
  * linked to it, `docs/adr/0001-stack.md` and README.md, and runs `git init`.
  * Nothing is written until every check passes; `--dry-run` stops there.
  *
@@ -23,6 +23,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -110,6 +111,14 @@ function baselineState(dir: string): Baseline {
 }
 
 function checkTarget(target: string) {
+  // Inside another repository the project would get no repo of its own, and a
+  // first commit would land in the outer one. An empty clone is its own top.
+  let existing = target
+  while (!existsSync(existing)) existing = dirname(existing)
+  const top = run(['git', 'rev-parse', '--show-toplevel'], existing)
+  if (top.status === 0 && realpathSync(top.stdout.trim()) !== (existsSync(target) ? realpathSync(target) : ''))
+    throw new UsageError(`${target} is inside the git repository at ${top.stdout.trim()}; name a folder outside it.`)
+
   if (!existsSync(target)) return
   if (!lstatSync(target).isDirectory()) throw new UsageError(`${target} is a file; name a new or empty folder.`)
   const extra = readdirSync(target).filter(name => !ALLOWED_IN_TARGET.has(name))
@@ -118,6 +127,9 @@ function checkTarget(target: string) {
       `${target} already holds ${extra.slice(0, 5).join(', ')}${extra.length > 5 ? ', …' : ''}; name a new or empty folder.`,
     )
 }
+
+/** `path` quoted for a POSIX shell, for a command the user may paste. */
+const shellQuote = (path: string) => `'${path.replaceAll("'", "'\\''")}'`
 
 const today = () => {
   const now = new Date()
@@ -142,7 +154,8 @@ function scaffold(options: { answers: string; target: string; baselines: string;
   const read = (path: string) => {
     const full = join(baselines, path)
     if (!existsSync(full)) throw new UsageError(`${full} is missing; is --baselines the claude-improvements baselines folder?`)
-    return readFileSync(full, 'utf8')
+    // A Windows checkout may hold CRLF; the parsers match whole lines.
+    return readFileSync(full, 'utf8').replaceAll('\r\n', '\n')
   }
   const kickoff = kickoffFor(parseKickoff(read('general/kickoff.md')), stack)
   const defaults = parseDefaults(read(`${stack}/README.md`))
@@ -165,7 +178,7 @@ function scaffold(options: { answers: string; target: string; baselines: string;
     },
     { path: 'README.md', text: renderReadme(answers) },
   ]
-  const overwritten = generated.filter(file => byPath.has(file.path)).map(file => file.path)
+  const overwritten = [...generated.map(file => file.path), 'AGENTS.md'].filter(path => byPath.has(path))
   if (overwritten.length > 0) throw new Error(`The baseline already ships ${overwritten.join(', ')}; scaffold would overwrite it.`)
   const leftovers = leftoverPlaceholders([...files, ...generated])
   if (leftovers.length > 0) throw new Error(leftovers.join('\n'))
@@ -204,7 +217,7 @@ function scaffold(options: { answers: string; target: string; baselines: string;
   console.log(
     [
       `Scaffolded the ${stack} baseline into ${target}: ${plan.length} paths, ${git}.`,
-      `Next: node ${join(HERE, 'new-project.ts')} setup ${target}`,
+      `Next: node ${shellQuote(join(HERE, 'new-project.ts'))} setup ${shellQuote(target)}`,
     ].join('\n'),
   )
 }
@@ -241,7 +254,7 @@ function bumpMiseTools(dir: string): string | undefined {
 async function bumpRustToolchain(dir: string): Promise<string | undefined> {
   let version: string
   try {
-    const response = await fetch(RUST_STABLE_MANIFEST)
+    const response = await fetch(RUST_STABLE_MANIFEST, { signal: AbortSignal.timeout(30_000) })
     if (!response.ok) return `${RUST_STABLE_MANIFEST} answered ${response.status}`
     version = rustStableVersion(await response.text())
     const toolchainPath = join(dir, 'rust-toolchain.toml')
@@ -250,7 +263,9 @@ async function bumpRustToolchain(dir: string): Promise<string | undefined> {
     writeFileSync(toolchainPath, pinned.toolchain)
     writeFileSync(cargoPath, pinned.cargo)
   } catch (error) {
-    return `Could not pin the current stable Rust: ${(error as Error).message}`
+    // fetch hides the network reason, such as a refused connection, in `cause`.
+    const { message, cause } = error as Error
+    return `Could not pin the current stable Rust: ${message}${cause instanceof Error ? ` (${cause.message})` : ''}`
   }
   console.log(`Rust ${version} is the current stable.`)
   // With no toolchain named, rustup installs the one rust-toolchain.toml
