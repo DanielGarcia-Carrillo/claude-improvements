@@ -1,7 +1,8 @@
 /**
  * PostToolUse on Edit|Write: apply safe lint fixes and format the file, then
- * hand whatever lint could not fix back to Claude (exit 2) while the edit is
- * still fresh. Type-aware rules run in the Stop hook and in `pnpm lint`.
+ * hand whatever lint could not fix, or a file oxfmt can't parse, back to
+ * Claude (exit 2) while the edit is still fresh. Type-aware rules run in the
+ * Stop hook and in `pnpm lint`.
  */
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -26,7 +27,14 @@ const run = (args: string[]) => spawnSync('pnpm', ['exec', ...args], { cwd: root
 const ext = extname(file)
 
 if (LINTED.has(ext)) run(['oxlint', '--fix', file])
-if (FORMATTED.has(ext)) run(['oxfmt', file])
+if (FORMATTED.has(ext)) {
+  // A file .oxfmtrc.json ignores is an unmatched pattern, not an error.
+  const format = run(['oxfmt', '--no-error-on-unmatched-pattern', file])
+  if (format.status !== 0) {
+    process.stderr.write(`oxfmt: couldn't format ${relative(root, file)}:\n${format.stdout}${format.stderr}`)
+    process.exit(2)
+  }
+}
 if (LINTED.has(ext)) {
   const lint = run(['oxlint', file])
   if (lint.status !== 0) {

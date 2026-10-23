@@ -7,8 +7,10 @@
  * prefix, so `pnpm dlx wrangler deploy`, `./node_modules/.bin/wrangler deploy`
  * or `wrangler --config x deploy` would slip past it. This matches `wrangler`
  * anywhere on a line, with any global options, followed by a subcommand that
- * changes production. A line that only quotes such a command is blocked too:
- * a false block costs a rephrase, a missed one a production deploy.
+ * changes production. Each such call is checked on its own, up to the next
+ * `;`, `&` or `|`, so a `--dry-run` or `--env` on one doesn't excuse another
+ * on the same line. A line that only quotes such a command is blocked too: a
+ * false block costs a rephrase, a missed one a production deploy.
  *
  * Allowed: `--dry-run`, `--env <name>` for a non-production environment, and
  * the preview commands (`wrangler preview`, `wrangler versions upload`).
@@ -19,7 +21,8 @@ import { readFileSync } from 'node:fs'
 /** `wrangler` however it is invoked (npx, pnpm dlx, a path, `@4`), then its global options. */
 const WRANGLER = String.raw`\bwrangler(?:@\S+)?(?:\.\w+)?(?:\s+-{1,2}[\w-]+(?:=\S+|\s+(?!-)\S+)?)*\s+`
 const CHANGES_PRODUCTION = new RegExp(
-  `${WRANGLER}(deploy|publish|versions\\s+deploy|triggers\\s+deploy|rollback|delete|secret\\s+(?:put|delete|bulk))\\b(.*)$`,
+  `${WRANGLER}(deploy|publish|versions\\s+deploy|triggers\\s+deploy|rollback|delete|secret\\s+(?:put|delete|bulk))\\b([^;&|]*)`,
+  'g',
 )
 /** Names a production environment is plausibly given. */
 const PRODUCTION = new Set(['main', 'master', 'production', 'prod', 'release'])
@@ -49,13 +52,13 @@ function refuse(why: string): never {
 }
 
 for (const line of bashCommand(JSON.parse(readFileSync(0, 'utf8'))).split('\n')) {
-  const match = CHANGES_PRODUCTION.exec(line)
-  if (!match) continue
-  const subcommand = (match[1] ?? '').replace(/\s+/g, ' ')
-  const args = match[2] ?? ''
-  if (/(?:^|\s)--dry-run\b/.test(args)) continue
-  const envs = environments(args)
-  const production = envs.find((env) => PRODUCTION.has(env))
-  if (production) refuse(`\`--env ${production}\` is a production environment.`)
-  if (envs.length === 0) refuse(`\`wrangler ${subcommand}\` changes the production Worker.`)
+  for (const match of line.matchAll(CHANGES_PRODUCTION)) {
+    const subcommand = (match[1] ?? '').replace(/\s+/g, ' ')
+    const args = match[2] ?? ''
+    if (/(?:^|\s)--dry-run\b/.test(args)) continue
+    const envs = environments(args)
+    const production = envs.find((env) => PRODUCTION.has(env))
+    if (production) refuse(`\`--env ${production}\` is a production environment.`)
+    if (envs.length === 0) refuse(`\`wrangler ${subcommand}\` changes the production Worker.`)
+  }
 }

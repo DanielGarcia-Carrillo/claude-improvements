@@ -19,11 +19,12 @@ Versions and statuses were checked on 2026-10-20.
    wrangler.jsonc), `Replace Me` and a `Replace me: …` description
    (index.html, the manifest in vite.config.ts, the home route and its e2e
    test) and `ReplaceMe` (the manifest's short name, at most 12 characters).
-   `git grep -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
+   `git grep --untracked -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
    fails while any remain.
 3. `mise install && pnpm install && pnpm exec playwright install chromium webkit`.
-   The template has no lockfile and its ranges are carets, so this already
-   resolves the newest minor and patch releases.
+   The template has no lockfile, so this resolves the newest release each
+   range allows: a caret on 0.x takes patches only, and StyleX is pinned
+   exactly. Step 4 takes the rest.
 4. Take new majors too: raise the pins in this repo's `mise.toml` and
    `packageManager` in package.json by hand, then `pnpm up --latest` and
    `pnpm verify`. If a major breaks verify, revert that one and note it in
@@ -107,7 +108,8 @@ for an ADR, not a default), TanStack Pacer (beta; a debounce plus
 
 ### Add an API
 
-1. `pnpm add hono zod` and `pnpm add -D @cloudflare/vite-plugin`.
+1. `pnpm add hono zod @hono/standard-validator` and
+   `pnpm add -D @cloudflare/vite-plugin`.
 2. Write `worker/index.ts` exporting a Hono app with routes under `/api`,
    validated with `@hono/standard-validator`, and `export type AppType`.
    Start it with `secureHeaders()` (`_headers` never applies to Worker
