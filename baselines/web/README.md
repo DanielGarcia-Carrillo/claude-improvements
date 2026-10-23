@@ -158,3 +158,23 @@ precache, so declare the Latin file yourself in `src/index.css`. One
 `'<Family> Fallback'` (`src: local('Arial')` with `size-adjust` and
 `ascent-override`). Put both first in `font.body` in `tokens.stylex.ts`.
 `woff2` is already in the precache glob, so the font works offline.
+
+## Sources
+
+- **The starting point**: Christoph Nakazawa,
+  [Fastest Frontend Tooling](https://cpojer.net/posts/fastest-frontend-tooling)
+  (read in its 2026-09-30 revision). It recommends native TypeScript,
+  oxlint with type-aware rules, oxfmt, Vite and pnpm. This template differs
+  in four ways:
+  - TypeScript 7 ships the native compiler as `tsc`, so there is no `tsgo`.
+  - Lint is the correctness and suspicious categories rather than the
+    post's strict `@nkzw/oxlint-config` preset.
+  - The React Compiler's `panicThreshold` fails the build, so no ESLint is
+    kept for its rules.
+  - `verify` runs its steps in order and stops at the first failure, rather
+    than in parallel.
+- **The update prompt**: Workbox's
+  [Handling service worker updates](https://developer.chrome.com/docs/workbox/handling-service-worker-updates)
+  and web.dev's [PWA update](https://web.dev/learn/pwa/update) guide.
+- **The `.claude/` hooks**: Claude Code's
+  [hooks guide](https://code.claude.com/docs/en/hooks-guide).
