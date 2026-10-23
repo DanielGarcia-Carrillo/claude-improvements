@@ -19,7 +19,7 @@ under Rolldown.
 | Tool | Covers | Free tier | Browser cost | Notes |
 |---|---|---|---|---|
 | **Sentry** 11.8 | Errors, tracing, replay, logs | 1 user, 5k errors, 50 replays, 5M spans a month | Errors only 30 KB; with tracing 53 KB; with replay 87 KB | `tunnel` option gets past ad blockers. The Vite plugin uploads source maps and deletes them. `@sentry/cloudflare` for Workers |
-| **PostHog** | Analytics, replay, errors, feature flags | 1M events, 5k recordings, 100k exceptions a month (from its FAQ) | 108 KB default; 52 KB slim | `cookieless_mode: "always"` needs no consent banner; EU host; documented Cloudflare Worker proxy |
+| **PostHog** | Analytics, replay, errors, feature flags | 1M events, 5k recordings, 100k exceptions a month (from its FAQ) | 108 KB default; 52 KB slim | `cookieless_mode: "always"` stores nothing in the browser, and PostHog says it then needs no consent banner (with its "Cookieless server hash mode" on); EU host; documented Cloudflare Worker proxy |
 | **Workers Logs, Traces, Issues** | Worker logs, traces, grouped errors | 200k log events a day. Changes on 2026-12-01 to 0.5 GB a day, kept 7 days | None | Traces are early beta; Issues is open beta and groups errors logged with `console.error()` |
 | **Cloudflare Web Analytics** | Traffic, LCP, INP, CLS | Free | 10.3 KB, third-party beacon | Cookieless; SPA soft navigations since 2026-08; some ad blockers drop it |
 | **Grafana Faro** | Errors, vitals, sessions, traces | 50k sessions a month, 14-day retention | 40 KB; 89 KB with tracing | Self-hostable through Alloy |
@@ -33,14 +33,16 @@ under Rolldown.
 
 - `pnpm add @sentry/react` and `pnpm add -D @sentry/vite-plugin`.
 - `src/lib/monitoring.ts` calls `import('@sentry/react')` from
-  `requestIdleCallback` after first render, with `dsn`, `tunnel: '/api/e'`,
+  `requestIdleCallback` after first render (`setTimeout` where it is
+  missing: Safari has it only behind a flag), with `dsn`, `tunnel: '/api/e'`,
   `release`, `sendDefaultPii: false` and `tracesSampleRate: 0`. No replay or
   tracing integrations. A small early `error` listener queues errors that
   happen before the SDK loads.
 - A Hono route `/api/e` forwards envelopes to Sentry's host, allowing only
   your project's ID. Each forwarded error is a Worker request.
-- The service worker can't run Sentry (undocumented); its `error` and
-  `unhandledrejection` listeners post to a client or to `/api/e`.
+- Sentry doesn't document service-worker support, so the service worker
+  doesn't load it; its `error` and `unhandledrejection` listeners post to a
+  client or to `/api/e`.
 - Source maps: `build.sourcemap: 'hidden'` only when `SENTRY_AUTH_TOKEN` is
   set, and the plugin's `filesToDeleteAfterUpload: ['dist/**/*.map']`. The
   token reaches CI's build step on `main` only. Before `wrangler deploy`, fail

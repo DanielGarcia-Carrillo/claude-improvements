@@ -8,9 +8,10 @@ is planned.** Checked on 2026-10-20.
 A dedicated visual regression tool built for agent workflows is in
 development, and it is meant to become the default for pixel diffs in these
 baselines: deterministic comparisons, `main` commits as baselines, a compact
-per-PR summary. Until it reaches a usable release, the template relies on
-the test runners' own assertions, so there is nothing to migrate away from
-except the assertion calls.
+per-PR summary. Until it reaches a usable release, the template has no
+screenshot assertions: its PR screenshots job (below) shows reviewers what
+changed. Adopting the tool means replacing that job, and any screenshot
+assertions a project has added.
 
 ## Until then
 
@@ -28,7 +29,8 @@ except the assertion calls.
 - Mask anything that changes on its own (dates, live data) and keep reduced
   motion on, as the template's Playwright config does.
 - Prefer aria snapshots (`toMatchAriaSnapshot`) for structure: they catch
-  most layout and content regressions without pixel noise.
+  structure and content regressions without pixel noise, but not layout or
+  styling.
 
 ## Hosted alternatives
 
@@ -41,4 +43,5 @@ except the assertion calls.
 ## Revisit when
 
 The in-house tool has a release that covers Playwright captures and stories;
-then replace the built-in assertions with it in the template.
+then replace the template's PR screenshots job, and any screenshot
+assertions, with it.

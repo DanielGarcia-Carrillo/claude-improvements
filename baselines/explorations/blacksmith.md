@@ -50,8 +50,8 @@ Blacksmith for twice the cores, so it breaks even only if it runs at least
 For Linux 2-vCPU jobs, with *m* minutes a month on GitHub and a speed-up
 *s*:
 
-- GitHub: (*m* − 3,000) × $0.006
-- Blacksmith: (*m* / *s* − 3,000) × $0.004, plus $4 per user per month for
+- GitHub: max(0, *m* − 3,000) × $0.006
+- Blacksmith: max(0, *m* / *s* − 3,000) × $0.004, plus $4 per user per month for
   Team
 
 Worked example: $60 a month of Linux overage is about 10,000 paid plus
@@ -93,9 +93,11 @@ things change:
 3. Set the repo variable `CI_RUNNER` to `blacksmith-2vcpu-ubuntu-2404`.
 4. After a week, compare minutes, wall-clock time and cost with the week
    before.
-5. If it holds up, move the other private repos and set `CI_RUNNER` once as
-   an organisation variable limited to private repositories. Public repos in
-   the organisation then stay on GitHub's free runners.
+5. If it holds up, move the other private repos, add each to Blacksmith's
+   app, and set `CI_RUNNER` once as an organisation variable for those same
+   selected repositories. A repo with the variable but not the app has no
+   runner for its jobs. Public repos in the organisation stay on GitHub's
+   free runners.
 
 ## Risks
 
@@ -103,7 +105,9 @@ things change:
   each job in its own VM, and doesn't request access to secrets. Its app
   does ask for read/write on contents, workflows, pull requests, checks and
   actions (for its migration wizard and agent features), so install it on
-  selected repos only.
+  selected repos only. It also gets organisation-wide read/write on
+  self-hosted runners, which is how jobs reach its runners; repo selection
+  doesn't limit that.
 - **Ubuntu 24.04 only**, while the templates default to 26.04. Toolchains
   come from mise and `rustup`, not the image, so this rarely matters;
   Playwright's `--with-deps` supports 24.04.

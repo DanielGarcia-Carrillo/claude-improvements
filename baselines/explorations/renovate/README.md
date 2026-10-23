@@ -47,12 +47,15 @@ From [Renovate's hosting docs](https://docs.renovatebot.com/mend-hosted/overview
 
 1. Install the Renovate GitHub app on that repo only, or add the self-hosted
    Action.
-2. Copy [`renovate.json`](renovate.json) to the repo root.
+2. Copy [`renovate.json`](renovate.json) onto Renovate's `renovate/configure`
+   branch, replacing the config in its "Configure Renovate" PR. On the
+   default branch it would onboard the repo silently, with no PR.
 3. Delete `.github/dependabot.yml`, or both bots will open PRs for the same
    updates. (Keep Dependabot *security* alerts on in the repo settings; they
    are separate from version updates.)
-4. Merge Renovate's "Configure Renovate" PR, which lists what it detected.
+4. Merge that PR once its description lists what you expect.
 
 `renovate.json` here runs weekly before 6am Monday, groups minor and patch
 updates into one PR with separate ones for Actions and for `mise.toml`, and
-waits three days before taking a new npm release.
+waits three days before taking a new npm release (`config:best-practices`
+does that, with the exemptions pins and lock-file maintenance need).

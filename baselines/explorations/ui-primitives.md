@@ -16,13 +16,13 @@ browser-compat-data 8.1.6:
 | Modal dialog with focus trap and inert background | `<dialog>` + `showModal()` | Yes |
 | Non-modal popups, light dismiss, top layer | Popover API (`popover`, `popovertarget`) | Yes (Safari 17) |
 | Exclusive accordion | `<details name="…">` | Yes (Safari 17.2) |
-| Opening dialogs and popovers without JS | Invoker commands (`commandfor`) | No: Safari 26.2+ |
-| Positioning a popup next to its trigger | CSS anchor positioning | No: Safari 27 |
+| Opening modal dialogs without JS | Invoker commands (`commandfor`) | No: Safari 26.2+ |
+| Positioning a popup next to its trigger | CSS anchor positioning | No: Safari 26 |
 | Fully stylable `<select>` | `appearance: base-select` | No: Safari 27 |
 
 So menus and comboboxes that must sit next to their trigger, and a styled
-select, still need JavaScript in this range; dialogs, popovers and
-accordions don't.
+select, still need JavaScript in this range. Popovers and accordions don't,
+and a modal dialog needs only a `showModal()` call.
 
 ## When a widget needs a library
 
@@ -48,8 +48,9 @@ target (`'[data-state="open"]': …`).
 
 ## Suggested pick by widget
 
-- **Menu, popover menu, tooltip, combobox:** Radix, for size, until anchor
-  positioning reaches the browser floor.
+- **Menu, popover menu, tooltip:** Radix, for size, until anchor
+  positioning reaches the browser floor. Radix has no combobox; take that
+  from Base UI or Ariakit.
 - **Date picker, number or currency field, anything locale-heavy:** React
   Aria, the one case where its weight buys something the others lack. A
   DatePicker alone is +60 KB with the locale optimiser. Once React Aria is
@@ -83,7 +84,9 @@ fit the per-widget slot:
 
 - Astryx reaches 1.0, or ships unstyled primitives.
 
-- Safari 27 becomes the floor (about three Safari majors from now): anchor
-  positioning and stylable selects remove most of the remaining need.
+- Safari 26 becomes the floor (when Safari 28 ships): anchor positioning is
+  in range.
+- Safari 27 becomes the floor (when Safari 29 ships): stylable selects
+  remove most of the remaining need.
 - A project needs several complex widgets at once; then one kit may beat
   several per-widget picks.
