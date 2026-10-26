@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Correctness and suspicious patterns only: rules that catch bugs or remove
+  // a choice nobody should make by hand. Style is the formatter's job.
+  "plugins": ["typescript", "react", "jsx-a11y", "import", "unicorn", "oxc", "promise", "vitest"],
+  // StyleX's own rules through oxlint's JS plugin support (alpha, but these
+  // are verified): invalid values, unused styles, conflicting className.
+  "jsPlugins": ["@stylexjs/eslint-plugin"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "env": { "browser": true, "es2024": true },
+  "ignorePatterns": ["dist", "storybook-static", "src/routeTree.gen.ts"],
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "import/no-cycle": "error",
+    // No index files that re-export a folder: they defeat tree-shaking in
+    // dev and tests, and hide where a name comes from.
+    "oxc/no-barrel-file": ["error", { "threshold": 0 }],
+    // Stylesheets are imported for their side effect.
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    // The automatic JSX runtime needs no React in scope.
+    "react/react-in-jsx-scope": "off",
+    // <output> is not announced as a live region consistently across screen
+    // readers; role="status" on a div is.
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "@stylexjs/valid-styles": "error",
+    "@stylexjs/no-unused": "error",
+    "@stylexjs/valid-shorthands": "error",
+    "@stylexjs/enforce-extension": "error",
+    "@stylexjs/no-conflicting-props": "error",
+    // Workbox's injection point is a fixed name.
+    "no-underscore-dangle": ["error", { "allow": ["__WB_MANIFEST"] }],
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
+  },
+  "overrides": [
+    {
+      "files": ["tests/**", "**/*.test.ts", "**/*.test.tsx", "*.config.ts", ".claude/hooks/**"],
+      "rules": { "no-console": "off" }
+    },
+    {
+      // Playwright fixtures call a parameter named `use`; it is not React's.
+      "files": ["tests/e2e/**"],
+      "rules": { "react/rules-of-hooks": "off" }
+    }
+  ]
+}

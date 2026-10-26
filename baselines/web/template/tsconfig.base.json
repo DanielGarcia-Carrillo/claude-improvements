@@ -1,0 +1,34 @@
+{
+  // Shared by every program. Strictness lives here so no program can drift
+  // looser than the others.
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    // Only syntax that type stripping can remove: no enums, namespaces or
+    // parameter properties. Node runs our scripts without a compiler.
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    // Our code is checked in full; library declarations are not. Several
+    // reference optional peers we don't install (webpack, rspack) or fail
+    // under exactOptionalPropertyTypes (workbox), and none of that is ours.
+    "skipLibCheck": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // Errors rather than editor hints.
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false
+  }
+}

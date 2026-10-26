@@ -1,0 +1,4 @@
+[tools]
+# Even-numbered majors become LTS in October. pnpm comes from package.json's
+# `packageManager`, which pnpm itself enforces.
+node = "26"
