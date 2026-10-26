@@ -15,11 +15,7 @@
       "Bash(git push -f *)",
       "Bash(git push * -f)",
       "Bash(git push * -f *)",
-      "Bash(git push * +*)",
-      "Bash(wrangler deploy *)",
-      "Bash(pnpm exec wrangler deploy *)",
-      "Bash(pnpm wrangler deploy *)",
-      "Bash(npx wrangler deploy *)"
+      "Bash(git push * +*)"
     ]
   },
   "hooks": {

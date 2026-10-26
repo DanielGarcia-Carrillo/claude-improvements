@@ -89,9 +89,11 @@ by itself.
   released; `test.teardownTimeout` in vite.config.ts works around it. Remove
   it once a StyleX release includes the fix.
 - **Never deploy production from a session.** CI deploys `main`;
-  `.claude/hooks/guard-deploy.ts` refuses deploys, rollbacks and secret
-  changes. A branch preview is `wrangler preview`, which has its own
-  bindings; `wrangler versions upload` would carry production's.
+  `.claude/hooks/guard-deploy.ts` refuses production deploys, rollbacks and
+  secret changes. Previews are fine: `wrangler preview` gives the branch its
+  own URL and only the bindings in `wrangler.jsonc`'s `previews` block, while
+  `wrangler versions upload` would carry production's. `--dry-run` and a
+  non-production `--env` pass too.
 - **The CSP lives in `public/_headers`** and `vite preview` applies it, so
   e2e fails on any violation. A new third-party origin (fonts, analytics,
   an API) goes into the matching directive there, not into an inline

@@ -3,15 +3,16 @@
  * production Worker serves, or its secrets. CI deploys `main`
  * (.github/workflows/ci.yml); a session never does.
  *
- * permissions.deny can't express this on its own: a Bash rule matches a
- * prefix, so `pnpm dlx wrangler deploy`, `"./node_modules/.bin/wrangler" deploy`
- * or `wrangler --config x deploy` would slip past it. This matches `wrangler`
- * anywhere on a line, quoted or not, with any global options, followed by a
- * subcommand that changes production. Each such call is checked on its own,
- * up to the next `;`, `&` or `|` (or a `#` comment), so a `--dry-run` or
- * `--env` on one doesn't excuse another on the same line. A line that only
- * quotes such a command is blocked too: a false block costs a rephrase, a
- * missed one a production deploy.
+ * It is the only guard: settings.json has no wrangler deny rules, because a
+ * Bash rule matches a prefix. `wrangler deploy *` would refuse a dry run or a
+ * staging deploy as well, and still miss `pnpm dlx wrangler deploy`,
+ * `"./node_modules/.bin/wrangler" deploy` or `wrangler --config x deploy`.
+ * This matches `wrangler` anywhere on a line, quoted or not, with any global
+ * options, followed by a subcommand that changes production. Each such call
+ * is checked on its own, up to the next `;`, `&` or `|` (or a `#` comment),
+ * so a `--dry-run` or `--env` on one doesn't excuse another on the same line.
+ * A line that only quotes such a command is blocked too: a false block costs
+ * a rephrase, a missed one a production deploy.
  *
  * Allowed: `--dry-run` (not `--dry-run=false`), `--env <name>` on either side
  * of the subcommand for a non-production environment spelled out on the line

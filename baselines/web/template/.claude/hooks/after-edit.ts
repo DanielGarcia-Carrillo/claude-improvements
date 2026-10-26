@@ -4,8 +4,8 @@
  * Claude (exit 2) while the edit is still fresh. Type-aware rules run in the
  * Stop hook and in `pnpm lint`.
  */
-import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
+import { readFileSync, realpathSync } from 'node:fs'
 import { extname, relative } from 'node:path'
 
 const FORMATTED = new Set(['.ts', '.tsx', '.js', '.mjs', '.json', '.jsonc', '.css', '.md', '.yaml', '.yml', '.html'])
@@ -32,10 +32,26 @@ function checkout(payload: unknown): string {
   return top.status === 0 ? top.stdout.trim() : cwd
 }
 
+/** `path` with symlinks resolved, as git reports a checkout's top level. */
+function real(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
+}
+
+/** What a tool printed, or why it didn't start. */
+function printed(result: SpawnSyncReturns<string>): string {
+  return result.error ? `${result.error.message}\n` : `${result.stdout}${result.stderr}`
+}
+
 const payload: unknown = JSON.parse(readFileSync(0, 'utf8'))
-const file = editedFile(payload)
-const root = checkout(payload)
-if (!file || relative(root, file).startsWith('..')) process.exit(0)
+const edited = editedFile(payload)
+if (!edited) process.exit(0)
+const root = real(checkout(payload))
+const file = real(edited)
+if (relative(root, file).startsWith('..')) process.exit(0)
 
 const run = (args: string[]) => spawnSync('pnpm', ['exec', ...args], { cwd: root, encoding: 'utf8' })
 const ext = extname(file)
@@ -45,16 +61,14 @@ if (FORMATTED.has(ext)) {
   // A file .oxfmtrc.json ignores is an unmatched pattern, not an error.
   const format = run(['oxfmt', '--no-error-on-unmatched-pattern', file])
   if (format.status !== 0) {
-    process.stderr.write(`oxfmt: couldn't format ${relative(root, file)}:\n${format.stdout}${format.stderr}`)
+    process.stderr.write(`oxfmt: couldn't format ${relative(root, file)}:\n${printed(format)}`)
     process.exit(2)
   }
 }
 if (LINTED.has(ext)) {
   const lint = run(['oxlint', file])
   if (lint.status !== 0) {
-    process.stderr.write(
-      `oxlint: problems in ${relative(root, file)} that --fix could not resolve:\n${lint.stdout}${lint.stderr}`,
-    )
+    process.stderr.write(`oxlint: problems in ${relative(root, file)} that --fix could not resolve:\n${printed(lint)}`)
     process.exit(2)
   }
 }

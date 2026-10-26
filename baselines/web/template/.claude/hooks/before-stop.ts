@@ -6,7 +6,7 @@
  * the user's own work in progress). Tests stay in `pnpm verify`; this is the
  * fast part.
  */
-import { spawnSync } from 'node:child_process'
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
 /** Whether this stop follows one this hook already blocked. */
@@ -32,6 +32,11 @@ function checkout(payload: unknown): string {
   return top.status === 0 ? top.stdout.trim() : cwd
 }
 
+/** What a command printed, or why it didn't start. */
+function printed(result: SpawnSyncReturns<string>): string {
+  return result.error ? result.error.message : `${result.stdout}${result.stderr}`
+}
+
 const payload: unknown = JSON.parse(readFileSync(0, 'utf8'))
 const retry = isRetry(payload)
 const root = checkout(payload)
@@ -42,7 +47,7 @@ if (run('git', ['status', '--porcelain']).stdout.trim() === '') process.exit(0)
 for (const script of ['typecheck', 'lint']) {
   const result = run('pnpm', ['-s', script])
   if (result.status !== 0) {
-    const output = `${result.stdout}${result.stderr}`.trim().split('\n').slice(-80).join('\n')
+    const output = printed(result).trim().split('\n').slice(-80).join('\n')
     if (retry) {
       process.stderr.write(`\`pnpm ${script}\` still fails:\n${output}\n`)
       process.exit(1)
