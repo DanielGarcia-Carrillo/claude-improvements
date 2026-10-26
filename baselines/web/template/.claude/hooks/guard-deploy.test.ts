@@ -34,6 +34,14 @@ describe('guard-deploy', () => {
     // The shell decides these, so they may be production.
     'wrangler deploy --env "$TARGET"',
     'wrangler deploy --env=$(cat env)',
+    'wrangler deploy --env pro\\duction',
+    // Bash drops these quotes, so each is still the command it spells.
+    'pnpm exec "wrangler" deploy',
+    'wrangler "deploy"',
+    "wrangler 'secret' put API_KEY",
+    'wrangler deploy --env p"rod"uction',
+    // Bash ignores a line from a word starting with `#`.
+    'wrangler deploy # --dry-run',
   ])('blocks %s', (command) => {
     expect(verdict(command)).toBe(2)
   })
@@ -46,6 +54,8 @@ describe('guard-deploy', () => {
     'wrangler deploy --env staging',
     'wrangler deploy --env staging 2>&1 | tee deploy.log',
     'wrangler deploy --env staging && wrangler deploy --env qa',
+    'wrangler --env staging deploy',
+    '(cd app && wrangler deploy --env "staging")',
     'wrangler versions upload --preview-alias my-branch',
     'wrangler preview',
     'pnpm build',

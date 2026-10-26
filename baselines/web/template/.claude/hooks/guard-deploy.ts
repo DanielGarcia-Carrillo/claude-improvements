@@ -4,26 +4,33 @@
  * (.github/workflows/ci.yml); a session never does.
  *
  * permissions.deny can't express this on its own: a Bash rule matches a
- * prefix, so `pnpm dlx wrangler deploy`, `./node_modules/.bin/wrangler deploy`
+ * prefix, so `pnpm dlx wrangler deploy`, `"./node_modules/.bin/wrangler" deploy`
  * or `wrangler --config x deploy` would slip past it. This matches `wrangler`
- * anywhere on a line, with any global options, followed by a subcommand that
- * changes production. Each such call is checked on its own, up to the next
- * `;`, `&` or `|`, so a `--dry-run` or `--env` on one doesn't excuse another
- * on the same line. A line that only quotes such a command is blocked too: a
- * false block costs a rephrase, a missed one a production deploy.
+ * anywhere on a line, quoted or not, with any global options, followed by a
+ * subcommand that changes production. Each such call is checked on its own,
+ * up to the next `;`, `&` or `|` (or a `#` comment), so a `--dry-run` or
+ * `--env` on one doesn't excuse another on the same line. A line that only
+ * quotes such a command is blocked too: a false block costs a rephrase, a
+ * missed one a production deploy.
  *
- * Allowed: `--dry-run` (not `--dry-run=false`), `--env <name>` for a
- * non-production environment named on the line (not `$VAR`, which only the
- * shell resolves), and the preview commands (`wrangler preview`,
- * `wrangler versions upload`).
+ * Allowed: `--dry-run` (not `--dry-run=false`), `--env <name>` on either side
+ * of the subcommand for a non-production environment spelled out on the line
+ * (not `$VAR` or anything else only the shell resolves), and the preview
+ * commands (`wrangler preview`, `wrangler versions upload`).
+ *
+ * It reads the line as text, not as Bash would, so it stops an agent's
+ * mistake, not someone set on deploying: a variable holding `deploy`, `eval`,
+ * a script or a direct API call gets past it.
  * Exit 2 blocks the call and sends stderr back to Claude.
  */
 import { readFileSync } from 'node:fs'
 
-/** `wrangler` however it is invoked (npx, pnpm dlx, a path, `@4`), then its global options. */
-const WRANGLER = String.raw`\bwrangler(?:@\S+)?(?:\.\w+)?(?:\s+-{1,2}[\w-]+(?:=\S+|\s+(?!-)\S+)?)*\s+`
+/** A quote Bash drops, so `"wrangler" 'deploy'` is still a deploy. */
+const Q = `["']?`
+/** `wrangler` however it is invoked (npx, pnpm dlx, a quoted path, `@4`), then its global options. */
+const WRANGLER = String.raw`\bwrangler(?:@\S+)?(?:\.\w+)?${Q}((?:\s+-{1,2}[\w-]+(?:=\S+|\s+(?!-)\S+)?)*)\s+`
 const CHANGES_PRODUCTION = new RegExp(
-  `${WRANGLER}(deploy|publish|versions\\s+deploy|triggers\\s+deploy|rollback|delete|secret\\s+(?:put|delete|bulk))\\b([^;&|]*)`,
+  `${WRANGLER}${Q}(deploy|publish|versions${Q}\\s+${Q}deploy|triggers${Q}\\s+${Q}deploy|rollback|delete|secret${Q}\\s+${Q}(?:put|delete|bulk))\\b${Q}([^;&|]*)`,
   'g',
 )
 /** Names a production environment is plausibly given. */
@@ -52,9 +59,9 @@ function isDryRun(args: string): boolean {
   return (last[2] ?? last[4] ?? 'true') === 'true'
 }
 
-/** Every value given to `--env`/`-e` in `args`. */
+/** Every value given to `--env`/`-e` in `args`, as written. */
 function environments(args: string): string[] {
-  return [...args.matchAll(/(?:^|\s)(?:--env|-e)(?:=|\s+)(["']?)([^\s"']+)\1/g)].flatMap((match) => match[2] ?? [])
+  return [...args.matchAll(/(?:^|\s)(?:--env|-e)(?:=|\s+)(?!-)([^\s)]+)/g)].flatMap((match) => match[1] ?? [])
 }
 
 function refuse(why: string): never {
@@ -73,14 +80,19 @@ function refuse(why: string): never {
 const command = bashCommand(JSON.parse(readFileSync(0, 'utf8'))).replaceAll(/\\\r?\n/g, '')
 for (const line of command.split('\n')) {
   for (const match of line.matchAll(CHANGES_PRODUCTION)) {
-    const subcommand = (match[1] ?? '').replace(/\s+/g, ' ')
-    const args = match[2] ?? ''
+    const subcommand = (match[2] ?? '').replaceAll(/["'\s]+/g, ' ')
+    // yargs reads options on either side of the subcommand, and Bash ignores
+    // the rest of the line from a word that starts with `#`.
+    const args = `${match[1] ?? ''} ${match[3] ?? ''}`.replace(/(?:^|\s)#.*/, '')
     if (isDryRun(args)) continue
     const envs = environments(args)
-    const unresolved = envs.find((env) => /[$`]/.test(env))
-    if (unresolved) refuse(`\`--env ${unresolved}\` is only known when the shell runs it; name the environment.`)
-    const production = envs.find((env) => PRODUCTION.has(env))
-    if (production) refuse(`\`--env ${production}\` is a production environment.`)
+    for (const env of envs) {
+      // Bash drops quotes, so `p"rod"uction` is `production`. Anything else it
+      // would expand or unescape isn't a plain name.
+      const name = env.replaceAll(/["']/g, '')
+      if (!/^[\w-]+$/.test(name)) refuse(`\`--env ${env}\` is only known when the shell runs it; name the environment.`)
+      if (PRODUCTION.has(name)) refuse(`\`--env ${name}\` is a production environment.`)
+    }
     if (envs.length === 0) refuse(`\`wrangler ${subcommand}\` changes the production Worker.`)
   }
 }

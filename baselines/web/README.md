@@ -64,7 +64,7 @@ Versions and statuses were checked on 2026-10-20.
 | Visual regression | None in the template beyond the PR screenshots above. A project that needs pixel assertions uses the built-in ones (Playwright `toHaveScreenshot`, Vitest `toMatchScreenshot` on stories), with baselines generated only in CI or a pinned Docker image | No service, no account; pinning the environment is what keeps pixels stable | A dedicated, agent-oriented visual regression tool is in development and is meant to take over pixel diffs, while PRs keep their screenshots; see [explorations/visual-regression](../explorations/visual-regression.md) |
 | Hosting | Cloudflare Workers static assets | Free static hosting, one deploy for app and API | See [infra.md](../general/infra.md) |
 | Security headers | A strict same-origin CSP, COOP, CORP and HSTS in `public/_headers`; `vite preview` applies them and every e2e test fails on a CSP violation | StyleX emits a CSS file and Vite no inline scripts, so the policy needs no `unsafe-inline` | Trusted Types once a default policy covers the service worker's registration |
-| Deploy | CI's `deploy` job on `main`, its token in a `production` environment limited to `main` | No other branch's workflow can read the token, and it never shares a runner with the test run | — |
+| Deploy | CI's `deploy` job on `main`, its token in a `production` environment limited to `main` | No other branch's workflow can read the token, and it never shares a runner with the test run. In a session, `.claude/hooks/guard-deploy.ts` refuses production deploys; it reads the command as text, so it catches an agent's mistake, not a deliberate workaround | — |
 
 **Not in the baseline, on purpose:** lodash-style utilities (use the
 platform), an immutability helper (spread and `toSorted`/`with` cover it;
@@ -130,7 +130,9 @@ for an ADR, not a default), TanStack Pacer (beta; a debounce plus
    "observability": { "enabled": true },
    "upload_source_maps": true,
    ```
-   Once it has a custom domain, set `"workers_dev": false` and
+   `namespace_id` is account-wide: bindings that share one share their
+   counters, even across Workers, so pick a number nothing else in the
+   account uses. Once it has a custom domain, set `"workers_dev": false` and
    `"preview_urls": false`: zone WAF and rate-limit rules don't cover
    `*.workers.dev`. Add a budget alert in the dashboard as well.
 4. Add `cloudflare()` from `@cloudflare/vite-plugin` to vite.config.ts so
