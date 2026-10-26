@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:report": "playwright show-report \"$(ls -td test-results/*/report | head -1)\"",
     "storybook": "storybook dev -p 6006 --ci",
     "build-storybook": "storybook build",
     "screenshots": "SCREENSHOT_DIR=screenshots vitest run --project storybook && SCREENSHOT_DIR=screenshots playwright test screens",
