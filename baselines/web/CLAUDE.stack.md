@@ -11,6 +11,7 @@ pnpm dev               # Vite dev server; the service worker is off in dev
 pnpm verify            # typecheck, lint, format check, every test suite: the gate
 pnpm test              # Vitest: unit tests (node) and every story in a real browser
 pnpm e2e               # Playwright against a production build and preview server
+pnpm e2e:report        # the newest local run's HTML report, with each test's trace
 pnpm lint:fix          # safe autofixes; then `pnpm format`
 pnpm storybook         # component workshop on :6006 or the next free port
 ```
@@ -77,7 +78,7 @@ by itself.
 
 - **The service worker is generated from `src/sw.ts`.** `dist/sw.js` is
   rebuilt on every build, and dev runs without a worker. Test offline
-  behaviour against `pnpm e2e` or `pnpm preview`.
+  behaviour against `pnpm e2e`, or `pnpm build` then `pnpm preview`.
 - **The precache lists extensions, never `**/*`.** `public/_headers` is read
   by Cloudflare at deploy and never served; precaching a URL that 404s fails
   the worker's install, which kills offline mode silently.
@@ -98,6 +99,10 @@ by itself.
   e2e fails on any violation. A new third-party origin (fonts, analytics,
   an API) goes into the matching directive there, not into an inline
   `<script>` or `<style>`.
-- **Playwright finds its server from the server's output, never a fixed
-  port**, so parallel worktrees do not test each other's builds. Keep
-  `webServer.wait` and do not add a `port`.
+- **Every e2e run keeps to itself.** Playwright finds its server from the
+  server's output, never a fixed port, and a local run writes its build,
+  traces and report to its own `test-results/<time>-<pid>/`, so sessions
+  sharing a checkout or running in worktrees never test or wipe each
+  other's builds and results. Keep `webServer.wait`, don't add a `port`,
+  and don't point the e2e build back at `dist/`, which only `pnpm build`
+  writes.
