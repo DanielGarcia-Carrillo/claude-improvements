@@ -358,8 +358,14 @@ test('pins Rust to the current stable and reports what a bump changed', async ()
   const kept = pinRust({ toolchain, cargo: library }, '1.100.2')
   expect(kept.toolchain).toBe(pinned.toolchain)
   expect(kept.cargo).toBe(library)
+  // A root package's own MSRV comes first in the file, but members inherit the workspace's.
+  const rooted = `[package]\nname = "tool"\nrust-version = "1.96"\n\n${cargo}`
+  expect(pinRust({ toolchain, cargo: rooted }, '1.100.2').cargo).toBe(rooted.replace('"1.99"', '"1.100"'))
   expect(() => pinRust({ toolchain: '[toolchain]\n', cargo }, '1.100.2')).toThrow('no `channel = "…"` line')
   expect(() => pinRust({ toolchain, cargo: '[workspace.package]\n' }, '1.100.2')).toThrow('no `rust-version = "…"` line')
+  expect(() => pinRust({ toolchain, cargo: '[package]\nrust-version = "1.99"\n' }, '1.100.2')).toThrow(
+    'no `rust-version = "…"` line in [workspace.package]',
+  )
 
   expect(changedLines(cargo, pinned.cargo)).toEqual(['- rust-version = "1.99"', '+ rust-version = "1.100"'])
   expect(changedLines(cargo, cargo)).toEqual([])
