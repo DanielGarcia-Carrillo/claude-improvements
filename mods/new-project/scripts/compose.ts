@@ -159,10 +159,10 @@ export function rustStableVersion(manifest: string): string {
 }
 
 /**
- * The `key = "…"` line of a TOML file's `[table]`: its value, and the file
- * with that line set to another. Throws when the table has no such line.
+ * The `key = "…"` line of a TOML file's `[table]`, if it has one: its value,
+ * and the file with that line set to another.
  */
-function tomlString(text: string, table: string, key: string, file: string) {
+function tomlString(text: string, table: string, key: string) {
   const line = new RegExp(`^${key} = "([^"]*)"`)
   const lines = text.split('\n')
   let current: string | undefined
@@ -171,23 +171,29 @@ function tomlString(text: string, table: string, key: string, file: string) {
     return current === table && line.test(row)
   })
   const value = line.exec(lines[at] ?? '')?.[1]
-  if (value === undefined) throw new Error(`${file} has no \`${key} = "…"\` line in [${table}] to bump.`)
+  if (value === undefined) return undefined
   const set = (next: string) => lines.map((row, i) => (i === at ? row.replace(line, `${key} = "${next}"`) : row)).join('\n')
   return { value, set }
 }
 
 /**
- * Pins the toolchain file's channel to `version`. The workspace's
- * `rust-version`, the one in `[workspace.package]` that members inherit,
- * moves to its minor only while it equals the old channel's: a binary-only
- * tool's MSRV is the pinned channel, but an older one, such as a published
- * library's, was set on purpose and stays. A root `[package]`'s own stays
- * too. Throws when either line has moved, so a bump never half lands.
+ * Pins the toolchain file's channel to `version`. The project's
+ * `rust-version` moves to its minor only while it equals the old channel's:
+ * a binary-only tool's MSRV is the pinned channel, but an older one, such as
+ * a published library's, was set on purpose and stays. That MSRV is the one
+ * in `[workspace.package]`, which members inherit, else a single crate's in
+ * `[package]`; a root package beside a workspace MSRV keeps its own. Throws
+ * when either line has moved, so a bump never half lands.
  */
 export function pinRust(files: { toolchain: string; cargo: string }, version: string) {
   const minor = (release: string) => release.split('.').slice(0, 2).join('.')
-  const channel = tomlString(files.toolchain, 'toolchain', 'channel', 'rust-toolchain.toml')
-  const msrv = tomlString(files.cargo, 'workspace.package', 'rust-version', 'Cargo.toml')
+  const missing = (file: string, key: string, tables: string) =>
+    new Error(`${file} has no \`${key} = "…"\` line in ${tables} to bump.`)
+  const channel = tomlString(files.toolchain, 'toolchain', 'channel')
+  if (channel === undefined) throw missing('rust-toolchain.toml', 'channel', '[toolchain]')
+  const msrv =
+    tomlString(files.cargo, 'workspace.package', 'rust-version') ?? tomlString(files.cargo, 'package', 'rust-version')
+  if (msrv === undefined) throw missing('Cargo.toml', 'rust-version', '[workspace.package] or [package]')
   return {
     toolchain: channel.set(version),
     cargo: msrv.value === minor(channel.value) ? msrv.set(minor(version)) : files.cargo,
