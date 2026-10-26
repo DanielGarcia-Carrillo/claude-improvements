@@ -1,7 +1,7 @@
 ---
 name: new-project
 description: Bootstrap a new repository from the claude-improvements project baselines (a React PWA on Cloudflare, or a Rust CLI workspace). Asks the kickoff questions in one batch, copies and renames the template, writes CLAUDE.md, AGENTS.md and the stack ADR, then installs and runs verify. Use when the user wants to start, create, scaffold or bootstrap a new project or repository.
-argument-hint: "[what it is] [where it goes]"
+argument-hint: '[what it is] [where it goes]'
 ---
 
 # Bootstrap a new project
