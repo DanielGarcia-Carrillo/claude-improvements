@@ -12,6 +12,9 @@ blob-report/
 .vitest/
 .vitest-attachments/
 
+# Claude Code worktrees, each a checkout of its own
+.claude/worktrees/
+
 # TanStack Router plugin scratch space
 .tanstack/
 
