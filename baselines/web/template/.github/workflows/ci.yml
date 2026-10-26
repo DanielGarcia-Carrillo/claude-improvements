@@ -101,8 +101,10 @@ jobs:
   # Shows the captures a PR changes in its description, before and after
   # (scripts/pr-screenshots.ts), and keeps main's captures current. Images go
   # to the orphan `screenshots` branch, so they keep the repo's access rules.
-  # Skipped for forks and Dependabot, whose tokens can't write. Nothing from
-  # npm runs with this job's write token: only git, gh and that one script.
+  # The write token reaches mise-action, the mise binary it fetches, and the
+  # script and mise.toml checked out here, which on a PR are the PR's own. No
+  # npm package runs. Forks and Dependabot are skipped, so only people who can
+  # push branches here get that far, and they could edit this workflow anyway.
   screenshots:
     needs: [verify]
     if: ${{ github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
