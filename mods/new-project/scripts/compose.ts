@@ -232,6 +232,14 @@ export function parseAnswers(raw: unknown): Answers {
 
   const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer'])
   const changed = list<ChangedDefault>('changed', ['area', 'to', 'why'], true)
+  // The ADR has one row per area, so a second change to one would drop out
+  // of it. `list` hands back the malformed items it reported, too.
+  const areas = changed.map(change => (isRecord(change) ? change['area'] : undefined))
+  areas.forEach((area, i) => {
+    const first = areas.indexOf(area)
+    if (typeof area === 'string' && first < i)
+      problems.push(`\`changed[${i}]\` names area "${area}" again; merge it into \`changed[${first}]\`.`)
+  })
   const architecture = list<ArchitectureLine>('architecture', ['choice', 'line'])
   const alternatives = list<Alternative>('alternatives', ['option', 'why'])
   const followUps = raw['followUps'] ?? []
@@ -548,6 +556,9 @@ export function renderAdr(
   input: { date: string; kickoff: readonly KickoffSection[]; defaults: readonly Default[]; baseline: Baseline },
 ): string {
   if (!DATE.test(input.date)) throw new Error(`The ADR date "${input.date}" is not YYYY-MM-DD.`)
+  // A change to an area outside the table would have no row to land in.
+  const unknown = unknownAreas(answers, input.defaults)
+  if (unknown.length > 0) throw new AnswersError(unknown)
   const stack = STACKS[answers.stack]
 
   const asked = input.kickoff.flatMap(section => section.questions)

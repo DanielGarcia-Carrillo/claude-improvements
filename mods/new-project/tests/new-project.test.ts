@@ -411,16 +411,23 @@ test('the ADR records the answers and each default kept or changed', async () =>
 
   const answers = webAnswers({ changed: [{ area: 'Styling', to: 'vanilla-extract', why: 'Semantic class names' }] })
   expect(unknownAreas(answers, defaults)).toEqual([])
-  expect(unknownAreas(webAnswers({ changed: [{ area: 'Style', to: 'x', why: 'y' }] }), defaults)[0]).toContain(
-    'not one of: Styling, Hosting',
-  )
+  const unknown = webAnswers({ changed: [{ area: 'Style', to: 'x', why: 'y' }] })
+  expect(unknownAreas(unknown, defaults)[0]).toContain('not one of: Styling, Hosting')
+  // Each area has one row, so a second change to it, or a change to no area, would drop out of the ADR.
+  expect(problemsOf({ ...answers, changed: [...answers.changed, { area: 'Styling', to: 'x', why: 'y' }] })).toEqual([
+    '`changed[1]` names area "Styling" again; merge it into `changed[0]`.',
+  ])
+  // Malformed items get one problem each, not a crash in the repeat check.
+  expect(problemsOf({ ...answers, changed: [null, 'Styling'] }).length).toBe(2)
 
-  const adr = renderAdr(answers, {
+  const input = {
     date: '2026-10-20',
     kickoff: kickoffFor(parseKickoff(KICKOFF), 'web'),
     defaults,
     baseline: { sha: 'e12caf4', isDirty: false },
-  })
+  }
+  expect(() => renderAdr(unknown, input)).toThrow('names area "Style", which is not one of')
+  const adr = renderAdr(answers, input)
   expect(adr).toContain('- Date: 2026-10-20')
   expect(adr).toContain('| Public or private repo? | Private (assumed) |')
   expect(adr).toContain('(`baselines/web` at `e12caf4`)')
