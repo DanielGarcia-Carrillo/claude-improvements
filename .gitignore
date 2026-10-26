@@ -1,3 +1,5 @@
 # Written by Claude Code into each mod folder when it loads the mod
 mods/*/.claude-plugin/types/
 mods/*/tsconfig.json
+# new-project has a tsconfig of its own, so Claude Code writes none there.
+!mods/new-project/tsconfig.json

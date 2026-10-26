@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // The web template's (baselines/web/template/.oxfmtrc.json), copied so a
+  // bare `oxfmt` and editors find it here.
+  "printWidth": 120,
+  "semi": false,
+  "singleQuote": true,
+  "sortImports": {},
+  "sortPackageJson": true,
+  "ignorePatterns": ["pnpm-lock.yaml"]
+}

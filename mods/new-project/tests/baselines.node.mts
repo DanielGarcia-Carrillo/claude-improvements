@@ -24,7 +24,8 @@ const BASELINES = resolve(import.meta.dirname, '../../../baselines')
 const scratch = mkdtempSync(join(tmpdir(), 'new-project-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
-const run = (command: string, args: readonly string[], cwd: string) => spawnSync(command, args, { cwd, encoding: 'utf8' })
+const run = (command: string, args: readonly string[], cwd: string) =>
+  spawnSync(command, args, { cwd, encoding: 'utf8' })
 
 /** Answers that take every default, with names that test the escaping. */
 function answersFor(stack: Stack) {
@@ -39,7 +40,7 @@ function answersFor(stack: Stack) {
     summary: 'A scaffold check.',
     issues: 'GitHub Issues',
     merging: 'The owner merges',
-    kickoff: sections.flatMap(s => s.questions.map(question => ({ question, answer: 'Default', assumed: true }))),
+    kickoff: sections.flatMap((s) => s.questions.map((question) => ({ question, answer: 'Default', assumed: true }))),
     changed: [],
     architecture: [{ choice: 'Shape', line: 'The baseline as is' }],
     alternatives: [{ option: 'Nothing else', why: 'This is a test' }],
@@ -52,7 +53,11 @@ function scaffold(stack: Stack): string {
   const answers = join(scratch, `${stack}.json`)
   writeFileSync(answers, JSON.stringify(answersFor(stack)))
   const target = join(scratch, stack)
-  const result = run('node', [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', BASELINES], scratch)
+  const result = run(
+    'node',
+    [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', BASELINES],
+    scratch,
+  )
   assert.equal(result.status, 0, result.stderr)
   return target
 }
@@ -62,7 +67,9 @@ function leftovers(repo: string): string {
   assert.equal(run('git', ['add', '-A'], repo).status, 0)
   const grep = run('git', ['grep', '-niE', 'replace[-_ ]?me([^a-z]|$)', '--', `:!${PLACEHOLDER_EXEMPT}`], repo)
   assert.notEqual(grep.status, 2, grep.stderr)
-  const paths = run('git', ['ls-files'], repo).stdout.split('\n').filter(path => PLACEHOLDER.test(path))
+  const paths = run('git', ['ls-files'], repo)
+    .stdout.split('\n')
+    .filter((path) => PLACEHOLDER.test(path))
   return [grep.stdout, ...paths].join('\n').trim()
 }
 
@@ -71,7 +78,7 @@ const read = (repo: string, path: string) => readFileSync(join(repo, path), 'utf
 /** A copy of the baselines to alter, without build output. */
 function baselinesCopy(name: string): string {
   const copy = join(scratch, name)
-  cpSync(BASELINES, copy, { recursive: true, filter: source => !/\/(node_modules|target|dist)(\/|$)/.test(source) })
+  cpSync(BASELINES, copy, { recursive: true, filter: (source) => !/\/(node_modules|target|dist)(\/|$)/.test(source) })
   return copy
 }
 
@@ -79,7 +86,11 @@ function baselinesCopy(name: string): string {
 function dryRun(target: string, baselines: string) {
   const answers = join(scratch, 'web.json')
   writeFileSync(answers, JSON.stringify(answersFor('web')))
-  return run('node', [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', baselines, '--dry-run'], scratch)
+  return run(
+    'node',
+    [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', baselines, '--dry-run'],
+    scratch,
+  )
 }
 
 test('the web template scaffolds with no placeholder left', () => {
@@ -154,7 +165,10 @@ test('setup needs --stack for a folder holding both manifests, and runs the stac
   mkdirSync(bin)
   writeFileSync(join(bin, 'mise'), `#!/bin/sh\necho "$*" >> '${calls}'\n[ "$1" != exec ]\n`, { mode: 0o755 })
   const setup = (...options: string[]) =>
-    spawnSync(process.execPath, [SCRIPT, 'setup', repo, ...options], { encoding: 'utf8', env: { ...process.env, PATH: bin } })
+    spawnSync(process.execPath, [SCRIPT, 'setup', repo, ...options], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: bin },
+    })
 
   const inferred = setup()
   assert.equal(inferred.status, 1)

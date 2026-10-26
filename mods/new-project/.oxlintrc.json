@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // The web template's rules (baselines/web/template/.oxlintrc.json), less
+  // what only its React app uses: the react and jsx-a11y plugins and rules,
+  // StyleX's JS plugin and rules, and the exceptions for its stylesheets,
+  // Workbox's global and Playwright's fixtures. Copied, because extending
+  // that file loads StyleX's plugin, which only the template installs.
+  //
+  // Correctness and suspicious patterns only: rules that catch bugs or remove
+  // a choice nobody should make by hand. Style is the formatter's job.
+  "plugins": ["typescript", "import", "unicorn", "oxc", "promise", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  // The scripts run on Node; the hooks module runs in the engine, which
+  // `claude plugin validate` checks.
+  "env": { "node": true, "es2024": true },
+  "rules": {
+    // node:test's `test` returns a promise its runner tracks itself.
+    "typescript/no-floating-promises": [
+      "error",
+      { "allowForKnownSafeCalls": [{ "from": "package", "package": "node:test", "name": "test" }] }
+    ],
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "import/no-cycle": "error",
+    // No index files that re-export a folder: they hide where a name comes from.
+    "oxc/no-barrel-file": ["error", { "threshold": 0 }],
+    "import/no-unassigned-import": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-underscore-dangle": "error",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
+  },
+  "overrides": [
+    {
+      "files": ["tests/**"],
+      "rules": { "no-console": "off" }
+    }
+  ]
+}

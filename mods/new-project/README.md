@@ -28,6 +28,7 @@ a first ADR that record why it looks the way it does.
    It checks everything first (every kickoff question answered, names that
    are valid package and crate names, nothing left that the template CI's
    placeholder step would find) and writes nothing if a check fails.
+
 4. **Judgment.** Claude adapts what the answers change: issue keys outside
    Linear, conventions for parts the project won't use, a licence.
 5. **Setup and verify.** `scripts/new-project.ts setup` runs the stack
@@ -54,6 +55,19 @@ Playwright's browsers, Rust, just, nextest, cargo-deny, cargo-shear) come from
 each template's `mise.toml` and lockfiles.
 
 ## Develop
+
+The mod keeps to the web template's rules: its oxlint and oxfmt settings,
+copied here, and its `tsconfig.base.json` strictness, extended. From
+`mods/new-project`, `pnpm install` once (pnpm 12, as the template pins), then
+
+```bash
+pnpm verify
+```
+
+type-checks, lints, checks formatting and runs both the plugin's validation and
+the tests below. `claude-code.d.ts` types the part of Claude Code's plugin API
+the hook and its tests use; widen it when they use more. Each step also runs on
+its own:
 
 ```bash
 claude plugin validate mods/new-project

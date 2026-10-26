@@ -69,14 +69,18 @@ test('a relative baselines option is refused', { options: { baselines: 'src/base
   expect(disk.asked).toEqual([])
 })
 
-test('missing baselines replace the skill with how to fix it', { options: { baselines: '/nowhere' } }, async ($, on) => {
-  engine(on)
-  const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
-  expect(result.text).toContain('cannot find the project baselines')
-  expect(result.text).toContain('`baselines` option')
-  expect(result.text).toContain('/nowhere')
-  expect(result.text.includes(SKILL_BODY)).toBe(false)
-})
+test(
+  'missing baselines replace the skill with how to fix it',
+  { options: { baselines: '/nowhere' } },
+  async ($, on) => {
+    engine(on)
+    const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
+    expect(result.text).toContain('cannot find the project baselines')
+    expect(result.text).toContain('`baselines` option')
+    expect(result.text).toContain('/nowhere')
+    expect(result.text.includes(SKILL_BODY)).toBe(false)
+  },
+)
 
 test("leaves other skills, and another plugin's new-project, alone", async ($, on) => {
   const { asked } = engine(on)
@@ -163,28 +167,30 @@ function problemsOf(raw: unknown): readonly string[] {
 
 test('reports every answer problem at once', async () => {
   const problems = problemsOf({ stack: 'rust', name: 'Fn', slug: 'fn', kickoff: [] })
-  expect(problems.some(p => p.includes('Rust keyword'))).toBe(true)
-  expect(problems.some(p => p.startsWith('`repository`'))).toBe(true)
-  expect(problems.some(p => p.startsWith('`summary`'))).toBe(true)
-  expect(problems.some(p => p.startsWith('`kickoff`'))).toBe(true)
-  expect(problemsOf({ ...webAnswers(), slug: 'Trip_Planner' }).some(p => p.startsWith('`slug`'))).toBe(true)
-  expect(problemsOf({ ...webAnswers(), name: 'A <b>' }).some(p => p.startsWith('`name`'))).toBe(true)
+  expect(problems.some((p) => p.includes('Rust keyword'))).toBe(true)
+  expect(problems.some((p) => p.startsWith('`repository`'))).toBe(true)
+  expect(problems.some((p) => p.startsWith('`summary`'))).toBe(true)
+  expect(problems.some((p) => p.startsWith('`kickoff`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), slug: 'Trip_Planner' }).some((p) => p.startsWith('`slug`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), name: 'A <b>' }).some((p) => p.startsWith('`name`'))).toBe(true)
   // A carriage return would break the generated TypeScript string literal.
-  expect(problemsOf({ ...webAnswers(), name: 'A\rB' }).some(p => p.startsWith('`name`'))).toBe(true)
-  expect(problemsOf({ ...webAnswers(), description: 'One\rtwo.' }).some(p => p.startsWith('`description`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), name: 'A\rB' }).some((p) => p.startsWith('`name`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), description: 'One\rtwo.' }).some((p) => p.startsWith('`description`'))).toBe(
+    true,
+  )
   // A quote or backslash would break Cargo.toml's quoted `repository`.
   for (const repository of ['https://github.com/o/r"bad', 'https://github.com/o/r\\x'])
-    expect(problemsOf({ ...webAnswers(), repository }).some(p => p.startsWith('`repository`'))).toBe(true)
+    expect(problemsOf({ ...webAnswers(), repository }).some((p) => p.startsWith('`repository`'))).toBe(true)
   // URL characters that spell no URL with a host.
   for (const repository of ['https://?', 'https://'])
-    expect(problemsOf({ ...webAnswers(), repository }).some(p => p.startsWith('`repository`'))).toBe(true)
+    expect(problemsOf({ ...webAnswers(), repository }).some((p) => p.startsWith('`repository`'))).toBe(true)
   expect(problemsOf({ ...webAnswers(), repository: 'https://github.com/owner/name' })).toEqual([])
   expect(problemsOf(webAnswers())).toEqual([])
 })
 
 test('every kickoff question of the stack needs an answer', async () => {
   const sections = kickoffFor(parseKickoff(KICKOFF), 'web')
-  expect(sections.map(s => s.title)).toEqual(['Every project', 'Web apps'])
+  expect(sections.map((s) => s.title)).toEqual(['Every project', 'Web apps'])
   expect(missingKickoff(webAnswers(), sections)).toEqual([])
 
   const short = webAnswers({ kickoff: [{ question: 'Public or private repo?', answer: 'Public' }] })
@@ -293,14 +299,21 @@ test('answers holding $ patterns land as written', async () => {
     web,
   )
   expect(html.text).toBe(
-    "<meta name=\"description\" content=\"Costs $$, $&amp; or $` and $' at most.\" />\n<title>Save $$ $&amp; $` $'</title>",
+    '<meta name="description" content="Costs $$, $&amp; or $` and $\' at most." />\n<title>Save $$ $&amp; $` $\'</title>',
   )
   expect(leftoverPlaceholders([vite, html])).toEqual([])
 
-  for (const repository of ['https://example.com/r/$$-tool', 'https://example.com/r/$&-tool', "https://example.com/r/$'-tool"]) {
+  for (const repository of [
+    'https://example.com/r/$$-tool',
+    'https://example.com/r/$&-tool',
+    "https://example.com/r/$'-tool",
+  ]) {
     const rust = parseAnswers({ ...webAnswers(), stack: 'rust', slug: 'line-width', repository })
     const manifest = renameFile(
-      { path: 'Cargo.toml', text: 'repository = "https://github.com/replace-me-owner/replace-me"\nname = "replace-me"' },
+      {
+        path: 'Cargo.toml',
+        text: 'repository = "https://github.com/replace-me-owner/replace-me"\nname = "replace-me"',
+      },
       rust,
     )
     expect(manifest.text).toBe(`repository = "${repository}"\nname = "line-width"`)
@@ -344,7 +357,8 @@ test("refuses answers the new repo's placeholder check would fail on", async () 
 })
 
 test('pins Rust to the current stable and reports what a bump changed', async () => {
-  const manifest = '[pkg.cargo]\nversion = "0.100.0 (abc 2026-10-13)"\n\n[pkg.rust]\nversion = "1.100.2 (58cf8f9c3 2026-10-13)"\n'
+  const manifest =
+    '[pkg.cargo]\nversion = "0.100.0 (abc 2026-10-13)"\n\n[pkg.rust]\nversion = "1.100.2 (58cf8f9c3 2026-10-13)"\n'
   expect(rustStableVersion(manifest)).toBe('1.100.2')
   expect(() => rustStableVersion('[pkg.cargo]\nversion = "1"')).toThrow('no [pkg.rust] version')
 
@@ -395,30 +409,35 @@ test("bumps mise.toml's pins at their own precision, and nothing else", async ()
   expect(bumpMiseToml(toml, {})).toBe(toml)
 })
 
+const label = (step: Step) => ('run' in step ? step.run.join(' ') : step.bump)
+
 test('setup takes majors only in the steps marked so', async () => {
-  const label = (step: Step) => ('run' in step ? step.run.join(' ') : step.bump)
   for (const stack of ['web', 'rust'] as const) {
     const steps: readonly Step[] = STACKS[stack].steps
-    const majors = steps.filter(step => step.isMajor === true).map(label)
-    const kept = steps.filter(step => step.isMajor !== true).map(label)
+    const majors = steps.filter((step) => step.isMajor === true).map(label)
+    const kept = steps.filter((step) => step.isMajor !== true).map(label)
     expect(majors.length).toBe(2)
     expect(kept[0]).toBe('mise trust')
     expect(kept.at(-1)?.endsWith(STACKS[stack].verify)).toBe(true)
     // `mise up` reaches the global config's tools and uninstalls old versions.
-    expect(steps.map(label).some(step => step.startsWith('mise up'))).toBe(false)
+    expect(steps.map(label).some((step) => step.startsWith('mise up'))).toBe(false)
   }
   const web = (STACKS.web.steps as readonly Step[]).map(label)
   // Each pair must be present, in this order.
-  const order = (...picks: ((step: string) => boolean)[]) => web.filter(step => picks.some(pick => pick(step)))
-  expect(order(s => s === 'mise-tools', s => s === 'mise exec -- pnpm install')).toEqual([
-    'mise-tools',
-    'mise exec -- pnpm install',
-  ])
+  const order = (...picks: ((step: string) => boolean)[]) => web.filter((step) => picks.some((pick) => pick(step)))
+  expect(
+    order(
+      (s) => s === 'mise-tools',
+      (s) => s === 'mise exec -- pnpm install',
+    ),
+  ).toEqual(['mise-tools', 'mise exec -- pnpm install'])
   // Browsers come after the majors, so they match the Playwright that stays.
-  expect(order(s => s === 'mise exec -- pnpm up --latest', s => s.includes('playwright install'))).toEqual([
-    'mise exec -- pnpm up --latest',
-    'mise exec -- pnpm exec playwright install chromium webkit',
-  ])
+  expect(
+    order(
+      (s) => s === 'mise exec -- pnpm up --latest',
+      (s) => s.includes('playwright install'),
+    ),
+  ).toEqual(['mise exec -- pnpm up --latest', 'mise exec -- pnpm exec playwright install chromium webkit'])
 })
 
 const TEMPLATE = `<!--
@@ -484,7 +503,9 @@ test('a skeleton or fragment that drifted fails loudly', async () => {
   expect(() => composeAgentFile(TEMPLATE, `${FRAGMENT}\n## Commands\n\nMore.\n`, webAnswers())).toThrow(
     'two "## Commands" sections',
   )
-  expect(() => composeAgentFile(`${TEMPLATE}\n<New placeholder>\n`, FRAGMENT, webAnswers())).toThrow('<New placeholder>')
+  expect(() => composeAgentFile(`${TEMPLATE}\n<New placeholder>\n`, FRAGMENT, webAnswers())).toThrow(
+    '<New placeholder>',
+  )
   expect(() => composeAgentFile(TEMPLATE.replace('<Project name>', 'X'), FRAGMENT, webAnswers())).toThrow(
     'no longer holds <Project name>',
   )
@@ -516,7 +537,9 @@ test('the ADR records the answers and each default kept or changed', async () =>
   expect(adr).toContain('- Date: 2026-10-20')
   expect(adr).toContain('| Public or private repo? | Private (assumed) |')
   expect(adr).toContain('(`baselines/web` at `e12caf4`)')
-  expect(adr).toContain('| Styling | StyleX | Build-time atomic CSS | Changed: vanilla-extract. Semantic class names. |')
+  expect(adr).toContain(
+    '| Styling | StyleX | Build-time atomic CSS | Changed: vanilla-extract. Semantic class names. |',
+  )
   expect(adr).toContain('| Hosting | Cloudflare Workers static assets | Free static hosting | Kept |')
   expect(adr).toContain('- **SSR**: No SEO.')
 })
