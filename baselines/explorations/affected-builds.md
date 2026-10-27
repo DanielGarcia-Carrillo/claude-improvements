@@ -12,32 +12,34 @@ under each table so it can be re-run.
 
 ## Status
 
-Two pieces are going ahead in the CLI repo, in this order:
+In the CLI repo:
 
-1. **Reuse `main`'s CLI binary and cache Playwright's browser in CI**
-   ([items 4–5 below](#before-the-vitest-migration)).
-2. **Move the npm package's tests from `node:test` to Vitest**, based on
-   `main`: one setup PR, about 6 batches, and a teardown PR. Locally each
+1. **Done: reuse `main`'s CLI binary and cache Playwright's browser in
+   CI** ([items 4–5 below](#before-the-vitest-migration)). The npm wrapper
+   job reuses `main`'s build when no Rust input changed. The viewer job
+   still builds the CLI itself.
+2. **Next: move the npm package's tests from `node:test` to Vitest**, based
+   on `main`: one setup PR, about 6 batches, and a teardown PR. Locally each
    batch runs its changed tests plus lint; the setup and last PRs run the
    full smoke.
+3. **Going ahead as one PR: the selector mapping and smoke selection**
+   ([Recommendation §1](#1-fix-the-selector-mapping-ci-and-smoke)). Daniel
+   decided that stacked PRs diff against their parent, and that the
+   selected smoke is enough before merge, with no `--all` run required.
+   These change two deliberate choices in the repo's CI policy (stacked PRs
+   ran every lane, and macOS smoke was a full pre-merge requirement), so
+   they come with a new ADR.
+4. **Paused: the pass cache** ([§2](#2-skip-lanes-whose-exact-inputs-already-passed)).
+   It reverses a third choice, that an old green SHA doesn't vouch for a
+   rebased one. It waits until smoke selection's savings are measured.
 
-The selector mapping, smoke selection and pass cache
-([Recommendation](#recommendation)) are paused: "I don't think it's fully
-thought out yet" (Daniel, 2026-10-27). They change deliberate choices in
-the CLI repo's CI policy: stacked PRs run every lane, the macOS smoke stays
-a full pre-merge requirement, and an old green SHA doesn't vouch for a
-rebased one.
-
-A pass cache has to settle five things before it fits that policy:
+The pass cache has to settle five things before it fits that policy:
 
 - only `main` writes markers that other PRs trust;
 - the gate reports a cached lane as a named success, never as skipped;
 - lanes with inputs outside the tree (release, bench) aren't cached;
 - whether a lane that needed a retry can be cached;
 - reviewers can see which lanes were cached.
-
-An open question is whether some PRs still need `smoke --all` before
-merge: the top of a stack, or a PR whose selection fell back to full.
 
 **Keep visual regression capture unconditional.** A capture job that skips
 screens publishes an incomplete baseline on `main` and can't be signed off
