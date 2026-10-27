@@ -78,7 +78,10 @@ const read = (repo: string, path: string) => readFileSync(join(repo, path), 'utf
 /** A copy of the baselines to alter, without build output. */
 function baselinesCopy(name: string): string {
   const copy = join(scratch, name)
-  cpSync(BASELINES, copy, { recursive: true, filter: (source) => !/\/(node_modules|target|dist)(\/|$)/.test(source) })
+  cpSync(BASELINES, copy, {
+    recursive: true,
+    filter: (source) => !/\/(node_modules|target|dist|\.venv)(\/|$)/.test(source),
+  })
   return copy
 }
 
@@ -114,6 +117,19 @@ test('the Rust template scaffolds with no placeholder left', () => {
   assert.match(read(repo, 'crates/line-width/src/cli.rs'), /use line_width_core::/)
   assert.match(read(repo, 'crates/line-width/tests/cli.rs'), /fn line_width\(\) -> Command/)
   assert.match(read(repo, 'CLAUDE.md'), /cargo nextest run -p line-width-core/)
+})
+
+test('the Python template scaffolds with no placeholder left', () => {
+  const repo = scaffold('python')
+  assert.equal(leftovers(repo), '')
+  assert.ok(existsSync(join(repo, 'src/line_width/cli.py')))
+  const pyproject = read(repo, 'pyproject.toml')
+  assert.match(pyproject, /^name = "line-width"$/m)
+  assert.match(pyproject, /^Repository = "https:\/\/github.com\/someone\/line-width"$/m)
+  assert.match(pyproject, /^line-width = "line_width.cli:main"$/m)
+  assert.match(pyproject, /^"src\/line_width\/_output.py" = /m)
+  assert.match(read(repo, 'tests/test_cli.py'), /^def line_width\(/m)
+  assert.match(read(repo, 'CLAUDE.md'), /uv run line-width check FILE --json/)
 })
 
 test('baselines checked out with CRLF line endings scaffold too', () => {
@@ -172,7 +188,7 @@ test('setup needs --stack for a folder holding both manifests, and runs the stac
 
   const inferred = setup()
   assert.equal(inferred.status, 1)
-  assert.match(inferred.stderr, /holds both package\.json and Cargo\.toml; pass --stack rust or --stack web/)
+  assert.match(inferred.stderr, /holds package\.json and Cargo\.toml; pass --stack web or --stack rust/)
   assert.ok(!existsSync(calls), 'setup ran mise before it knew the stack')
 
   // --keep-versions skips the toolchain bump, which would fetch the stable release.
@@ -181,7 +197,23 @@ test('setup needs --stack for a folder holding both manifests, and runs the stac
   assert.match(rust.stderr, /`mise exec -- cargo generate-lockfile` failed/)
   assert.equal(read(scratch, 'mise-calls'), 'trust\ninstall\nexec -- cargo generate-lockfile\n')
 
-  assert.match(setup('--stack', 'go').stderr, /--stack must be web or rust, not "go"/)
+  assert.match(setup('--stack', 'go').stderr, /--stack must be web, rust or python, not "go"/)
+
+  // Python bindings for a Rust tool hold pyproject.toml beside Cargo.toml.
+  writeFileSync(join(repo, 'pyproject.toml'), '[project]\n')
+  assert.match(
+    setup().stderr,
+    /holds package\.json, Cargo\.toml and pyproject\.toml; pass --stack web, --stack rust or --stack python/,
+  )
+  rmSync(calls)
+  const python = setup('--stack', 'python', '--keep-versions')
+  assert.equal(python.status, 1)
+  assert.match(python.stderr, /`mise exec -- uv lock` failed/)
+  assert.equal(read(scratch, 'mise-calls'), 'trust\ninstall\nexec -- uv lock\n')
+
   rmSync(join(repo, 'package.json'))
   assert.match(setup('--stack', 'web').stderr, /--stack web needs package\.json/)
+  rmSync(join(repo, 'Cargo.toml'))
+  rmSync(join(repo, 'pyproject.toml'))
+  assert.match(setup().stderr, /holds no package\.json, Cargo\.toml or pyproject\.toml/)
 })

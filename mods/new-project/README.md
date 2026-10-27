@@ -1,7 +1,8 @@
 # new-project
 
 `/new-project` starts a repository from the [project baselines](../../baselines/README.md):
-the React PWA on Cloudflare, or the Rust CLI workspace. You get a checkout
+the React PWA on Cloudflare, the Rust CLI workspace, or the Python package.
+You get a checkout
 that passes its verify command before the first commit, with an agent file and
 a first ADR that record why it looks the way it does.
 
@@ -11,13 +12,15 @@ a first ADR that record why it looks the way it does.
    [kickoff.md](../../baselines/general/kickoff.md) in one message, each with a
    recommended answer, plus the name, slug and target folder. Reply "ok", or
    override by number.
-2. **Baseline.** The answers pick web or Rust. A brief neither fits (SSR, a
-   mobile app, a Python service) stops here rather than forcing a template.
+2. **Baseline.** The answers pick web, Rust or Python. A brief none of them
+   fits (SSR, a mobile app, a Python web service) stops here rather than
+   forcing a template.
 3. **Scaffold.** `scripts/new-project.ts scaffold` copies
    `general/files/` and the stack's `template/` into the target, renames the
    placeholders (each spells "replace me": `replace-me`, `Replace Me`,
    `ReplaceMe` and the description for web; the `replace-me` crates, folders
-   and packages and `replace_me` identifiers for Rust), and writes:
+   and packages and `replace_me` identifiers for Rust; the `replace-me`
+   project and `replace_me` package for Python), and writes:
    - `CLAUDE.md`: `general/CLAUDE.template.md` with the stack's
      `CLAUDE.stack.md` spliced in and every placeholder filled. `AGENTS.md`
      links to it.
@@ -30,15 +33,17 @@ a first ADR that record why it looks the way it does.
    placeholder step would find) and writes nothing if a check fails.
 
 4. **Judgment.** Claude adapts what the answers change: issue keys outside
-   Linear, conventions for parts the project won't use, a licence.
+   Linear, conventions for parts the project won't use, a license.
 5. **Setup and verify.** `scripts/new-project.ts setup` runs the stack
    README's "Using it" steps through `mise exec`: install, take new majors
-   (mise.toml's pins and npm packages; the Rust toolchain and crates), format what the
-   scaffold wrote, then `pnpm verify` or `just verify`. A major that breaks
-   verify is reverted and recorded in the ADR, and `--keep-versions` reruns
-   without taking majors again. `--stack web` or `--stack rust` names the
-   baseline, which a folder holding both package.json and Cargo.toml (a Rust
-   tool with an npm wrapper) needs. Claude reports the result and offers the
+   (mise.toml's pins and npm packages; the Rust toolchain and crates; uv,
+   just and the Python release, while `uv lock` takes every dependency's
+   newest), format what the scaffold wrote, then `pnpm verify` or
+   `just verify`. A major that breaks verify is reverted and recorded in the
+   ADR, and `--keep-versions` reruns without taking majors again.
+   `--stack web`, `--stack rust` or `--stack python` names the baseline, which
+   a folder holding more than one manifest (a Rust tool with an npm wrapper or
+   Python bindings) needs. Claude reports the result and offers the
    first commit. Nothing is pushed.
 
 ## Where the baselines come from
@@ -51,8 +56,9 @@ folder** option set to a checkout's `baselines` folder; without it,
 ## Needs
 
 Node 23.6 or later for the script, and mise. The stacks' own tools (pnpm,
-Playwright's browsers, Rust, just, nextest, cargo-deny, cargo-shear) come from
-each template's `mise.toml` and lockfiles.
+Playwright's browsers, Rust, just, nextest, cargo-deny, cargo-shear, uv,
+Python, ruff, ty) come from each template's `mise.toml`, toolchain files and
+lockfiles.
 
 ## Develop
 
@@ -79,7 +85,7 @@ claude plugin test mods/new-project
 
 The tests cover the hook that finds the baselines and the text work in
 `scripts/compose.ts`. The plugin test kit has no file system, so the test that
-scaffolds both stacks from the real `baselines/` and runs the template CI's
+scaffolds every stack from the real `baselines/` and runs the template CI's
 placeholder check on the result runs under Node:
 
 ```bash
