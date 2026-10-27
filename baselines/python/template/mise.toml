@@ -1,0 +1,6 @@
+# Python comes from .python-version through uv, and every checker (ruff, ty,
+# pytest, deptry) from uv.lock. mise pins the two tools outside the project,
+# each a prebuilt binary, so every checkout and CI agree.
+[tools]
+uv = "0.13.6"
+just = "1.59.0"

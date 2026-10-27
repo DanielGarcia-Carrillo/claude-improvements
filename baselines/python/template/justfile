@@ -1,0 +1,42 @@
+# `just verify` runs the checks CI runs on a PR. Run it before every handoff.
+# uv and just come from mise.toml (`mise install`), Python from
+# .python-version, and every other tool from uv.lock through `uv run`.
+
+# A pyproject.toml that no longer matches uv.lock fails, as in CI, instead of
+# being quietly re-resolved. `uv lock` updates the lockfile.
+export UV_LOCKED := "1"
+
+verify: fmt-check lint types deps test
+
+fmt-check:
+    uv run ruff format --check
+
+lint:
+    uv run ruff check
+
+types:
+    uv run ty check
+
+# Dependencies the code imports but pyproject.toml doesn't declare, and
+# declared ones it never imports.
+deps:
+    uv run deptry src
+
+test *args:
+    uv run pytest {{ args }}
+
+# Known vulnerabilities in uv.lock. Not part of verify: a new advisory
+# shouldn't fail an unrelated change. CI runs it on main and weekly.
+audit:
+    uv audit --preview-features audit-command
+
+# Apply every machine fix: ruff's safe fixes, then formatting.
+fix:
+    uv run ruff check --fix
+    uv run ruff format
+
+# Rewrite changed inline snapshots in place, then run again to show they
+# pass; the diff is the review. The first run fails when it writes a new one.
+snapshots:
+    -uv run pytest --inline-snapshot=fix,create
+    uv run pytest

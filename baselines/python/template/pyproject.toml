@@ -1,0 +1,127 @@
+[project]
+name = "replace-me"
+version = "0.1.0"
+description = "Reports lines wider than a limit."
+# The one Python this is built and tested on, as .python-version pins it. A
+# published library sits two or three releases lower, with a CI leg there.
+requires-python = ">=3.15"
+license = "MIT"
+dependencies = []
+# PyPI refuses any upload with a "Private" classifier, so a stray `uv publish`
+# fails. Remove it to publish.
+classifiers = ["Private :: Do Not Upload"]
+
+[project.urls]
+Repository = "https://github.com/replace-me-owner/replace-me"
+
+[project.scripts]
+replace-me = "replace_me.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+# Floors only: uv.lock pins the exact versions, and `uv lock --upgrade` moves
+# them. Every check runs from here through `uv run`, so CI and every checkout
+# agree.
+[dependency-groups]
+dev = [
+  "deptry>=0.25.1",
+  "hypothesis>=6.170.12",
+  "inline-snapshot>=0.36.1",
+  "pytest>=9.2.0",
+  "ruff>=0.17.3",
+  "ty>=0.0.92",
+]
+
+[tool.ruff]
+line-length = 100
+
+# Every rule, then a short list of exceptions, each with its reason. A rule
+# names the problem and usually the fix, which steers an agent better than
+# prose. Override one line with `# noqa: CODE  <reason>`; a bare `# noqa`
+# fails (PGH004) and an unused one fails (RUF100).
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # The formatter owns trailing commas; ruff warns when both are on.
+  "COM812",
+  # The license is in pyproject.toml and LICENSE, not atop every file.
+  "CPY001",
+  # The formatter sets line length. What it can't wrap, a long string or
+  # URL, reads better whole.
+  "E501",
+  # Type-only imports outside a TYPE_CHECKING block or `lazy`: annotations
+  # are evaluated lazily, and a stdlib import costs next to nothing. Use 3.15's
+  # `lazy import` where `python -X importtime` shows a heavy one.
+  "TC001",
+  "TC002",
+  "TC003",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"sys.stdout".msg = "Print from `replace_me/_output.py`, the CLI's one output module."
+"sys.stderr".msg = "Log with `logging`, or print from `replace_me/_output.py`."
+
+[tool.ruff.lint.per-file-ignores]
+# The CLI contract's one output module may print.
+"src/replace_me/_output.py" = ["T201", "TID251"]
+"tests/**" = [
+  # pytest's assertions are plain `assert`.
+  "S101",
+  # Tests run the CLI as a subprocess with fixed arguments.
+  "S603",
+  # Test names say what they test.
+  "D1",
+  # Expected values are literals.
+  "PLR2004",
+  # pytest imports tests without packages.
+  "INP001",
+  # A test reaches into private modules to test them.
+  "PLC2701",
+  # The contract test checks stderr directly.
+  "TID251",
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# Off by default in ty; together with ruff's ANN rules they cover what
+# `mypy --strict` adds, per ty's "coming from mypy" guide.
+[tool.ty.rules]
+blanket-ignore-comment = "error"
+dynamic-function-decorator-return = "error"
+missing-type-argument = "error"
+possibly-unresolved-reference = "error"
+unsound-assignment = "error"
+unsound-return-statement = "error"
+unsound-yield = "error"
+unused-ignore-comment = "error"
+
+[tool.ty.analysis]
+strict-equality-semantics = true
+strict-generic-narrowing = true
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.pytest]
+minversion = "9.0"
+# Unknown markers and config keys fail, and an xfail that passes fails.
+strict = true
+# The docstring examples in src run as tests too.
+testpaths = ["src", "tests"]
+addopts = ["--import-mode=importlib", "--doctest-modules"]
+# A warning is a failure, so a deprecation surfaces in the PR that causes it.
+filterwarnings = ["error"]
+
+# Snapshots inline-snapshot writes come out formatted, so `just snapshots`
+# leaves nothing for the format check.
+[tool.inline-snapshot]
+format-command = "ruff format --stdin-filename {filename}"
+
+[tool.deptry]
+known_first_party = ["replace_me"]

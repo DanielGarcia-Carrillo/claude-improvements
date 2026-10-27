@@ -1,8 +1,8 @@
 <!--
 Skeleton for a new project's CLAUDE.md. Copy it to the repo root as
 CLAUDE.md, symlink AGENTS.md to it (`ln -s CLAUDE.md AGENTS.md`), fill every
-<placeholder>, and splice in the stack fragment (web/CLAUDE.stack.md or
-rust/CLAUDE.stack.md) where marked. Delete these comments.
+<placeholder>, and splice in the stack fragment (web/, rust/ or
+python/CLAUDE.stack.md) where marked. Delete these comments.
 
 Keep it short: an agent reads all of it every session. Anything the
 toolchain can enforce belongs in a lint, test or hook, with one line here
@@ -75,9 +75,10 @@ every handoff and never hand off red.
   silent fallbacks; an unexpected state fails loudly.
 - **Parse at the boundary, trust types inside.** Invalid states should not
   be representable.
-- **Native before dependencies** in the browser; in Rust, the ecosystem's
-  standard crate before hand-rolled code. A new dependency is justified in
-  its commit message; a structural one gets an ADR.
+- **Native before dependencies** in the browser and in Python's standard
+  library; in Rust, the ecosystem's standard crate before hand-rolled code.
+  A new dependency is justified in its commit message; a structural one gets
+  an ADR.
 - **Tests check behaviour** a caller can observe, not internals or what the
   types already guarantee, and only inputs that can happen. Shared setup in
   fixtures and builders, one behaviour per test, failure messages that say

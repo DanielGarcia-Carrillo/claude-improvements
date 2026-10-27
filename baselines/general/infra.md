@@ -131,7 +131,8 @@ rules:
   token. It runs on `main` only, on a GitHub-hosted runner, and installs
   with `--ignore-scripts`, so no install script runs beside the token.
 - Every run's summary lists its ten slowest steps; the Rust template adds
-  its slowest tests and a `cargo --timings` report as an artifact, and
+  its slowest tests and a `cargo --timings` report as an artifact, the
+  Python template its slowest tests from pytest's JUnit report, and
   Playwright's HTML report ranks tests by duration. For trends, use GitHub's
   Actions performance metrics (organisation Insights) or Blacksmith's
   dashboard.
@@ -147,7 +148,8 @@ It is built in and free on private repos, but has two known gaps:
   Watch its first PRs; if it can't update the lockfile, that settles the
   question.
 - It doesn't read `mise.toml`, so Node and the Rust tools pinned there are
-  bumped by hand.
+  bumped by hand, as are uv and just in the Python template, and its
+  `.python-version`.
 
 Renovate covers both and is free for public and private repos through Mend's
 Community Cloud, or self-hosted. It is parked as an exploration, with a
@@ -181,6 +183,9 @@ repo, and stay in its history.
   directly. A global `rust = "stable"` in mise exports `RUSTUP_TOOLCHAIN`,
   which overrides that file in every repo; the Rust template's `mise.toml`
   makes mise read the file instead.
+- **Python** is pinned by `.python-version`, which uv reads and installs
+  from its own builds; the Python template's `mise.toml` pins only uv and
+  just. Leave Python out of mise there, so uv's copy is the only one.
 - **pnpm refuses packages published less than a day ago.** The web
   template sets `minimumReleaseAge` explicitly, which also makes it strict:
   pnpm fails rather than fall back to a younger release. A template that
@@ -203,7 +208,8 @@ Encode process in the cheapest mechanism that enforces it:
 Hooks are guarantees; text in the agent file is a request. The stack
 templates ship a `.claude/settings.json` wired this way:
 [web](../web/template/.claude/settings.json),
-[rust](../rust/template/.claude/settings.json).
+[rust](../rust/template/.claude/settings.json),
+[python](../python/template/.claude/settings.json).
 
 Git hooks are optional. Claude Code hooks catch problems earlier inside the
 agent loop; CI is the gate for everything else. Add a thin lefthook
