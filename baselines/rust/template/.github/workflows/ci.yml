@@ -3,7 +3,9 @@ name: ci
 on:
   push:
     branches: [main]
+  # ready_for_review starts the first real run of a PR opened as a draft.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   schedule:
     # Weekly, so a new security advisory surfaces even when nothing merges.
@@ -27,6 +29,9 @@ env:
 # private repo). Deleting the variable moves CI back, with no commit.
 jobs:
   lint:
+    # Drafts run nothing: agents push many of them, and a draft can't merge.
+    # The `ci` check still reports, and marking the PR ready runs lint and test.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
     timeout-minutes: 15
     steps:
@@ -57,6 +62,7 @@ jobs:
       - run: cargo shear
 
   test:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     # Add macos-latest and windows-latest only for tools shipped there.
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
     timeout-minutes: 20

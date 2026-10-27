@@ -401,18 +401,42 @@ The local distribution is wide. A `scripts/`-only PR drops to about 48 s, a
 JS-only PR to about 99 s, and a PR touching a crate still runs about 276 s,
 because it needs Rust and the npm wrapper's integration tests.
 
-Method: each PR's file list goes through `ci_policy.select()` from
-`main`, with lane costs taken from October's per-job averages (CI) and from
-the timed smoke above (local). Bench smoke and single-pass release are
-estimated at 4 and 8 minutes.
+Method:
+
+- **Files:** each PR's changed files as GitHub reports them, which is the
+  diff against the PR's own base branch. For a stacked PR that base is the
+  parent, the same diff the proposed policy and `gt parent` would use.
+- **Today:** `ci_policy.select()` as it was on `main` on 2026-10-27, which
+  forces every lane for a stacked PR.
+- **With the mapping:** the same `select()` with the changes above
+  applied: no forced full run for stacked PRs, and the `scripts/`,
+  `actions/`, `templates/` and workflow rules as listed.
+- **Costs:** lane costs come from October's per-job averages (CI) and from
+  the timed smoke above (local), with each lane mapped to its smoke steps.
+  Bench smoke and single-pass release are estimated at 4 and 8 minutes.
+
+The simulation script wasn't kept, so re-running it means re-applying those
+rule changes to the selector.
 
 ### 2. Skip lanes whose exact inputs already passed
 
-Key each lane by a hash of the Git tree IDs of its input paths
-(`git rev-parse HEAD:<dir>` is free, because Git already content-addresses
-them), plus the toolchain and lock files, the OS and architecture, and the
-policy script's own hash. On a green lane, record a pass marker under that
-key. Before running a lane, look the key up, and skip the lane on a hit.
+Key each lane by a hash of the Git tree IDs of its input paths, plus:
+
+- the toolchain and lock files;
+- the OS and architecture;
+- the files that define what the lane runs: the policy script, the smoke
+  runner and the CI workflow.
+
+On a green lane, record a pass marker under that key. Before running a
+lane, look the key up, and skip the lane on a hit.
+
+The tree IDs must describe the files the lane actually tested.
+`git rev-parse HEAD:<dir>` is free in CI, where the checkout is clean. In a
+local worktree it ignores uncommitted and untracked edits, so a dirty
+worktree would match an old marker. Locally, hash the working tree instead:
+`git add -A` into a temporary index (`GIT_INDEX_FILE`), then
+`git write-tree` and `git rev-parse <tree>:<dir>`. Or simply allow no
+cache hits while the worktree is dirty.
 
 - **Locally** the marker is a file under `~/.cache/<repo>-smoke/`. Every
   worktree shares it. In a restacked 30-PR stack, each child whose Rust
@@ -486,7 +510,7 @@ to retrofit:
 - **One required gate job** that checks the others' results. Jobs can then
   be split, skipped or renamed without touching branch protection. The web
   template's `ci` job already does this.
-- **Drafts skip CI**, as above.
+- **Drafts skip CI**, as above. The web and Rust templates both do this.
 - **Add lanes only when a job is worth skipping**, meaning it takes more
   than a couple of minutes and has inputs that many PRs don't touch.
   - Keep the path → lane rules in one script with its own tests, not
@@ -508,9 +532,12 @@ to retrofit:
 
 ## Cost
 
-At GitHub's $0.006 per Linux minute beyond the 3,000 included minutes, the
-CLI repo is about 6,500 overage minutes a month, or roughly $39. A third off
-brings it to about $20. **The money is small.** The real gains are PR
+The CLI repo is private, so its Actions minutes are billed; public repos
+on standard runners are free. Assuming a plan with 3,000 included minutes a
+month (GitHub Pro) and $0.006 per Linux minute beyond that, the repo uses
+about 6,500 overage minutes a month, or roughly $39. A third off brings it
+to about $20. On a plan with fewer included minutes, both figures go up by
+the difference times $0.006, a few dollars. **The money is small.** The real gains are PR
 latency (18 → 13 minutes on average, and much lower for PRs that skip the
 release build) and local CPU with many agents running smoke at once.
 [Blacksmith](blacksmith.md) stacks on top: it makes the remaining minutes

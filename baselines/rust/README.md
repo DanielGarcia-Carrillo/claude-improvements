@@ -53,7 +53,7 @@ Versions and statuses were checked on 2026-10-20.
 | Supply chain | cargo-deny (licences, bans, sources; advisories on main and weekly, or `just deny-all`), cargo-shear | Unused and duplicate dependencies fail; a new advisory doesn't block an unrelated PR |
 | Tasks | `just` | One `just verify` that runs the checks PR CI runs |
 | Tools | mise pins just, nextest, cargo-deny, cargo-shear, cargo-insta as prebuilt binaries; CI installs them from the same `mise.toml` | Same versions locally and in CI, and no tool compiles from source |
-| CI | GitHub Actions, SHA-pinned; `rustup toolchain install` reads the toolchain file; Swatinem/rust-cache; jdx/mise-action for the tools | Linux only by default; add macOS and Windows test legs only for tools shipped there |
+| CI | GitHub Actions, SHA-pinned; `rustup toolchain install` reads the toolchain file; Swatinem/rust-cache; jdx/mise-action for the tools. Draft PRs skip lint and test; marking a PR ready runs them | Linux only by default; drafts cost nothing until someone marks one ready; add macOS and Windows test legs only for tools shipped there |
 
 ## Add when needed
 
