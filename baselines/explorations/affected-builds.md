@@ -430,11 +430,81 @@ This is the remote-cache half of what Nx, Turborepo and moon sell, in about
 
 ### 3. The single Vite app
 
-Cache `~/.cache/ms-playwright` keyed on the Playwright version and keep
-`install-deps` for the system libraries, or run the job in
-`mcr.microsoft.com/playwright`. Use `vitest --changed` for the Storybook
-project locally. Keep the Playwright end-to-end suite unconditional: it's
-small, and `--only-changed` can't see app changes.
+See [Web-only projects](#web-only-projects).
+
+## New and web-only projects
+
+### Web-only projects
+
+A single Vite app, like the [web template](../web/template/), is one
+package with one CI job. There's nothing to route between lanes, and a full
+`pnpm verify` takes a few minutes. The waste is in setup and in running CI
+on PRs nobody is looking at yet, not in which tests run. In order of
+payoff:
+
+1. **Skip CI on draft PRs.** Agents open PRs as drafts, so this is where a
+   burst of 30 PRs costs nothing until each one is marked ready. Add
+   `ready_for_review` to the `pull_request` types and gate the verify job
+   on `!github.event.pull_request.draft`. The required `ci` job still
+   reports, and a draft can't merge anyway.
+2. **Cache Playwright's browsers.** The template runs
+   `playwright install --with-deps chromium webkit` on every run. Cache
+   `~/.cache/ms-playwright` keyed on the Playwright version in the
+   lockfile, and on a hit run only `playwright install-deps` for the system
+   libraries. Or run the job in the `mcr.microsoft.com/playwright` image for
+   that version. Normally that saves 20–40 s, but it also removes the
+   8–10 minute download spikes we saw.
+3. **Select tests locally, run everything in CI.** While an agent iterates,
+   run a `verify:changed` script:
+   - `tsc -b` as today, since it's already incremental;
+   - oxlint and oxfmt on the changed files only;
+   - `vitest run --changed <base>`, where base is `gt parent` or the merge
+     base with `main`. This covers both the unit and Storybook projects,
+     because stories import the components they render, so Vitest's module
+     graph sees them.
+
+   Skip end-to-end tests locally. CI runs the full `pnpm verify` and is the
+   gate, and the PR summary says that local checks were selected. This is
+   the same deal the CLI repo adopted for its Vitest migration.
+4. **Keep end-to-end tests unconditional in CI.** `playwright
+   --only-changed` follows only the spec files' imports, so it misses app
+   changes the browser reaches at runtime. The suite is small; if it grows,
+   shard it (`--shard`) rather than select it.
+5. **Don't add a pass cache or a build tool.** With one job and drafts
+   skipped, a cache key would save one re-run of a few minutes.
+
+When a web project grows into a pnpm workspace with several packages, start
+with pnpm's own filter, `pnpm -r --filter "...[origin/main]" test`. It
+selects changed packages plus everything that depends on them. Move to
+Turborepo only when you need its cache across runs.
+
+### New projects
+
+Set these up from the start, because they're cheap on day one and painful
+to retrofit:
+
+- **One required gate job** that checks the others' results. Jobs can then
+  be split, skipped or renamed without touching branch protection. The web
+  template's `ci` job already does this.
+- **Drafts skip CI**, as above.
+- **Add lanes only when a job is worth skipping**, meaning it takes more
+  than a couple of minutes and has inputs that many PRs don't touch.
+  - Keep the path → lane rules in one script with its own tests, not
+    scattered `paths:` filters. Then CI and local smoke read the same rules.
+  - Map every new top-level directory when you add it; an unmapped path
+    should fail the policy test, not silently fall back to "full".
+  - Stacked PRs diff against their parent from the first stack.
+- **Write tests a module graph can see.** Prefer in-process unit tests,
+  which Vitest selects soundly. Keep tests that start processes or load
+  files into a browser in a small integration tier with declared inputs.
+  Most of the CLI repo's selection problem came from 20 of 39 test files
+  starting processes.
+- **Rust:** test the whole workspace, not `-p` subsets, and let the lane
+  decide whether Rust runs at all.
+- **A binary built in one language and tested from another:** cache it by
+  the tree hash of its inputs from the first CI job that needs it.
+- **Print per-step timings** in the run summary, as the web template's
+  `ci` job does, so slow steps show up before they're expensive.
 
 ## Cost
 
