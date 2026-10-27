@@ -12,7 +12,7 @@ need a line live in the stack READMEs' "Instead, when" columns
 | [UI primitives](ui-primitives.md) | Native elements | A project needs a widget the platform lacks (menu, combobox, date picker); Astryx re-evaluated and not adopted |
 | [Visual regression](visual-regression.md) | PR screenshots | The in-house visual regression tool has a usable release |
 | [Blacksmith](blacksmith.md) | GitHub-hosted runners | A private repo pays for Actions minutes: pilot one repo in an organisation on Team, then set `CI_RUNNER` for the rest |
-| [Affected-only builds](affected-builds.md) | Path → lane selectors plus full local smoke | Agent PRs run checks their files can't affect: fix the lane mapping and add a content-hash pass cache; adopt moon or Turborepo only past roughly 15–20 projects |
+| [Affected-only builds](affected-builds.md) | Full checks on every PR, drafts skipped, setup cached | A job is slow and its inputs are separable: tested path → job rules or Vitest selection; moon for a mixed Rust/JS repo; Turborepo for a JS monorepo |
 | [Observability](observability.md) | Nothing in the browser; Workers Logs and Issues once there is an API Worker | Launch: Sentry for browser errors (lazy, tunnelled) and Cloudflare Web Analytics |
 | [tsrs](tsrs.md) | TypeScript 7's `tsc` | It has a stable release against TypeScript 7.1 and a project's typecheck gets slow |
 
