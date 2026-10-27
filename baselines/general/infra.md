@@ -123,9 +123,9 @@ rules:
 - One aggregate job (`ci`) is the required status check, so renaming or
   splitting jobs never breaks branch protection.
 - CI runs the same verify command as local, on a clean checkout.
-- Two jobs hold something sensitive, and neither runs package code. The web
-  template's `screenshots` job has a write token and runs only git, gh and
-  one script. `deploy` has the Cloudflare token and runs on `main` only.
+- One job holds a secret: the web template's `deploy`, with the Cloudflare
+  token. It runs on `main` only, on a GitHub-hosted runner, and installs
+  with `--ignore-scripts`, so no install script runs beside the token.
 - Every run's summary lists its ten slowest steps; the Rust template adds
   its slowest tests and a `cargo --timings` report as an artifact, and
   Playwright's HTML report ranks tests by duration. For trends, use GitHub's

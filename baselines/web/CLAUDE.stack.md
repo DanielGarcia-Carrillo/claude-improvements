@@ -53,13 +53,14 @@ by itself.
 - **Component tests are stories.** A story's play function is its
   interaction test and runs under Vitest with axe; don't add a separate test
   file that renders the same component.
-- **Visual changes reach the PR on their own.** CI captures every story and
-  screen and puts those that differ from `main` in the PR description,
-  between `<!-- screenshots:start -->` and `<!-- screenshots:end -->`; don't
-  write inside those markers. A new screen is captured once its path is in
+- **A visible change gets a screenshot in its PR.** `pnpm screenshots`
+  captures every story and every screen in `paths`, in both browsers, into
+  `screenshots/stories/` and `screenshots/screens/`. Put the one or two that
+  show the change best in the PR's Screenshots section; if the change alters
+  something that exists, run the same command in a scratch worktree of
+  `main` for the before. A new screen is captured once its path is in
   `paths`; anything that changes by itself (dates, live data) goes in
-  `VOLATILE` in `tests/e2e/screens.spec.ts`. `pnpm screenshots` writes the
-  same PNGs locally.
+  `VOLATILE` in `tests/e2e/screens.spec.ts`.
 - **Strictness is on everywhere and stays on.** Don't loosen a tsconfig
   flag, the React Compiler's `panicThreshold`, Vitest's `requireAssertions`
   or the e2e error fixtures to get green; fix the code. A compiler bail-out

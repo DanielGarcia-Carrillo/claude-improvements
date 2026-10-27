@@ -37,6 +37,12 @@ every handoff and never hand off red.
   (or `Closes #n`) line, how it was verified and, for a visible change, a
   representative screenshot ([template](.github/pull_request_template.md)).
   Open as draft. <Who may push, mark ready and merge.>
+- **Screenshots**: on the repo's orphan `screenshots` branch under
+  `pr-<number>/`, committed from a separate worktree, never on the PR's
+  branch. Link each by that branch's commit, so a later push doesn't change
+  what an old description shows:
+  `![what it shows](https://github.com/<owner>/<repo>/blob/<commit>/pr-<number>/<file>.png?raw=true)`.
+  The images keep the repo's access rules, so a private repo's stay private.
 - **Provenance**: whatever an agent posts to a service (PR bodies, review
   replies, issue comments, chat messages) ends with a line naming the agent,
   such as `🤖 Generated with [Claude Code](https://claude.com/claude-code)`,
