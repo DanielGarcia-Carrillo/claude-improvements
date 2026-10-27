@@ -464,7 +464,7 @@ A single Vite app, like the [web template](../web/template/), is one
 package with one CI job. There's nothing to route between lanes, and a full
 `pnpm verify` takes a few minutes. The waste is in setup and in running CI
 on PRs nobody is looking at yet, not in which tests run. In order of
-payoff. The web template does the first two.
+payoff. The web template does the first three.
 
 1. **Skip CI on draft PRs.** Agents open PRs as drafts, so this is where a
    burst of 30 PRs costs nothing until each one is marked ready. Add
@@ -479,17 +479,22 @@ payoff. The web template does the first two.
    that version. Normally that saves 20–40 s, but it also removes the
    8–10 minute download spikes we saw.
 3. **Select tests locally, run everything in CI.** While an agent iterates,
-   run a `verify:changed` script:
+   it runs `pnpm verify:changed`:
    - `tsc -b` as today, since it's already incremental;
    - oxlint and oxfmt on the changed files only;
-   - `vitest run --changed <base>`, where base is `gt parent` or the merge
-     base with `main`. This covers both the unit and Storybook projects,
-     because stories import the components they render, so Vitest's module
-     graph sees them.
+   - `vitest run --changed <base>`. The base is the Graphite parent or
+     `main`, from its merge base with HEAD, and the changes include
+     uncommitted and untracked files. This covers both the unit and
+     Storybook projects, because stories import the components they render,
+     so Vitest's module graph sees them. A config or `package.json` change
+     reruns every test.
 
-   Skip end-to-end tests locally. CI runs the full `pnpm verify` and is the
-   gate, and the PR summary says that local checks were selected. This is
-   the same deal the CLI repo adopted for its Vitest migration.
+   End-to-end tests don't run locally. In the template, `pnpm verify` stays
+   the gate before handoff. A project with many small PRs can make CI the
+   only gate instead and say in the PR summary that local checks were
+   selected; that's the deal the CLI repo adopted for its Vitest migration.
+   In a scratch copy of the template, a one-component change checked in
+   about 4 s, running only that component's stories.
 4. **Keep end-to-end tests unconditional in CI.** `playwright
    --only-changed` follows only the spec files' imports, so it misses app
    changes the browser reaches at runtime. The suite is small; if it grows,
