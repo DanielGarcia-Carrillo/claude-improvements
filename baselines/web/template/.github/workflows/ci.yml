@@ -42,17 +42,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium webkit
 
       # The same gate as local: typecheck, lint, format, unit, browser and
-      # story tests, build, end-to-end. SCREENSHOT_DIR makes the story and
-      # screen tests save PNGs too, for the screenshots job.
+      # story tests, build, end-to-end.
       - run: pnpm verify
-        env:
-          SCREENSHOT_DIR: ${{ github.workspace }}/screenshots
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: screenshots
-          path: screenshots/
-          retention-days: 7
 
       # Only on failure, and briefly: traces record request headers and bodies.
       - if: ${{ failure() }}
@@ -97,40 +88,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-
-  # Shows the captures a PR changes in its description, before and after
-  # (scripts/pr-screenshots.ts), and keeps main's captures current. Images go
-  # to the orphan `screenshots` branch, so they keep the repo's access rules.
-  # The write token reaches mise-action, the mise binary it fetches, and the
-  # script and mise.toml checked out here, which on a PR are the PR's own. No
-  # npm package runs. Forks and Dependabot are skipped, so only people who can
-  # push branches here get that far, and they could edit this workflow anyway.
-  screenshots:
-    needs: [verify]
-    if: ${{ github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
-    permissions:
-      contents: write
-      pull-requests: write
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: |
-            scripts/pr-screenshots.ts
-            mise.toml
-          sparse-checkout-cone-mode: false
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: screenshots
-          path: screenshots/
-      - run: node scripts/pr-screenshots.ts --captures screenshots --sha "$HEAD_SHA" ${PR:+--pr "$PR"}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
   # The one required status check. Jobs above can be renamed or split without
   # touching branch protection.

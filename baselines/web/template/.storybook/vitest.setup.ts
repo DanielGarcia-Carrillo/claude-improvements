@@ -9,7 +9,7 @@ declare module 'vitest' {
 }
 
 /**
- * With SCREENSHOT_DIR set, as CI sets it for PR screenshots, every story that
+ * With SCREENSHOT_DIR set, as `pnpm screenshots` sets it, every story that
  * passed is saved as `<dir>/stories/<file>--<story>.png`. Otherwise nothing is
  * written.
  */

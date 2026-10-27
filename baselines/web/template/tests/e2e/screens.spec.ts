@@ -7,8 +7,8 @@ const dir = process.env['SCREENSHOT_DIR']
 const VOLATILE = [testIds.today]
 
 /**
- * Not a test of behaviour: with SCREENSHOT_DIR set, as CI sets it for PR
- * screenshots, saves every screen at each project's viewport
+ * Not a test of behaviour: with SCREENSHOT_DIR set, as `pnpm screenshots`
+ * sets it, saves every screen at each project's viewport
  * (`<dir>/screens/<screen>--<project>.png`). Skipped otherwise.
  */
 test.describe('screens', () => {

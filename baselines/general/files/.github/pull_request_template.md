@@ -10,12 +10,9 @@ Linear: <!-- PER-12 https://linear.app/... With GitHub Issues, make this line "C
 
 <!-- The verify command and its result, plus anything checked by hand. -->
 
-<!-- screenshots:start -->
-
 ## Screenshots
 
-<!-- A visible change: a representative screenshot, before and after if it alters something that exists. A CLI: the changed output (a snapshot diff counts). Nothing visible changed: "None". If CI posts screenshots here, it rewrites everything between the screenshots markers on each push, so leave the section to it. -->
-<!-- screenshots:end -->
+<!-- A visible change: a representative screenshot, before and after if it alters something that exists. A CLI: the changed output (a snapshot diff counts). Nothing visible changed: "None". -->
 
 ## Notes for review
 

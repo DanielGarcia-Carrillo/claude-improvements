@@ -9,20 +9,19 @@ A dedicated visual regression tool built for agent workflows is in
 development, and it is meant to become the default for pixel diffs in these
 baselines: deterministic comparisons, `main` commits as baselines, a compact
 per-PR summary. Until it reaches a usable release, the template has no
-screenshot assertions: its PR screenshots job (below) shows reviewers what
-changed. Adopting the tool replaces any screenshot assertions a project
+screenshot assertions: agents attach screenshots of what changed to their
+PRs (below). Adopting the tool replaces any screenshot assertions a project
 has added, but not the PR screenshots: whatever does the diffing, a PR that
-changes the UI shows representative screenshots in its description. The
-job stays unless the tool's PR summary includes them.
+changes the UI shows representative screenshots in its description. Agents
+keep attaching them unless the tool's PR summary includes them.
 
 ## Until then
 
-- **PR screenshots** (already in the web template): CI captures every story
-  and screen and shows those that changed, before and after, in the PR
-  description. It compares bytes, not pixels, so it relies on the same
-  runner image for `main` and the PR. A change of `CI_RUNNER` makes
-  everything differ once, until `main`'s captures are refreshed. It shows
-  changes; it doesn't fail the build.
+- **PR screenshots** (already in the web template): `pnpm screenshots`
+  captures every story and screen, and the agent puts the ones that show its
+  change, before and after, in the PR description. It shows changes; it
+  doesn't fail the build, and it catches only what the agent thinks to look
+  at.
 - **Playwright `toHaveScreenshot`** for whole screens, and **Vitest
   `toMatchScreenshot`** for stories in browser mode.
 - Generate and update baselines only in one pinned environment (CI, or the
@@ -46,5 +45,5 @@ job stays unless the tool's PR summary includes them.
 
 The in-house tool has a release that covers Playwright captures and stories;
 then make it the pixel-diff check in place of any screenshot assertions.
-Keep the PR screenshots job unless the tool's PR summary shows the
-screenshots itself.
+Keep attaching PR screenshots unless the tool's PR summary shows them
+itself.
