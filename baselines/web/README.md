@@ -38,7 +38,7 @@ Versions and statuses were checked on 2026-10-20.
 | Area | Default | Why | Instead, when |
 |---|---|---|---|
 | Runtime and packages | Node 26 (mise), pnpm 12 | Node 26 is LTS from late October 2026. pnpm 12 refuses releases younger than a day and asks before installing into a stale `node_modules` | — |
-| Build | Vite 8 (Rolldown) | The fast default; Lightning CSS built in | — |
+| Build | Vite 8 (Rolldown) | The fast default; Lightning CSS built in | A package published to npm: `tsc` with `isolatedDeclarations`, checked by publint; see [explorations/tsdown](../explorations/tsdown.md) |
 | Types | TypeScript 7 (native `tsc`) | `typescript@7` *is* the Go compiler; `tsgo`/native-preview are legacy names | — |
 | Strictness | ES modules everywhere (always strict mode; the service worker, built as a classic script, gets `'use strict'` added); `<StrictMode>`; TypeScript `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` and friends; React Compiler `panicThreshold: 'all_errors'`; unit tests must assert; e2e fails on page errors, console errors and CSP violations; pnpm `engineStrict` | Each turns a silent problem into a failure that names it | — |
 | Lint | oxlint + type-aware (tsgolint) | Correctness and suspicious categories only; StyleX and React Compiler rules included. Detects agents and prints one line per finding | — |
