@@ -3,7 +3,9 @@ name: ci
 on:
   push:
     branches: [main]
+  # ready_for_review starts the first real run of a PR opened as a draft.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +21,9 @@ concurrency:
 # private repo). Deleting the variable moves CI back, with no commit.
 jobs:
   verify:
+    # Drafts run nothing: agents push many of them, and a draft can't merge.
+    # The `ci` check still reports, and marking the PR ready runs verify.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
     timeout-minutes: 20
     steps:
@@ -39,7 +44,21 @@ jobs:
           cache: true
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium webkit
+
+      # Browsers are cached per Playwright version; the system libraries
+      # they need aren't, so a cache hit still installs those.
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium-webkit
+      - if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: pnpm exec playwright install-deps chromium webkit
 
       # The same gate as local: typecheck, lint, format, unit, browser and
       # story tests, build, end-to-end.

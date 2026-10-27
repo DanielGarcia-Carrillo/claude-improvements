@@ -440,15 +440,15 @@ A single Vite app, like the [web template](../web/template/), is one
 package with one CI job. There's nothing to route between lanes, and a full
 `pnpm verify` takes a few minutes. The waste is in setup and in running CI
 on PRs nobody is looking at yet, not in which tests run. In order of
-payoff:
+payoff. The web template does the first two.
 
 1. **Skip CI on draft PRs.** Agents open PRs as drafts, so this is where a
    burst of 30 PRs costs nothing until each one is marked ready. Add
    `ready_for_review` to the `pull_request` types and gate the verify job
    on `!github.event.pull_request.draft`. The required `ci` job still
    reports, and a draft can't merge anyway.
-2. **Cache Playwright's browsers.** The template runs
-   `playwright install --with-deps chromium webkit` on every run. Cache
+2. **Cache Playwright's browsers.** Instead of running
+   `playwright install --with-deps chromium webkit` every time, cache
    `~/.cache/ms-playwright` keyed on the Playwright version in the
    lockfile, and on a hit run only `playwright install-deps` for the system
    libraries. Or run the job in the `mcr.microsoft.com/playwright` image for
