@@ -39,7 +39,8 @@ beforeAll(() => {
   commit('src/a.ts', 'src/b.ts', 'src/gone.ts', 'README.md')
   mainHead = git('rev-parse', 'HEAD')
   git('checkout', '-qb', 'feature')
-  commit('src/a.ts')
+  // A non-ASCII name, which git quotes unless asked for NUL-separated output.
+  commit('src/a.ts', 'src/über.ts')
 })
 beforeEach(() => {
   git('checkout', '-qf', 'feature')
@@ -55,15 +56,26 @@ describe('verify:changed', () => {
     writeFileSync(join(repo.root, 'README.md'), 'edited\n')
     rmSync(join(repo.root, 'src/gone.ts'))
     repo.write('src/new.tsx')
+    repo.write('src/naïve.ts')
     repo.write('notes.txt')
     const { status, calls } = verifyChanged()
     expect(status).toBe(0)
+    const files = 'src/a.ts src/b.ts src/naïve.ts src/new.tsx src/über.ts'
     expect(calls).toEqual([
       `${repo.root}|-s typecheck`,
-      `${repo.root}|-s lint src/a.ts src/b.ts src/new.tsx`,
-      `${repo.root}|exec oxfmt --check --no-error-on-unmatched-pattern README.md src/a.ts src/b.ts src/new.tsx`,
+      `${repo.root}|-s lint ${files}`,
+      `${repo.root}|exec oxfmt --check --no-error-on-unmatched-pattern README.md ${files}`,
       `${repo.root}|exec vitest run --changed ${mainHead}`,
     ])
+  })
+
+  it('fails rather than passing when git cannot list the changes', () => {
+    const index = join(repo.base, 'corrupt-index')
+    writeFileSync(index, 'not an index')
+    const { status, stderr, calls } = verifyChanged({ GIT_INDEX_FILE: index })
+    expect(status).toBe(1)
+    expect(stderr).toContain('could not list the changed files')
+    expect(calls).toEqual([])
   })
 
   it('skips lint and format when no file of theirs changed', () => {

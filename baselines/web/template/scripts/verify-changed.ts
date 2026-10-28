@@ -21,6 +21,15 @@ function git(args: string[]): string | undefined {
   return result.status === 0 ? result.stdout.trim() : undefined
 }
 
+/**
+ * The paths a git command lists, or undefined if it failed. Run with `-z`:
+ * NUL-separated output leaves non-ASCII names unquoted.
+ */
+function gitPaths(args: string[]): string[] | undefined {
+  const result = spawnSync('git', args, { encoding: 'utf8' })
+  return result.status === 0 ? result.stdout.split('\0').filter(Boolean) : undefined
+}
+
 /** The branch to compare against, as described above. */
 function baseBranch(): string | undefined {
   const fromEnv = process.env['VERIFY_BASE']
@@ -48,12 +57,17 @@ if (base === undefined) {
 }
 
 // Committed, staged and unstaged changes against the merge base, minus
-// deletions, plus untracked files.
-const changed = [
-  ...(git(['diff', '--name-only', '--diff-filter=d', base]) ?? '').split('\n'),
-  ...(git(['ls-files', '--others', '--exclude-standard']) ?? '').split('\n'),
-]
-const files = [...new Set(changed.filter(Boolean))].toSorted()
+// deletions, plus untracked files. A failed listing stops the run rather
+// than passing with nothing checked.
+const tracked = gitPaths(['diff', '--name-only', '-z', '--diff-filter=d', base])
+const untracked = gitPaths(['ls-files', '-z', '--others', '--exclude-standard'])
+if (tracked === undefined || untracked === undefined) {
+  process.stderr.write(
+    'verify:changed: git could not list the changed files. Check the repository, or run `pnpm verify`.\n',
+  )
+  process.exit(1)
+}
+const files = [...new Set([...tracked, ...untracked])].toSorted()
 const linted = files.filter((file) => LINTED.has(extname(file)))
 const formatted = files.filter((file) => FORMATTED.has(extname(file)))
 

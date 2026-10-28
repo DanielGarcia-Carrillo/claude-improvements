@@ -37,9 +37,12 @@ and [Rust](../rust/template/) templates already do them.
 
 - **One required gate job** that checks the other jobs' results. Jobs can
   then be split, skipped or renamed without touching branch protection.
-- **Draft PRs skip CI.** Add `ready_for_review` to the `pull_request` types
-  and gate the work on `!github.event.pull_request.draft`. Agents open PRs
-  as drafts, so a burst of 30 costs nothing until each one is marked ready.
+- **Draft PRs skip CI.** Add `ready_for_review` and `converted_to_draft` to
+  the `pull_request` types, and gate the work on
+  `!github.event.pull_request.draft`. Converting back to draft then starts a
+  run that cancels the one in progress. Agents open PRs
+  as drafts, so a burst of 30 runs only the gate job, about a billable
+  minute a push, until each one is marked ready.
   The gate still reports, and a draft can't merge anyway.
 - **Cache setup, not results.** `rust-cache` with saves only from `main`,
   plus sccache for the workspace's own crates, which `rust-cache` drops
