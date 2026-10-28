@@ -196,8 +196,12 @@ a minute or so off each Rust job on PRs that change one crate.
   sccache to that job. New projects get it from the Rust template.
 - **Locally, to sccache instead of cloning:** sccache normalizes the
   working directory and `CARGO_MANIFEST_DIR` for Rust, so workspace crates
-  hit across worktrees. Or worktrees stop living on a copy-on-write file
-  system.
+  hit across worktrees
+  ([mozilla/sccache#2652](https://github.com/mozilla/sccache/issues/2652)
+  tracks applying `SCCACHE_BASEDIRS` to Rust). Leaving copy-on-write
+  isn't a reason to switch: a plain copy of `target/` still works but
+  costs disk and time, and sccache would still miss on workspace crates,
+  helping only with registry dependencies.
 - **To a remote cache:** builds move to machines that can't share a
   directory or the Actions cache, such as several self-hosted runners.
 
