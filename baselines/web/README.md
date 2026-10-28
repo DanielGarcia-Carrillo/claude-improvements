@@ -183,12 +183,21 @@ Router's `Route`, Jotai atoms and components would all need hand-written
 types, and an app emits no `.d.ts`.
 
 1. Compile with `tsc` from an emitting tsconfig, so every export states its
-   own type and any declaration emitter can produce the `.d.ts`:
+   own type and any declaration emitter can produce the `.d.ts`. It extends
+   the template's `tsconfig.base.json` for the strict flags, then switches
+   to Node's module rules, since Node loads the output, not Vite. Relative
+   imports keep their `.ts` extension, as in the app, and are rewritten to
+   `.js` on emit:
    ```jsonc
    // tsconfig.build.json
    {
-     "extends": "./tsconfig.json",
+     "extends": "./tsconfig.base.json",
      "compilerOptions": {
+       "module": "nodenext",
+       "moduleResolution": "nodenext",
+       "rewriteRelativeImportExtensions": true,
+       "lib": ["ES2024"],
+       "types": [], // ["node"] if the package uses Node's APIs
        "noEmit": false,
        "rootDir": "src",
        "outDir": "dist",
