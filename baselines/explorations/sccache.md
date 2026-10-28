@@ -6,7 +6,8 @@ question came from many parallel agent PRs, where each fresh worktree
 compiles cold and some CI jobs rebuild the same crates on every run. The
 guidance is drawn from measuring one of our repos in October 2026; that
 evidence is in the [worked example](#worked-example) at the end. For which
-jobs and tests run at all, see [affected-only builds](affected-builds.md).
+jobs and tests run at all, see
+[CI and local check speed](../general/ci-speed.md).
 
 ## The short version
 
@@ -195,8 +196,8 @@ a minute or so off each Rust job on PRs that change one crate.
 ## Worked example
 
 Measured on 2026-10-27 on the Rust CLI repo from
-[affected-only builds](affected-builds.md): 9 crates (one of them the CLI
-crate that most PRs touch), about 230 compile units for
+[CI and local check speed](../general/ci-speed.md): 9 crates (one of them
+the CLI crate that most PRs touch), about 230 compile units for
 `cargo test --workspace --no-run`, and 67 integration test files. Of
 October's 73 merged PRs that changed Rust, 49 changed only the CLI crate.
 
@@ -282,6 +283,6 @@ entries in a few seconds.
 
 **Outcome:** recommended for the viewer, npm wrapper and test jobs as a
 small addition, after the selector work in
-[affected-only builds](affected-builds.md), which saves about eight times as
-much. Release and bench jobs stay as they are. Locally, seeding worktrees
+[CI and local check speed](../general/ci-speed.md), which saves about
+eight times as much. Release and bench jobs stay as they are. Locally, seeding worktrees
 from a cloned `target/` is the better change.
