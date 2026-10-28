@@ -10,18 +10,25 @@ jobs and tests run at all, see [affected-only builds](affected-builds.md).
 
 ## The short version
 
-- **sccache only helps where the same crate is compiled again in the same
-  directory.** Its Rust cache key includes the working directory and every
-  `CARGO_*` variable, `CARGO_MANIFEST_DIR` among them. Registry
-  dependencies compile in `~/.cargo/registry` and hit from anywhere.
-  Workspace crates hit only from the same checkout path, and
-  `SCCACHE_BASEDIRS` doesn't change that for Rust.
-- **In CI, add it beside `rust-cache`, not instead of it.** CI checks out at
-  a fixed path, so workspace crates do hit. `rust-cache` restores the
-  dependencies; sccache then serves the workspace crates that `rust-cache`
-  deliberately doesn't keep. In the worked example that cut a binary
-  build's compile CPU by 79% for a PR that changed one crate. sccache alone
-  was slower than `rust-cache` alone.
+- **sccache pays off across builds, not within one.** It stores each
+  compiled crate in a cache that outlives the build, keyed by the crate's
+  inputs. A later build, in another job, run or worktree, downloads a crate
+  whose inputs match instead of compiling it. A single build compiles each
+  crate once and gains nothing.
+- **Its Rust key includes the working directory** and every `CARGO_*`
+  variable, `CARGO_MANIFEST_DIR` among them. Registry dependencies compile
+  in `~/.cargo/registry` and hit from anywhere. Workspace crates hit only
+  when compiled again at the same checkout path, and `SCCACHE_BASEDIRS`
+  doesn't change that for Rust.
+- **In CI, add it beside `rust-cache`, so PRs reuse `main`'s workspace
+  crates.** `rust-cache` carries dependencies from `main`'s runs to PR runs
+  but deliberately drops the repo's own crates, so every job recompiles all
+  of them. With sccache, a `main` push also saves each workspace crate it
+  compiles to the Actions cache. A PR's job then compiles only the crates
+  whose inputs differ from what `main` built, and downloads the rest. Every
+  runner checks out at the same path, so the keys match. In the worked
+  example, a PR that changed one crate spent 79% less compile CPU on a
+  binary build. sccache alone was slower than `rust-cache` alone.
 - **Locally, clone a warm `target/` instead.** An APFS clone of a built
   `target/` into a new worktree, followed by touching its checked-out files,
   reused every dependency and cut compile CPU by about half. sccache
@@ -53,6 +60,32 @@ jobs and tests run at all, see [affected-only builds](affected-builds.md).
 ## Migrating an existing project
 
 ### CI
+
+Within one job each crate compiles once, so the gain comes only from
+crates an earlier run already compiled. In practice that's `main`: its
+pushes save entries, and PR jobs read them, as with `rust-cache`. How
+much a PR reuses depends on how far its crates' inputs are from a recent
+`main` build:
+
+- **Changes one crate that nothing else depends on**, such as the binary
+  crate: every other workspace crate hits. This is the case that pays.
+- **Changes a crate others depend on:** that crate and everything
+  downstream miss, because each crate's key includes its dependencies'
+  compiled output.
+- **Based on an older `main`:** a crate `main` has changed since then hits
+  only if `main` built that exact version within the cache's 7-day expiry.
+  Keys are by content, not commit, so any recent `main` build counts.
+- **Re-runs of the same PR** hit only if PRs may write. Read-only is the
+  default here, because GitHub scopes a PR's cache writes to that PR's
+  ref, so no other PR or `main` can read them. They still count against
+  the repo's 10 GB, where the least recently used entries are evicted
+  first, so a burst of PR pushes can evict `main`'s entries, which every
+  PR's hits come from. They also share the repo's 200 uploads a minute.
+  Unchanged crates already hit from `main`, and the crate being edited
+  misses either way. So PR writes only help a re-run of the same commit,
+  or a PR that changed a crate others depend on and then edits elsewhere.
+  Allow them if that's common, and have the cache pruning remove a closed
+  PR's sccache entries.
 
 1. **Find the jobs that rebuild workspace crates.** In a job's log, count
    the `Compiling` lines for workspace members after a `rust-cache` hit.
@@ -205,7 +238,9 @@ with default settings (incremental on):
 
 GitHub's runners always check out at the same path, so this was emulated
 with one fixed worktree and a fresh `target/` per run, with
-`CARGO_INCREMENTAL=0` as in the repo's CI. "rust-cache" means dependencies
+`CARGO_INCREMENTAL=0` as in the repo's CI. First, a build of `main` filled
+the sccache cache, standing in for `main`'s push. Each PR run then started
+from a copy of that cache, as a PR job reads `main`'s entries. "rust-cache" means dependencies
 built and workspace crates removed (`cargo clean -p` for each member and
 the vendored path dependency), which is what a `rust-cache` hit leaves. The
 PR changed one source file in the CLI crate and had a new commit stamp,
