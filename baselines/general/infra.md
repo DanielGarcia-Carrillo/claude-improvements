@@ -123,6 +123,10 @@ rules:
 - One aggregate job (`ci`) is the required status check, so renaming or
   splitting jobs never breaks branch protection.
 - CI runs the same verify command as local, on a clean checkout.
+- Draft PRs skip the work jobs; `ready_for_review` starts the first real
+  run. Setup is cached (`rust-cache` saved from `main`, Playwright's
+  browsers by version), never results. For selecting what runs, see
+  [CI and local check speed](ci-speed.md).
 - One job holds a secret: the web template's `deploy`, with the Cloudflare
   token. It runs on `main` only, on a GitHub-hosted runner, and installs
   with `--ignore-scripts`, so no install script runs beside the token.

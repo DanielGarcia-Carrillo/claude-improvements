@@ -1,4 +1,4 @@
-# Affected-only builds (exploration)
+# CI and local check speed
 
 How to keep CI and local checks proportional to what a PR changes, for new
 projects and for existing ones. The question came from bursts of about 30
@@ -6,6 +6,11 @@ agent PRs of roughly 5 files each, every one running the full local check
 and full CI. The guidance is drawn from measuring two of our repos in
 October 2026; that evidence is summarized in the
 [worked example](#worked-example) at the end.
+
+Everything under [Every project](#every-project) is a default, and the
+templates already do it. Two pieces are still untried and listed as
+[explorations](../explorations/README.md#smaller-ones): moon for a mixed
+Rust and JS repo, and a pass cache.
 
 ## The short version
 
@@ -163,7 +168,7 @@ pays $0.006 per Linux minute beyond its plan's included minutes (3,000 on
 GitHub Pro). The repo in the worked example used about 9,500 minutes a
 month: roughly $39 of overage, or about $20 with a third cut. **The money is
 small.** The real gains are PR latency and local CPU when many agents run
-checks at once. [Blacksmith](blacksmith.md) stacks on top: it makes the
+checks at once. [Blacksmith](../explorations/blacksmith.md) stacks on top: it makes the
 remaining minutes cheaper, and this makes there be fewer of them.
 
 ## Switch to a build tool when

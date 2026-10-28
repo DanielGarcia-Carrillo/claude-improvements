@@ -10,6 +10,7 @@ strict, local, fast checks whose failures say how to fix them.
 | [general/principles.md](general/principles.md) | Errors as the interface for agents, dependencies, implementation ethos, ways of working |
 | [general/kickoff.md](general/kickoff.md) | Requirement questions to ask before choosing infrastructure |
 | [general/infra.md](general/infra.md) | Hosting (Cloudflare), data, CI, toolchains, Claude Code mechanisms |
+| [general/ci-speed.md](general/ci-speed.md) | Keeping CI and local checks proportional to a change: defaults for new projects, steps for existing ones |
 | [general/CLAUDE.template.md](general/CLAUDE.template.md) | Skeleton for a new repo's `CLAUDE.md` |
 | [general/files/](general/files/) | `.editorconfig`, `.gitattributes`, PR template, ADR template |
 | [explorations/](explorations/README.md) | Options under evaluation, not yet defaults: Renovate, UI primitives, visual regression, Blacksmith, observability, tsrs and smaller ones |
