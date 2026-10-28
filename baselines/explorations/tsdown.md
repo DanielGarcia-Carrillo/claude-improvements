@@ -1,7 +1,8 @@
 # tsdown (exploration)
 
 Status: **not the default.** A TypeScript package that's published to npm compiles with
-TypeScript 7's `tsc` and checks what it would publish with publint. Checked on
+TypeScript 7's `tsc` and checks what it would publish with publint, as in the web
+baseline's [Publish an npm package](../web/README.md#publish-an-npm-package). Checked on
 2026-10-27, against the npm package of an in-house visual regression tool in development.
 
 ## What it is
@@ -47,25 +48,17 @@ committed output. The tsdown build was unbundled, with two configs to keep `.ts 
 It works, but for a package that maps source files one to one onto output files it is slower
 than `tsc` and still needs `tsc --noEmit`. Its generated `exports` would need rewriting by hand.
 
-## What we do instead (kept from the trial)
+## What we do instead
 
-- Compile with `tsc` and set `isolatedDeclarations: true` in the emitting tsconfig. Every
-  export then states its own type, and any declaration emitter, tsdown's Oxc path included,
-  can produce the `.d.ts` later without code changes.
-- Check the package before it's published:
+The web baseline's [Publish an npm package](../web/README.md#publish-an-npm-package) recipe:
+`tsc` with `isolatedDeclarations`, a hand-written `exports` map, publint and a
+packed-consumer type test. What the trial adds to it:
 
-  ```json
-  "check-package": "publint run --strict ."
-  ```
-
-  It runs in the verify script and CI. A `package.json` field that doesn't match what
-  `pnpm pack` produces, such as an `exports` path pointing at a missing file, fails it.
-- Leave out attw (`@arethetypeswrong/cli`), even though it passed in the trial. It brings its
-  own copy of TypeScript alongside the project's, a second compiler to install and keep in step.
-  A type test that compiles a consumer file against the packed tarball covers the same ground
-  without it.
-
-The in-house package runs both.
+- Turning on `isolatedDeclarations` took 8 annotations, all on exported constants. With it on,
+  tsdown's Oxc path produced declarations with the same API, so switching later needs no code
+  changes.
+- publint 0.3.25 and attw 0.18.5 were both clean on both builds. attw still stays out, because
+  it brings its own copy of TypeScript, a second compiler to install and keep in step.
 
 ## Switch when
 

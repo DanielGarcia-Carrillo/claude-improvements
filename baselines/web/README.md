@@ -38,7 +38,7 @@ Versions and statuses were checked on 2026-10-20.
 | Area | Default | Why | Instead, when |
 |---|---|---|---|
 | Runtime and packages | Node 26 (mise), pnpm 12 | Node 26 is LTS from late October 2026. pnpm 12 refuses releases younger than a day and asks before installing into a stale `node_modules` | — |
-| Build | Vite 8 (Rolldown) | The fast default; Lightning CSS built in | A package published to npm: `tsc` with `isolatedDeclarations`, checked by publint; see [explorations/tsdown](../explorations/tsdown.md) |
+| Build | Vite 8 (Rolldown) | The fast default; Lightning CSS built in | A package published to npm: see [Publish an npm package](#publish-an-npm-package) |
 | Types | TypeScript 7 (native `tsc`) | `typescript@7` *is* the Go compiler; `tsgo`/native-preview are legacy names | — |
 | Strictness | ES modules everywhere (always strict mode; the service worker, built as a classic script, gets `'use strict'` added); `<StrictMode>`; TypeScript `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` and friends; React Compiler `panicThreshold: 'all_errors'`; unit tests must assert; e2e fails on page errors, console errors and CSP violations; pnpm `engineStrict` | Each turns a silent problem into a failure that names it | — |
 | Lint | oxlint + type-aware (tsgolint) | Correctness and suspicious categories only; StyleX and React Compiler rules included. Detects agents and prints one line per finding | — |
@@ -83,6 +83,7 @@ for an ADR, not a default), TanStack Pacer (beta; a debounce plus
 | App pages need SSR or SEO | TanStack Start 1.0 on `@cloudflare/vite-plugin` (keeps TanStack Router; can prerender or run as SPA) |
 | Content or marketing site | Astro 7 on Workers static assets, React islands where needed |
 | Must be Next.js | Next 16 via `@opennextjs/cloudflare`; only if required |
+| A package published to npm | `tsc` with `isolatedDeclarations`, not Vite ([recipe](#publish-an-npm-package)) |
 
 ## Decisions still open
 
@@ -172,6 +173,61 @@ regular weight). Then one for a metric-matched
 `'<Family> Fallback'` (`src: local('Arial')` with `size-adjust` and
 `ascent-override`). Put both first in `font.body` in `tokens.stylex.ts`.
 `woff2` is already in the precache glob, so the font works offline.
+
+### Publish an npm package
+
+Use this for a TypeScript package published to npm, and for internal
+monorepo libraries built through project references. Apps leave
+`isolatedDeclarations` off: exported inferred values such as TanStack
+Router's `Route`, Jotai atoms and components would all need hand-written
+types, and an app emits no `.d.ts`.
+
+1. Compile with `tsc` from an emitting tsconfig, so every export states its
+   own type and any declaration emitter can produce the `.d.ts`:
+   ```jsonc
+   // tsconfig.build.json
+   {
+     "extends": "./tsconfig.json",
+     "compilerOptions": {
+       "noEmit": false,
+       "rootDir": "src",
+       "outDir": "dist",
+       "declaration": true,
+       "declarationMap": true,
+       "isolatedDeclarations": true,
+     },
+     "include": ["src"],
+   }
+   ```
+2. Write the `exports` map by hand, `types` first in each entry, and list
+   what ships in `files`. Ship `src` too, so the declaration maps lead
+   editors to the source:
+   ```json
+   "type": "module",
+   "exports": {
+     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+     "./cli": { "types": "./dist/cli.d.ts", "default": "./dist/cli.js" }
+   },
+   "files": ["dist", "src"],
+   "scripts": {
+     "build": "tsc -p tsconfig.build.json",
+     "check-package": "publint run --strict ."
+   }
+   ```
+3. Run `build`, then `check-package`, in `verify`, which CI runs. publint
+   fails when a field such as an `exports` path, `bin` or `types` doesn't
+   match what `pnpm pack` produces.
+4. Add a packed-consumer type test to `verify`: `pnpm pack` into a temporary
+   directory, install the tarball into a scratch project, and run
+   `tsc --noEmit` on a file that imports every export path, once with
+   `"moduleResolution": "nodenext"` and once with `"bundler"`. It catches a
+   `types` file that exists but declares the wrong thing, which publint
+   can't see.
+
+Leave out attw (`@arethetypeswrong/cli`): it brings its own copy of
+TypeScript, and the type test covers the same ground. Bring in tsdown only
+when the package needs a real bundle (inlined dependencies, CJS, or a single
+file); see [explorations/tsdown](../explorations/tsdown.md).
 
 ## Sources
 
