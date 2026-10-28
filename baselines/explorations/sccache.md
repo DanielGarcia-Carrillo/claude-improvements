@@ -43,9 +43,9 @@ jobs and tests run at all, see
 
 ## New projects
 
-- **Start with `rust-cache`, saved only from `main`**, as in the
-  [Rust template](../rust/template/). Add sccache when a job keeps
-  recompiling workspace crates that a PR didn't touch (below).
+- **Use `rust-cache` and sccache together in CI, both written only from
+  `main`**, as the [Rust template](../rust/template/) does by default
+  (setup below).
 - **Keep build stamps in the leaf crate.** A build script that embeds the
   Git commit (`cargo:rustc-env=…`) changes that crate on every commit, so it
   and every crate depending on it miss any cache. Put it in the binary
@@ -92,23 +92,30 @@ much a PR reuses depends on how far its crates' inputs are from a recent
    the `Compiling` lines for workspace members after a `rust-cache` hit.
    `rust-cache` restores dependencies only, so every run rebuilds every
    workspace crate, and a PR that changed one crate pays for all of them.
-2. **Add sccache to those jobs, after `rust-cache`:**
+2. **Add sccache to those jobs, beside `rust-cache`.** The
+   [Rust template](../rust/template/)'s CI does this by default:
 
    ```yaml
-   - uses: Swatinem/rust-cache@<sha> # v2
-     with:
-       save-if: ${{ github.ref == 'refs/heads/main' }}
-   - uses: mozilla-actions/sccache-action@<sha> # v0.0.x
-     with:
-       version: v0.19.0
-   - run: echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
-     if: github.ref != 'refs/heads/main'
+   env:
+     SCCACHE_GHA_ENABLED: 'true'
+     RUSTC_WRAPPER: sccache
+     SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}
+   steps:
+     - uses: mozilla-actions/sccache-action@<sha> # v0.0.11
+       with:
+         version: v0.19.0
+     - uses: Swatinem/rust-cache@<sha> # v2
+       with:
+         save-if: ${{ github.ref == 'refs/heads/main' }}
    ```
 
-   The action sets `SCCACHE_GHA_ENABLED` and `RUSTC_WRAPPER`. Keep
-   `CARGO_INCREMENTAL=0`; sccache can't cache incremental compiles. Read-only
-   on PRs matches `rust-cache`'s `save-if`: `main` writes, and PRs read
-   `main`'s entries.
+   The action only installs sccache, passes the cache service's token
+   through, and reports the hit rate in a post step. The job sets
+   `SCCACHE_GHA_ENABLED` and `RUSTC_WRAPPER` itself. Install sccache before
+   any step that runs Cargo, because Cargo fails if `RUSTC_WRAPPER` names a
+   missing program. Keep `CARGO_INCREMENTAL=0` (`rust-cache` sets it);
+   sccache can't cache incremental compiles. Read-only on PRs matches
+   `rust-cache`'s `save-if`: `main` writes, and PRs read `main`'s entries.
 3. **Budget the Actions cache.** sccache stores each compiled crate under
    its own cache key. With `rust-cache` in front, sccache only sees
    workspace crates, so a `main` push writes about a dozen entries per job.
@@ -184,8 +191,9 @@ a minute or so off each Rust job on PRs that change one crate.
 
 ## Switch when
 
-- **CI:** a job rebuilds unchanged workspace crates on most runs, and that
-  build takes more than about a minute. Add sccache to that job.
+- **CI, in an existing project:** a job rebuilds unchanged workspace
+  crates on most runs, and that build takes more than about a minute. Add
+  sccache to that job. New projects get it from the Rust template.
 - **Locally, to sccache instead of cloning:** sccache normalizes the
   working directory and `CARGO_MANIFEST_DIR` for Rust, so workspace crates
   hit across worktrees. Or worktrees stop living on a copy-on-write file
