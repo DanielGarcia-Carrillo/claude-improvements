@@ -66,11 +66,25 @@ jobs:
     # Add macos-latest and windows-latest only for tools shipped there.
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
     timeout-minutes: 20
+    # rust-cache restores dependencies but drops the workspace's own crates, so
+    # every run would recompile them all. sccache keeps those in the Actions
+    # cache by content: a PR that changed one crate downloads the rest. Main
+    # writes; pull requests only read, as with rust-cache's save-if. It can't
+    # cache incremental builds; rust-cache already sets CARGO_INCREMENTAL=0.
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: rustup toolchain install
+      # Before anything runs cargo, since RUSTC_WRAPPER names it. Its post step
+      # reports the hit rate. Dependabot bumps the action, not `version`.
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: v0.19.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}

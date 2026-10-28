@@ -41,7 +41,9 @@ and [Rust](../rust/template/) templates already do them.
   and gate the work on `!github.event.pull_request.draft`. Agents open PRs
   as drafts, so a burst of 30 costs nothing until each one is marked ready.
   The gate still reports, and a draft can't merge anyway.
-- **Cache setup, not results.** `rust-cache` with saves only from `main`;
+- **Cache setup, not results.** `rust-cache` with saves only from `main`,
+  plus sccache for the workspace's own crates, which `rust-cache` drops
+  ([details](../explorations/sccache.md));
   Playwright's browsers in `~/.cache/ms-playwright` keyed on the Playwright
   version, with `playwright install-deps` on a hit. A browser download
   normally takes 20–40 s but spiked to 8–10 minutes in one repo.
@@ -62,7 +64,7 @@ and [Rust](../rust/template/) templates already do them.
 | New project | Selection | Cache |
 |---|---|---|
 | Single web app (one package) | None in CI. `vitest --changed` locally. Keep end-to-end tests unconditional, and shard them if they grow | Browsers, pnpm store |
-| Single Rust workspace | None. Test the whole workspace | `rust-cache`, saved from `main` |
+| Single Rust workspace | None. Test the whole workspace | `rust-cache` plus sccache in jobs that build tests or binaries (not clippy), both written only by `main` |
 | JS monorepo (pnpm workspace) | `pnpm -r --filter "...[origin/main]"`: changed packages plus their dependents | Turborepo, when re-runs of unchanged packages start to cost |
 | Rust and JS with real dependencies between them | A few lanes in one tested script, or pilot moon | Reuse built artifacts across languages, keyed by their inputs |
 
