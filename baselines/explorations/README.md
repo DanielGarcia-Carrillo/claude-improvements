@@ -14,6 +14,7 @@ need a line live in the stack READMEs' "Instead, when" columns
 | [Blacksmith](blacksmith.md) | GitHub-hosted runners | A private repo pays for Actions minutes: pilot one repo in an organisation on Team, then set `CI_RUNNER` for the rest |
 | [Observability](observability.md) | Nothing in the browser; Workers Logs and Issues once there is an API Worker | Launch: Sentry for browser errors (lazy, tunnelled) and Cloudflare Web Analytics |
 | [tsrs](tsrs.md) | TypeScript 7's `tsc` | It has a stable release against TypeScript 7.1 and a project's typecheck gets slow |
+| [sccache](sccache.md) (local use) | A cloned `target/` for new worktrees. In CI, sccache beside `rust-cache` is already the Rust template's default | sccache normalizes the working directory for Rust, so workspace crates hit across worktrees ([mozilla/sccache#2652](https://github.com/mozilla/sccache/issues/2652)). Without copy-on-write, a plain copy of `target/` still works but costs disk and time; sccache would help only with registry dependencies |
 
 ## Smaller ones
 
