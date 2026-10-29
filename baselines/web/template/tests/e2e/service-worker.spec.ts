@@ -1,6 +1,6 @@
 /**
- * The service worker's ways out of a bad deploy (the web README's "Service
- * worker emergencies"): a forced update, and the kill switch. Each test
+ * The service worker's ways out of a bad deploy (the web README's "Recover
+ * from a broken service worker"): a forced update, and the kill switch. Each test
  * installs the run's build, deploys another at the same origin, and checks
  * what the open page ends up running.
  */
@@ -90,13 +90,17 @@ test('a new deploy waits for the user to accept it', async ({ page }) => {
 
 test('update-policy.json makes an older build take the new deploy without asking', async ({ page }) => {
   await installCurrent(page)
-  // Every build made before now, which is the current one but not next.
+  // Every build made before now: next too, which is the newest there is.
   setPolicy(builds.next, new Date().toISOString())
   site.serve(builds.next)
   await page.reload()
 
   await expect.poll(() => runningEntry(page), { timeout: 15_000 }).toBe(entryOf(builds.next))
   await expect(page.getByRole('status')).not.toContainText('A new version is available.')
+  // With no newer worker waiting, the policy forces nothing more: no loop.
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  expect(await runningEntry(page)).toBe(entryOf(builds.next))
 })
 
 test('the kill switch removes the worker and its caches, and the app loads from the network', async ({ page }) => {

@@ -19,7 +19,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # The kill switch gets a group of its own. In main's group it would queue
+  # behind a running push, and a newer push would cancel it while pending.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ inputs.kill_switch && '-kill-switch' || '' }}
   # A newer push supersedes a branch run; a run on main always finishes.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 

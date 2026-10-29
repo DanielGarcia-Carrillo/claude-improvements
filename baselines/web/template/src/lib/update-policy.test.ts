@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
 import { mustUpdate } from './update-policy.ts'
@@ -23,5 +25,21 @@ describe('mustUpdate', () => {
 
   it('forces nothing when the build time is unreadable', () => {
     expect(mustUpdate({ forceUpdateBefore: '2026-10-28T18:00:00Z' }, 'unknown')).toBe(false)
+  })
+})
+
+describe('public/update-policy.json', () => {
+  // A cutoff without a zone, or a typo, forces nothing without a word, so
+  // the committed file must be the default or a well-formed instant.
+  it('forces nothing, or names an instant mustUpdate reads', () => {
+    const policy: unknown = JSON.parse(
+      readFileSync(new URL('../../public/update-policy.json', import.meta.url), 'utf8'),
+    )
+    const isDefault =
+      typeof policy === 'object' &&
+      policy !== null &&
+      'forceUpdateBefore' in policy &&
+      policy.forceUpdateBefore === null
+    expect(isDefault || mustUpdate(policy, '1970-01-01T00:00:00Z')).toBe(true)
   })
 })

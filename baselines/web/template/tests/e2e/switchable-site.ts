@@ -55,9 +55,9 @@ export class SwitchableSite {
   }
 
   private async respond(url: string, response: import('node:http').ServerResponse): Promise<void> {
-    const path = normalize(decodeURIComponent(new URL(url, this.url).pathname)).replace(/^(\.\.[/\\])+/, '')
-    const file = path === '/' || extname(path) === '' ? '/index.html' : path
     try {
+      const path = normalize(decodeURIComponent(new URL(url, this.url).pathname)).replace(/^(\.\.[/\\])+/, '')
+      const file = path === '/' || extname(path) === '' ? '/index.html' : path
       const body = await readFile(join(this.#root, file))
       response.writeHead(200, {
         'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream',

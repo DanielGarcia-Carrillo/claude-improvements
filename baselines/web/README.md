@@ -253,10 +253,11 @@ that works:
    security hole), but its page still runs. In the fix's PR, set
    `public/update-policy.json` to `{ "forceUpdateBefore": "<now, in UTC>" }`.
    Open copies of any build made before that instant install the fix and
-   reload without asking, on their next load or hourly check. Reloading
-   drops unsaved state in other tabs, so keep it for real emergencies, and
-   set the field back to `null` in a later PR. Only builds that already have
-   `src/lib/update-policy.ts` can read the policy.
+   reload without asking, on their next load or hourly check. That reloads
+   every tab of the app, the one in use included, possibly mid-edit, so
+   keep it for real emergencies. Set the field back to `null` in a later PR.
+   Only builds that already have `src/lib/update-policy.ts` can read the
+   policy.
 3. **The page can't update** (it never renders, or every navigation fails).
    Use the kill switch. Run the ci workflow on `main` from the Actions tab
    with **kill switch** checked. It deploys main's app with
@@ -269,7 +270,10 @@ that works:
 
    IndexedDB, localStorage and cookies stay. The kill-switch page registers
    no worker, so the app runs online-only until the next push to `main`
-   deploys the real worker again. Land the fix that way.
+   deploys the real worker again. Any push ends it, so hold merges to
+   `main` until most users have visited. That's at least the app's usual
+   return interval: a user who hasn't been back yet would otherwise meet
+   the broken worker again. Then land the fix as a normal PR.
 
 The kill switch also deletes any Cache Storage the app filled itself, and it
 can't reach a browser that never visits again. `tests/e2e/service-worker.spec.ts`
