@@ -17,11 +17,11 @@ from typing import NoReturn, override
 from replace_me import Error, check, read_source
 from replace_me._output import (
     CheckOutcome,
-    Exit,
     Format,
     Outcome,
     UsageError,
     emit,
+    emit_bug,
     emit_error,
     emit_usage_error,
 )
@@ -142,5 +142,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception:
         # A bug. Python's own exit status for it, 1, would read as findings.
         logger.exception("unexpected error")
-        return Exit.BUG
+        return emit_bug(output)
     return emit(output, outcome)

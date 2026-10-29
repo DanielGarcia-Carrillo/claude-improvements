@@ -5,9 +5,11 @@
   when the arguments don't parse. `--help` and `--version` print text.
 - **stderr** carries logs, and errors in text mode.
 - **Exit codes**: 0 clean, 1 findings reported, 2 usage or input error. An
-  unexpected exception logs its traceback and exits 70; it is a bug.
+  unexpected exception logs its traceback and exits 70; it is a bug, and
+  `--json` still prints its document.
 - **Error codes** (`error.code`) come from `replace_me.Error.code`, plus
-  `usage.invalid` for arguments that don't parse, and never change meaning.
+  `usage.invalid` for arguments that don't parse and `internal.bug` for an
+  unexpected exception, and never change meaning.
 - **Human output escapes control characters** in anything that came from
   input, such as a file name, so it can't drive the terminal. JSON escapes
   them itself.
@@ -29,6 +31,9 @@ from replace_me._paths import lossy
 USAGE_INVALID = "usage.invalid"
 """`error.code` for arguments that don't parse. Core errors bring their own
 codes; this one belongs to the CLI."""
+
+INTERNAL_BUG = "internal.bug"
+"""`error.code` for an unexpected exception, which exits 70."""
 
 
 class Format(Enum):
@@ -136,8 +141,23 @@ def emit_usage_error(output: Format, error: UsageError) -> int:
             "causes": [],
         }
         return _write(_json({"ok": False, "error": body}), Exit.ERROR)
-    print(f"{error.usage.rstrip()}\n{error.prog}: error: {error.message}", file=sys.stderr)
+    # argparse quotes the offending argument as given, control characters too.
+    message = terminal_safe(error.message)
+    print(f"{error.usage.rstrip()}\n{error.prog}: error: {message}", file=sys.stderr)
     return Exit.ERROR
+
+
+def emit_bug(output: Format) -> int:
+    """Reports an unexpected exception, whose traceback is already logged, and returns 70."""
+    if output is Format.JSON:
+        body = {
+            "code": INTERNAL_BUG,
+            "message": "unexpected error; the traceback is on stderr",
+            "hint": "this is a bug: report it with the traceback",
+            "causes": [],
+        }
+        return _write(_json({"ok": False, "error": body}), Exit.BUG)
+    return Exit.BUG
 
 
 def causes(error: BaseException) -> list[str]:

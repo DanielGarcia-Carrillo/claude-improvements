@@ -4,6 +4,7 @@ A changed snapshot is a contract change. `just snapshots` rewrites them in
 place, so the diff is the review.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -219,3 +220,32 @@ def test_an_unexpected_exception_exits_70_with_its_traceback(
     monkeypatch.setattr(cli, "check", broken)
     assert cli.main(["check", str(HERE / "fixtures/narrow.txt")]) == 70
     assert "RuntimeError: a bug" in caplog.text
+
+
+def test_an_unexpected_exception_still_prints_the_json_document(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def broken(_text: str, _max_width: int) -> list[Finding]:
+        msg = "a bug"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(cli, "check", broken)
+    assert cli.main(["check", str(HERE / "fixtures/narrow.txt"), "--json"]) == 70
+    assert json.loads(capsys.readouterr().out) == snapshot(
+        {
+            "ok": False,
+            "error": {
+                "code": "internal.bug",
+                "message": "unexpected error; the traceback is on stderr",
+                "hint": "this is a bug: report it with the traceback",
+                "causes": [],
+            },
+        }
+    )
+
+
+def test_a_bad_argument_reaches_stderr_escaped() -> None:
+    result = replace_me("check", "fixtures/narrow.txt", "\x1b[31mred")
+    assert result["exit"] == 2
+    assert r"\x1b[31mred" in result["stderr"]
+    assert "\x1b" not in result["stderr"]
