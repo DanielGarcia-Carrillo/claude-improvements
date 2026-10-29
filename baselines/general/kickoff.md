@@ -32,6 +32,7 @@ the user can accept defaults quickly.
 | Which languages and regions? (Default: English UI, locale-correct dates, numbers and units.) | i18n library or plain `Intl` |
 | Third-party APIs to call? Do they publish OpenAPI? | Typed client generation, proxying through a Worker |
 | Expected traffic and data size? | Plan tier, caching, whether the free tier suffices |
+| Is any of it published to npm as a package? | `tsc` with `isolatedDeclarations`, a hand-written `exports` map, publint and a packed-consumer type test ([recipe](../web/README.md#publish-an-npm-package)) |
 
 ## Rust tools
 
