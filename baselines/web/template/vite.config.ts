@@ -141,11 +141,11 @@ export default defineConfig(({ mode }) => ({
     projects: [
       {
         // A test that asserts nothing fails rather than passing vacuously.
-        // Hook tests run each hook as Claude Code would, with node and a payload.
+        // Hook and script tests run each one as Claude Code or pnpm would, with node.
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['src/**/*.test.ts', '.claude/hooks/**/*.test.ts'],
+          include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', '.claude/hooks/**/*.test.ts'],
           expect: { requireAssertions: true },
         },
       },

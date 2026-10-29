@@ -45,8 +45,11 @@ export interface ScratchCheckout {
   pathWithoutPnpm: string
   /** Creates `path` (relative to the checkout) and returns its absolute path. */
   write(path: string): string
-  /** Runs `hook` with `payload` on stdin; `env` is added to the stubbed environment. */
-  run(hook: string, payload: object, env?: Record<string, string>): HookRun
+  /**
+   * Runs `hook` with `payload` on stdin, in `cwd` (the checkout by default);
+   * `env` is added to the stubbed environment.
+   */
+  run(hook: string, payload: object, env?: Record<string, string>, cwd?: string): HookRun
   /** Deletes every file in the checkout, so the next test starts clean. */
   reset(): void
   remove(): void
@@ -75,9 +78,10 @@ export function scratchCheckout(): ScratchCheckout {
       writeFileSync(file, '')
       return file
     },
-    run(hook, payload, env = {}) {
+    run(hook, payload, env = {}, cwd = root) {
       rmSync(log, { force: true })
       const result = spawnSync(process.execPath, [hook], {
+        cwd,
         input: JSON.stringify(payload),
         encoding: 'utf8',
         env: {

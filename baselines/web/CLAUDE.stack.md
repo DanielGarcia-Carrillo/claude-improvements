@@ -9,6 +9,7 @@ project does not use (an API, Storybook) and these comments.
 ```bash
 pnpm dev               # Vite dev server; the service worker is off in dev
 pnpm verify            # typecheck, lint, format check, every test suite: the gate
+pnpm verify:changed    # while iterating: typecheck, then lint, format and Vitest for changed files only; no e2e
 pnpm test              # Vitest: unit tests (node) and every story in a real browser
 pnpm e2e               # Playwright against a production build and preview server
 pnpm e2e:report        # the newest local run's HTML report, with each test's trace
