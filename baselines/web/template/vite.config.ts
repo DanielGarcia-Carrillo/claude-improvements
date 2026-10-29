@@ -49,6 +49,13 @@ function headersForEveryPath(file: string): Record<string, string> {
   return headers
 }
 
+/**
+ * `pnpm build:kill-switch` sets this to ship src/kill-switch/sw.ts as the
+ * service worker, and a page that no longer registers one (see the web
+ * README's "Recover from a broken service worker").
+ */
+const isKillSwitch = process.env['SW_KILL_SWITCH'] === '1'
+
 export default defineConfig(({ mode }) => ({
   plugins: [
     // Generates src/routeTree.gen.ts from src/routes/. Must precede react().
@@ -72,7 +79,8 @@ export default defineConfig(({ mode }) => ({
     babel({ presets: [reactCompilerPreset({ panicThreshold: 'all_errors' })] }),
     VitePWA({
       strategies: 'injectManifest',
-      srcDir: 'src',
+      // The kill switch is also built as sw.js, so it replaces the worker browsers know.
+      srcDir: isKillSwitch ? 'src/kill-switch' : 'src',
       filename: 'sw.ts',
       registerType: 'prompt',
       injectRegister: false, // UpdatePrompt registers it through useRegisterSW.
@@ -104,6 +112,8 @@ export default defineConfig(({ mode }) => ({
             },
           ],
         },
+        // The kill switch precaches nothing; an empty injection point skips the manifest.
+        ...(isKillSwitch ? { injectionPoint: '' } : {}),
         // Extensions, never `**/*`: public/_headers is consumed by Cloudflare
         // and never served, and precaching a URL that 404s fails the install.
         globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
@@ -130,6 +140,11 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
 
+  define: {
+    // When this build was made, for public/update-policy.json (src/lib/update-policy.ts).
+    'import.meta.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
+    'import.meta.env.SW_KILL_SWITCH': JSON.stringify(isKillSwitch),
+  },
   build: { target: browserslistToEsbuild(browsers) },
   preview: { headers: headersForEveryPath(headersFile) },
   css: { transformer: 'lightningcss', lightningcss: { targets: browserslistToTargets(browsers) } },

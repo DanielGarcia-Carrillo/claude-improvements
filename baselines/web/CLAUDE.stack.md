@@ -15,6 +15,7 @@ pnpm e2e               # Playwright against a production build and preview serve
 pnpm e2e:report        # the newest local run's HTML report, with each test's trace
 pnpm lint:fix          # safe autofixes; then `pnpm format`
 pnpm storybook         # component workshop on :6006 or the next free port
+pnpm build:kill-switch # emergency only: the service worker kill switch (README, "Recover from a broken service worker")
 ```
 
 Node comes from `mise.toml`, pnpm from `packageManager`. If pnpm says
@@ -84,6 +85,10 @@ It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned ve
 - **The service worker is generated from `src/sw.ts`.** `dist/sw.js` is
   rebuilt on every build, and dev runs without a worker. Test offline
   behavior against `pnpm e2e`, or `pnpm build` then `pnpm preview`.
+- **`public/update-policy.json` stays `{ "forceUpdateBefore": null }`**
+  except in an emergency fix's PR. A date there makes every open tab of an
+  older build reload without asking. The kill switch is deployed only from
+  the Actions tab, never from a session.
 - **The precache lists extensions, never `**/*`.** `public/_headers` is read
   by Cloudflare at deploy and never served; precaching a URL that 404s fails
   the worker's install, which kills offline mode silently.

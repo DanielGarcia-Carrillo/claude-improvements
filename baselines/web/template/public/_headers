@@ -6,6 +6,10 @@
 /sw.js
   Cache-Control: no-cache
 
+# Read by every open copy of the app on load and hourly; see src/lib/update-policy.ts.
+/update-policy.json
+  Cache-Control: no-store
+
 # Revalidated rather than `immutable`: StyleX can change a chunk without
 # changing its hashed name (facebook/stylex#1918). Return to
 # `public, max-age=31536000, immutable` once a StyleX release fixes it.
