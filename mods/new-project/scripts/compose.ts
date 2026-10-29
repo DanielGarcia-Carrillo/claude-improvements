@@ -7,16 +7,23 @@
 
 export type Stack = 'web' | 'rust' | 'python'
 
-export type KickoffAnswer = { question: string; answer: string; assumed?: boolean }
+/**
+ * Where a kickoff answer came from: the user said it (in the brief or a
+ * reply), the agent read it from the brief and the user let it stand, or it
+ * is the baseline's default and neither of them raised it.
+ */
+export type AnswerSource = 'stated' | 'inferred' | 'default'
+export const ANSWER_SOURCES: readonly AnswerSource[] = ['stated', 'inferred', 'default']
+export type KickoffAnswer = { question: string; answer: string; source: AnswerSource }
 export type ChangedDefault = { area: string; to: string; why: string }
 export type ArchitectureLine = { choice: string; line: string }
 export type Alternative = { option: string; why: string }
 
 export type Answers = {
   stack: Stack
-  /** Display name, as people read it: `Trip Planner`. */
+  /** Display name, as people read it, for example `Trip Planner`. */
   name: string
-  /** Package, Worker and crate name: `trip-planner`. */
+  /** Package, Worker and crate name, for example `trip-planner`. */
   slug: string
   /** Web only: the installed app's label, at most 12 characters. */
   shortName?: string | undefined
@@ -24,7 +31,7 @@ export type Answers = {
   description: string
   /** CLAUDE.md's opening: what it is, who it is for, the one thing it must do well. */
   summary: string
-  /** Where issues live, in the words CLAUDE.md uses: `Linear team "Personal", project "Trips"`. */
+  /** Where issues live, in the words CLAUDE.md uses, for example `Linear team "Personal", project "Trips"`. */
   issues: string
   /** Who may push, mark ready and merge. */
   merging: string
@@ -324,6 +331,29 @@ const PYTHON_KEYWORDS = new Set(
   ).split(' '),
 )
 
+// Python 3.15's `sys.stdlib_module_names` that a slug can spell. A package
+// folder named after one is shadowed by the standard library's module.
+const PYTHON_STDLIB = new Set(
+  (
+    'abc annotationlib antigravity argparse array ast asyncio atexit base64 bdb binascii bisect builtins bz2 ' +
+    'calendar cmath cmd code codecs codeop collections colorsys compileall compression concurrent configparser ' +
+    'contextlib contextvars copy copyreg csv ctypes curses dataclasses datetime dbm decimal difflib dis doctest ' +
+    'email encodings ensurepip enum errno faulthandler fcntl filecmp fileinput fnmatch fractions ftplib functools ' +
+    'gc genericpath getopt getpass gettext glob graphlib grp gzip hashlib heapq hmac html http idlelib imaplib ' +
+    'importlib inspect io ipaddress itertools json keyword linecache locale logging lzma mailbox marshal math ' +
+    'mimetypes mmap modulefinder msvcrt multiprocessing netrc nt ntpath nturl2path numbers opcode operator optparse' +
+    ' os pathlib pdb pickle pickletools pkgutil platform plistlib poplib posix posixpath pprint profile profiling ' +
+    'pstats pty pwd py_compile pyclbr pydoc pydoc_data pyexpat queue quopri random re readline reprlib resource ' +
+    'rlcompleter runpy sched secrets select selectors shelve shlex shutil signal site smtplib socket socketserver ' +
+    'sqlite3 ssl stat statistics string stringprep struct subprocess symtable sys sysconfig syslog tabnanny tarfile' +
+    ' tempfile termios textwrap this threading time timeit tkinter token tokenize tomllib trace traceback ' +
+    'tracemalloc tty turtle turtledemo types typing unicodedata unittest urllib uuid venv warnings wave weakref ' +
+    'webbrowser winreg winsound wsgiref xml xmlrpc zipapp zipfile zipimport zlib zoneinfo '
+  )
+    .trim()
+    .split(' '),
+)
+
 const isRepositoryUrl = (url: string) =>
   /^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(url) && URL.canParse(url) && new URL(url).hostname !== ''
 
@@ -406,6 +436,8 @@ export function parseAnswers(raw: unknown): Answers {
     problems.push(`\`slug\` "${slug}" is a Rust keyword or sysroot crate; pick another name.`)
   if (slug !== undefined && stack === 'python' && PYTHON_KEYWORDS.has(slug.replaceAll('-', '_')))
     problems.push(`\`slug\` "${slug}" is a Python keyword; pick another name.`)
+  if (slug !== undefined && stack === 'python' && PYTHON_STDLIB.has(slug.replaceAll('-', '_')))
+    problems.push(`\`slug\` "${slug}" is a standard-library module, which would shadow the package; pick another name.`)
 
   const shortName = text('shortName', true)
   if (shortName !== undefined && (shortName.length > SHORT_NAME_MAX || /[<>{}"\\\r\n]/.test(shortName)))
@@ -427,7 +459,11 @@ export function parseAnswers(raw: unknown): Answers {
       '`repository` must be an https URL with a host, such as https://github.com/owner/name, without quotes, backslashes or spaces.',
     )
 
-  const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer'])
+  const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer', 'source'])
+  kickoff.forEach((answer, i) => {
+    if (!ANSWER_SOURCES.includes(answer.source))
+      problems.push(`\`kickoff[${i}].source\` must be "stated", "inferred" or "default", not "${answer.source}".`)
+  })
   const changed = list<ChangedDefault>('changed', ['area', 'to', 'why'], true)
   // The ADR has one row per area, so a second change to one would drop out of it.
   const areas = changed.map((change) => change.area)
@@ -742,14 +778,18 @@ export function composeAgentFile(template: string, fragment: string, answers: An
     ['<Who may push, mark ready and merge.>', sentence(answers.merging)],
     ['- <Choice>: <one line>. [ADR 0001](docs/adr/0001-stack.md)', architecture],
   ]
-  for (const [placeholder, value] of fills) {
+  // Checked before the answers go in, so an answer such as "Turns an <input>
+  // file into a plan" doesn't read as a placeholder left behind.
+  let skeleton = text
+  for (const [placeholder] of fills) {
     if (!text.includes(placeholder))
       throw new Error(`CLAUDE.template.md no longer holds ${placeholder}; update the fills in composeAgentFile.`)
-    text = text.replaceAll(placeholder, () => value)
+    skeleton = skeleton.replaceAll(placeholder, '')
   }
-
-  const left = unfilled(text)
+  const left = unfilled(skeleton)
   if (left.length > 0) throw new Error(`CLAUDE.md still has placeholders: ${left.join(', ')}.`)
+
+  for (const [placeholder, value] of fills) text = text.replaceAll(placeholder, () => value)
   return `${text.replace(/\n{3,}/g, '\n\n').trim()}\n`
 }
 
@@ -771,10 +811,11 @@ export function renderAdr(
   const rows = [
     ...asked.map((question) => ({ question, found: findAnswer(answers.kickoff, question) })),
     ...extra.map((found) => ({ question: found.question, found })),
-  ].map(({ question, found }) => {
-    const answer = found === undefined ? 'Not asked' : `${found.answer}${found.assumed === true ? ' (assumed)' : ''}`
-    return `| ${cell(question)} | ${cell(answer)} |`
-  })
+  ].map(({ question, found }) =>
+    found === undefined
+      ? `| ${cell(question)} | Not asked | |`
+      : `| ${cell(question)} | ${cell(found.answer)} | ${found.source} |`,
+  )
 
   const defaults = input.defaults.map((d) => {
     const change = answers.changed.find((c) => c.area === d.area)
@@ -806,10 +847,10 @@ export function renderAdr(
     '',
     answers.summary,
     '',
-    'The kickoff questions, answered when the repository was created. "(assumed)" marks a default taken without asking.',
+    "The kickoff questions, answered when the repository was created. Source says where each answer came from: *stated* by the user, *inferred* from their brief and left standing, or the baseline's *default*, which nobody raised.",
     '',
-    '| Question | Answer |',
-    '| --- | --- |',
+    '| Question | Answer | Source |',
+    '| --- | --- | --- |',
     ...rows,
     '',
     '## Decision',

@@ -40,7 +40,9 @@ function answersFor(stack: Stack) {
     summary: 'A scaffold check.',
     issues: 'GitHub Issues',
     merging: 'The owner merges',
-    kickoff: sections.flatMap((s) => s.questions.map((question) => ({ question, answer: 'Default', assumed: true }))),
+    kickoff: sections.flatMap((s) =>
+      s.questions.map((question) => ({ question, answer: 'Default', source: 'default' })),
+    ),
     changed: [],
     architecture: [{ choice: 'Shape', line: 'The baseline as is' }],
     alternatives: [{ option: 'Nothing else', why: 'This is a test' }],
@@ -166,6 +168,69 @@ test('a baseline folder that is a link is refused before anything is written', (
   const result = dryRun(join(scratch, 'linked-target'), copy)
   assert.equal(result.status, 1)
   assert.match(result.stderr, /links docs; scaffold would write docs\/adr\/0001-stack\.md through it/)
+})
+
+/** A folder for PATH holding stand-ins that print a version: git and mise, not gh. */
+function toolsBin(): string {
+  const bin = join(scratch, 'doctor-bin')
+  if (existsSync(bin)) return bin
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "git version 9.9.9"\n', { mode: 0o755 })
+  writeFileSync(join(bin, 'mise'), '#!/bin/sh\necho "2026.10.0 macos-arm64"\n', { mode: 0o755 })
+  return bin
+}
+
+const doctor = (script: string, options: readonly string[], env: Record<string, string> = {}) =>
+  spawnSync(process.execPath, [script, 'doctor', ...options], {
+    encoding: 'utf8',
+    env: { PATH: toolsBin(), ...env },
+  })
+
+test('doctor finds the checkout through a skill folder linked into an agent', () => {
+  // How Codex (~/.agents/skills) or a plain Claude Code skill installs it.
+  const skills = join(scratch, 'agent-skills')
+  mkdirSync(skills)
+  symlinkSync(resolve(import.meta.dirname, '../skills/new-project'), join(skills, 'new-project'))
+  const result = doctor(join(skills, 'new-project/scripts/new-project.ts'), [])
+  assert.equal(result.status, 0, result.stdout)
+  assert.ok(result.stdout.includes(`✓ Baselines: ${BASELINES} (from the checkout this script is in)`), result.stdout)
+  assert.match(result.stdout, /✓ git: git version 9\.9\.9\n✓ mise: 2026\.10\.0/)
+  assert.match(result.stdout, /- gh: not found \(optional/)
+})
+
+test('doctor takes --baselines over $NEW_PROJECT_BASELINES over the checkout, and fails on a wrong one', () => {
+  const copy = baselinesCopy('doctor')
+  const env = { NEW_PROJECT_BASELINES: copy }
+  assert.match(doctor(SCRIPT, [], env).stdout, new RegExp(`Baselines: ${copy} \\(from \\$NEW_PROJECT_BASELINES\\)`))
+  assert.match(doctor(SCRIPT, ['--baselines', BASELINES], env).stdout, /\(from --baselines\)/)
+
+  const wrong = doctor(SCRIPT, [], { NEW_PROJECT_BASELINES: scratch })
+  assert.equal(wrong.status, 1)
+  assert.match(
+    wrong.stdout,
+    /✗ Baselines: .*has no general\/kickoff\.md\. Pass --baselines or set NEW_PROJECT_BASELINES/,
+  )
+
+  const noMise = spawnSync(process.execPath, [SCRIPT, 'doctor'], { encoding: 'utf8', env: { PATH: scratch } })
+  assert.equal(noMise.status, 1)
+  assert.match(noMise.stdout, /✗ mise: missing\. Install it/)
+})
+
+test('scaffold finds the baselines the way doctor does', () => {
+  const answers = join(scratch, 'env-web.json')
+  writeFileSync(answers, JSON.stringify(answersFor('web')))
+  const dryRunWith = (target: string, env: Record<string, string>) =>
+    spawnSync(process.execPath, [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--dry-run'], {
+      cwd: scratch,
+      encoding: 'utf8',
+      env: { ...process.env, ...env },
+    })
+
+  const fromEnv = dryRunWith(join(scratch, 'env-target'), { NEW_PROJECT_BASELINES: baselinesCopy('env') })
+  assert.equal(fromEnv.status, 0, fromEnv.stderr)
+  const wrong = dryRunWith(join(scratch, 'env-wrong-target'), { NEW_PROJECT_BASELINES: scratch })
+  assert.equal(wrong.status, 1)
+  assert.match(wrong.stderr, /from \$NEW_PROJECT_BASELINES is .*, which has no general\/kickoff\.md/)
 })
 
 test('setup needs --stack for a folder holding both manifests, and runs the stack named', () => {

@@ -40,16 +40,13 @@ function engine(on: On) {
   return disk
 }
 
-test('names the baselines folder beside the mod', async ($, on) => {
+test('without the option, leaves finding the baselines to the skill', async ($, on) => {
+  // The skill's doctor reads $NEW_PROJECT_BASELINES, else its own checkout,
+  // which a note from the hook would override for every worktree.
   const disk = engine(on)
-  await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
-  const dir = (disk.asked[0] ?? '').replace(/\/general\/kickoff\.md$/, '')
-  expect(dir.endsWith('/baselines')).toBe(true)
-  expect(dir.includes('..')).toBe(false)
-
-  disk.baselinesAt = dir
   const result = await $.skill.prompt({ skill: 'new-project:new-project', text: SKILL_BODY })
-  expect(result.text).toBe(`Baselines folder: ${dir}\n\n${SKILL_BODY}`)
+  expect(result.text).toBe(SKILL_BODY)
+  expect(disk.asked).toEqual([])
 })
 
 test(
@@ -66,39 +63,55 @@ test('a relative baselines option is refused', { options: { baselines: 'src/base
   const disk = engine(on)
   disk.baselinesAt = 'src/baselines'
   const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
-  expect(result.text).toContain('cannot find the project baselines')
+  expect(result.text).toContain('cannot use the `baselines` option')
   expect(result.text).toContain('must be absolute')
   expect(disk.asked).toEqual([])
 })
 
 test(
-  'missing baselines replace the skill with how to fix it',
+  'missing baselines leave the skill running, with how to fix them',
   { options: { baselines: '/nowhere' } },
   async ($, on) => {
     engine(on)
     const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
-    expect(result.text).toContain('cannot find the project baselines')
+    expect(result.text).toContain('cannot use the `baselines` option')
     expect(result.text).toContain('`baselines` option')
     expect(result.text).toContain('/nowhere')
-    expect(result.text.includes(SKILL_BODY)).toBe(false)
+    expect(result.text.startsWith('Baselines folder:')).toBe(false)
+    expect(result.text.endsWith(`\n\n${SKILL_BODY}`)).toBe(true)
   },
 )
 
-test("leaves other skills, and another plugin's new-project, alone", async ($, on) => {
-  const { asked } = engine(on)
-  const other = await $.skill.prompt({ skill: 'commit', text: 'Commit it.' })
-  const elsewhere = await $.skill.prompt({
-    skill: 'new-project',
-    text: SKILL_BODY,
-    path: '/elsewhere/skills/new-project/SKILL.md',
-  })
-  // Another plugin's skill with no file path, such as an inline command.
-  const namesake = await $.skill.prompt({ skill: 'other:new-project', text: SKILL_BODY })
-  expect(other.text).toBe('Commit it.')
-  expect(elsewhere.text).toBe(SKILL_BODY)
-  expect(namesake.text).toBe(SKILL_BODY)
-  expect(asked).toEqual([])
-})
+test(
+  "leaves other skills, and another plugin's new-project, alone",
+  { options: { baselines: '/Users/someone/baselines' } },
+  async ($, on) => {
+    const { asked } = engine(on)
+    const other = await $.skill.prompt({ skill: 'commit', text: 'Commit it.' })
+    const elsewhere = await $.skill.prompt({
+      skill: 'new-project',
+      text: SKILL_BODY,
+      path: '/elsewhere/skills/new-project/SKILL.md',
+    })
+    // Another plugin's skill with no file path, such as an inline command.
+    const namesake = await $.skill.prompt({ skill: 'other:new-project', text: SKILL_BODY })
+    expect(other.text).toBe('Commit it.')
+    expect(elsewhere.text).toBe(SKILL_BODY)
+    expect(namesake.text).toBe(SKILL_BODY)
+    expect(asked).toEqual([])
+  },
+)
+
+test(
+  'a trailing slash on the option is dropped',
+  { options: { baselines: '/Users/someone/src/claude-improvements/baselines/' } },
+  async ($, on) => {
+    const disk = engine(on)
+    disk.baselinesAt = '/Users/someone/src/claude-improvements/baselines'
+    const result = await $.skill.prompt({ skill: 'new-project', text: SKILL_BODY })
+    expect(result.text.startsWith(`Baselines folder: ${disk.baselinesAt}\n`)).toBe(true)
+  },
+)
 
 const KICKOFF = `# Kickoff questions
 
@@ -142,13 +155,13 @@ function webAnswers(overrides: Record<string, unknown> = {}): Answers {
     name: "Dan's Trips",
     slug: 'dans-trips',
     description: 'Plans trips offline.',
-    summary: 'Plans trips offline for travellers.',
+    summary: 'Plans trips offline for travelers.',
     issues: 'GitHub Issues',
     merging: 'Daniel merges',
     kickoff: [
-      { question: 'What is it, in one sentence, and who uses it?', answer: 'A trip planner' },
-      { question: 'public or private   repo?', answer: 'Private', assumed: true },
-      { question: 'Does it need to work offline?', answer: 'Yes' },
+      { question: 'What is it, in one sentence, and who uses it?', answer: 'A trip planner', source: 'stated' },
+      { question: 'public or private   repo?', answer: 'Private', source: 'default' },
+      { question: 'Does it need to work offline?', answer: 'Yes', source: 'inferred' },
     ],
     architecture: [{ choice: 'Styling', line: 'StyleX' }],
     alternatives: [{ option: 'SSR', why: 'No SEO' }],
@@ -175,6 +188,11 @@ test('reports every answer problem at once', async () => {
   expect(problems.some((p) => p.startsWith('`kickoff`'))).toBe(true)
   const python = problemsOf({ ...webAnswers(), stack: 'python', slug: 'lambda' })
   expect(python.some((p) => p.includes('Python keyword'))).toBe(true)
+  for (const slug of ['json', 'py-compile'])
+    expect(problemsOf({ ...webAnswers(), stack: 'python', slug, repository: 'https://github.com/o/r' })).toEqual([
+      `\`slug\` "${slug}" is a standard-library module, which would shadow the package; pick another name.`,
+    ])
+  expect(problemsOf({ ...webAnswers(), slug: 'json' })).toEqual([])
   expect(python.some((p) => p.startsWith('`repository`'))).toBe(true)
   expect(problemsOf({ ...webAnswers(), stack: 'go' })).toEqual(['`stack` must be "web", "rust" or "python".'])
   expect(problemsOf({ ...webAnswers(), slug: 'Trip_Planner' }).some((p) => p.startsWith('`slug`'))).toBe(true)
@@ -194,12 +212,21 @@ test('reports every answer problem at once', async () => {
   expect(problemsOf(webAnswers())).toEqual([])
 })
 
+test('every kickoff answer says where it came from', async () => {
+  const [first, ...rest] = webAnswers().kickoff
+  const answer = { question: first?.question, answer: first?.answer }
+  expect(problemsOf({ ...webAnswers(), kickoff: [answer, ...rest] })).toEqual(['`kickoff[0]` needs `source`.'])
+  expect(problemsOf({ ...webAnswers(), kickoff: [{ ...answer, source: 'assumed' }, ...rest] })).toEqual([
+    '`kickoff[0].source` must be "stated", "inferred" or "default", not "assumed".',
+  ])
+})
+
 test('every kickoff question of the stack needs an answer', async () => {
   const sections = kickoffFor(parseKickoff(KICKOFF), 'web')
   expect(sections.map((s) => s.title)).toEqual(['Every project', 'Web apps'])
   expect(missingKickoff(webAnswers(), sections)).toEqual([])
 
-  const short = webAnswers({ kickoff: [{ question: 'Public or private repo?', answer: 'Public' }] })
+  const short = webAnswers({ kickoff: [{ question: 'Public or private repo?', answer: 'Public', source: 'stated' }] })
   const missing = missingKickoff(short, sections)
   expect(missing.length).toBe(2)
   expect(missing[0]).toContain('"What is it, in one sentence, and who uses it?" (Every project)')
@@ -402,7 +429,7 @@ test("refuses answers the new repo's placeholder check would fail on", async () 
     ...webAnswers(),
     name: 'Replace Me Later',
     followUps: ['Replace-me tokens in docs'],
-    kickoff: [{ question: 'Public or private repo?', answer: 'replace_me' }],
+    kickoff: [{ question: 'Public or private repo?', answer: 'replace_me', source: 'stated' }],
   })
   expect(problems).toEqual([
     '`name` "Replace Me Later" reads as a template placeholder to the new repo\'s CI; reword it.',
@@ -575,7 +602,7 @@ pnpm verify   # the gate
 
 test('builds CLAUDE.md from the skeleton and the stack fragment', async () => {
   const text = composeAgentFile(TEMPLATE, FRAGMENT, webAnswers())
-  expect(text.startsWith("# Dan's Trips\n\nPlans trips offline for travellers.\n")).toBe(true)
+  expect(text.startsWith("# Dan's Trips\n\nPlans trips offline for travelers.\n")).toBe(true)
   expect(text).toContain('```bash\npnpm verify   # the gate\n```\n\n`pnpm verify` is the gate.')
   expect(text).toContain('- **Issues** live in GitHub Issues.')
   expect(text).toContain('Open as draft. Daniel merges.')
@@ -584,6 +611,10 @@ test('builds CLAUDE.md from the skeleton and the stack fragment', async () => {
   expect(text.endsWith('- **A trap.** Avoid it.\n')).toBe(true)
   expect(text.includes('Skeleton instructions')).toBe(false)
   expect(text.includes('Fragment instructions')).toBe(false)
+
+  // Angle brackets in an answer are the user's words, not a placeholder left behind.
+  const angled = composeAgentFile(TEMPLATE, FRAGMENT, webAnswers({ summary: 'Turns an <input> file into a plan.' }))
+  expect(angled).toContain('Turns an <input> file into a plan.')
 })
 
 test('a skeleton or fragment that drifted fails loudly', async () => {
@@ -624,7 +655,9 @@ test('the ADR records the answers and each default kept or changed', async () =>
   expect(() => renderAdr(unknown, input)).toThrow('names area "Style", which is not one of')
   const adr = renderAdr(answers, input)
   expect(adr).toContain('- Date: 2026-10-20')
-  expect(adr).toContain('| Public or private repo? | Private (assumed) |')
+  expect(adr).toContain('| Question | Answer | Source |')
+  expect(adr).toContain('| Public or private repo? | Private | default |')
+  expect(adr).toContain('| Does it need to work offline? | Yes | inferred |')
   expect(adr).toContain('(`baselines/web` at `e12caf4`)')
   expect(adr).toContain(
     '| Styling | StyleX | Build-time atomic CSS | Changed: vanilla-extract. Semantic class names. |',

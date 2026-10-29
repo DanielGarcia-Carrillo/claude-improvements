@@ -1,52 +1,125 @@
 ---
 name: new-project
-description: Bootstrap a new repository from the claude-improvements project baselines (a React PWA on Cloudflare, a Rust CLI workspace, or a Python package on uv, ruff and ty). Asks the kickoff questions in one batch, copies and renames the template, writes CLAUDE.md, AGENTS.md and the stack ADR, then installs and runs verify. Use when the user wants to start, create, scaffold or bootstrap a new project or repository.
+description: Bootstrap a new repository from the claude-improvements project baselines (a React PWA on Cloudflare, a Rust CLI workspace, or a Python package on uv, ruff and ty). Proposes an answer to every kickoff question from the user's description and asks only the open ones, then copies and renames the template, writes CLAUDE.md, AGENTS.md and the stack ADR, installs and runs verify. Use when the user wants to start, create, scaffold or bootstrap a new project or repository.
 argument-hint: '[what it is] [where it goes]'
 ---
 
 # Bootstrap a new project
 
-`$ARGUMENTS` is the user's brief: what the project is, and perhaps where it
-goes.
+The brief is what the user asked for: what the project is, and perhaps
+where it goes. In Claude Code it follows the command: $ARGUMENTS
 
-- **BASELINES** is the folder named on this prompt's first line
-  (`Baselines folder: …`). If that line is missing, the mod's hook did not
-  run: use `${CLAUDE_PLUGIN_ROOT}/../../baselines` when it holds
-  `general/kickoff.md`, else ask the user where the baselines folder is.
-- **SCRIPT** is `${CLAUDE_PLUGIN_ROOT}/scripts/new-project.ts`. It needs Node
-  23.6 or later (`node --version`).
-- Single-quote each path you put in a command below: a folder the user
-  names may hold spaces.
+Any agent can run this skill: nothing below needs a particular one. Where a
+step says "ask", write the question in your reply and wait. A
+multiple-choice tool holds too few questions for the kickoff.
 
-## 1. Ask the kickoff, in one batch
+## 0. Check the tools
+
+- **SCRIPT** is `scripts/new-project.ts` in this skill's folder. Use the
+  absolute path.
+- Single-quote each path you put in a command: a folder the user names may
+  hold spaces.
+
+**NODE** is how you run the script.
+
+- It's plain `node` when `node --version` is 22.18 or later. Those
+  versions run TypeScript as is.
+- Otherwise it's `mise exec node@lts -- node`. That installs Node into
+  mise's cache for these commands only, and changes no global setting,
+  since other projects and worktrees on the machine depend on those.
+
+Setup also needs `mise` on PATH.
+
+- If mise is missing, ask before installing it: `brew install mise`, or the
+  [installer](https://mise.jdx.dev/installing-mise.html).
+- The installer puts it in `~/.local/bin`. If that isn't on PATH, start
+  each command below with `PATH="$HOME/.local/bin:$PATH"`.
+- Don't run `mise use -g` or edit shell profiles.
+
+Then run `NODE SCRIPT doctor`.
+
+- If this prompt starts with `Baselines folder: DIR`, the Claude Code
+  plugin's `baselines` option names a folder, so add `--baselines DIR`.
+- Doctor names the **BASELINES** folder and where it came from, and checks
+  git and mise.
+- For anything marked ✗, fix it with the user's go-ahead and run doctor
+  again. Don't start the kickoff until doctor passes.
+- If the baselines can't be found, ask the user for the `baselines` folder
+  of a claude-improvements checkout, and pass it as `--baselines` from then
+  on.
+
+## 1. Propose the kickoff, and ask only what's open
 
 Read `BASELINES/general/kickoff.md`, then the stack READMEs
 (`BASELINES/web/README.md`, `BASELINES/rust/README.md`,
-`BASELINES/python/README.md`) for each default and
-when another shape fits.
+`BASELINES/python/README.md`) for each default and when another shape fits.
 
-Send one message holding every question, then stop and wait for the reply.
-Don't use AskUserQuestion: it takes four questions and the batch is longer.
+**Answer every question yourself first.** Cover the setup values and every
+kickoff question for the stack, each marked with where the answer came from:
 
-- **Setup** first: display name; slug (lowercase words joined by hyphens: the
-  package, Worker, crate or project name); target folder (new or empty, and outside any git repository; recommend
-  `<parent of the main checkout>/<slug>` unless the brief names one, where
-  the main checkout is the parent of
+- **stated**: the brief says it.
+- **inferred**: it follows from the brief or the user's machine, but they
+  didn't say it. For example, "for my phone, works on the subway" implies
+  offline. A `gh` login gives the repository owner.
+- **default**: the brief is silent, so take the baseline's default from its
+  README or kickoff.md.
+
+The setup values are:
+
+- display name;
+- slug (lowercase words joined by hyphens: the package, Worker, crate or
+  project name);
+- target folder. It must be new or empty, and outside any git repository.
+  Unless the brief names one, use `<parent of the main checkout>/<slug>`.
+  The main checkout is the parent of
   `git rev-parse --path-format=absolute --git-common-dir`, so a worktree
-  session doesn't pick a folder inside the repo); for web,
-  a short name of at most 12 characters for the installed app; for Rust and
-  Python, the repository URL (`https://github.com/<owner>/<slug>`; `gh api user --jq .login`
-  gives the owner).
-- **Every project**, then the stack's own section, each question in
-  kickoff.md's words. If the brief makes the kind clear (a web app, a Rust or
-  Python tool), include only that stack's section and say which stack you
-  assumed; otherwise include each that could fit, headed with when it applies.
-- A recommended answer for every question, from the brief and the baseline's
-  defaults. Where the brief already answers one, give that answer and mark it
-  "from your brief".
+  session doesn't pick a folder inside the repo.
+- for web, a short name of at most 12 characters for the installed app;
+- for Rust and Python, the repository URL
+  (`https://github.com/<owner>/<slug>`; `gh api user --jq .login` gives the
+  owner).
 
-Lay it out as numbered tables (`# | Question | Recommended`) so the user can
-reply "ok", or "ok except 3: public, 9: multi-device sync".
+Cover "Every project", then the stack's own section, each question in
+kickoff.md's words. If the brief makes the kind clear (a web app, a Rust or
+Python tool), answer only that stack's section and say which stack you
+assumed. If it doesn't, the stack itself is an open question.
+
+**Then pick the open questions.** A question is open when its answer is
+inferred or default and either:
+
+- you can't tell, because the brief points both ways or says nothing that
+  bears on it; or
+- a wrong answer is costly to undo later. These always count, unless the
+  brief states them:
+  - public or private repo;
+  - accounts and auth;
+  - personal or sensitive data;
+  - offline;
+  - server-side data;
+  - whether anything is published (npm, crates.io, PyPI);
+  - hard constraints;
+  - the stack.
+
+Everything else stands as proposed. A short brief may leave most of the
+costly questions open. A detailed one may leave none.
+
+**Send one message, then stop and wait for the reply.**
+
+1. **Open questions**, numbered, each with your recommended answer and a
+   few words on why. If none are open, say so.
+2. **Proposed answers**: one table of the rest, `# | Question | Answer |
+   Source`, numbered on from the open questions, so any row can be
+   overridden. Put the setup values first.
+
+The user can reply "ok", which takes every recommendation, or overrides by
+number: "ok except 2: public, 9: multi-device sync". After the reply:
+
+- every open question, and every row the user overrode, is **stated**;
+- the rows they left alone keep their source, so the ADR shows what nobody
+  confirmed.
+
+If a reply changes the stack or the shape, ask again, but only about what
+that change opens.
 
 ## 2. Pick the baseline
 
@@ -59,6 +132,11 @@ reply "ok", or "ok except 3: public, 9: multi-device sync".
   service (FastAPI, Django) is not one: the template has no server.
 - None of them (a mobile app, a Python web service): say there is no baseline
   for it and stop. Don't force one.
+- A TypeScript package published to npm (a library, or a CLI installed
+  with npm) has no baseline either: the web template is an app. Point to
+  the web README's "Publish an npm package" recipe and stop. A web app that
+  also publishes a package of its own starts from web, and the package is a
+  follow-up built with that recipe.
 
 An API, server state or anything else under a README's recipes or "Add when
 needed" doesn't change the baseline: it's a follow-up, unless the user asked
@@ -66,8 +144,11 @@ for it now.
 
 ## 3. Write the answers file
 
-Write JSON to a file outside the target (your scratchpad if the session has
-one, else `$TMPDIR`). Every field is a string unless shown otherwise:
+Write JSON to a new file outside the target, named uniquely so another
+session on the machine can't overwrite it: `mktemp "${TMPDIR:-/tmp}/new-project.XXXXXX"`.
+Every field is a string unless shown otherwise. The values below are an
+example for a made-up trip planner. Take every value from the kickoff,
+never from this example:
 
 ```json
 {
@@ -75,13 +156,13 @@ one, else `$TMPDIR`). Every field is a string unless shown otherwise:
   "name": "Trip Planner",
   "slug": "trip-planner",
   "shortName": "Trips",
-  "description": "Plans multi-day trips offline, for travellers without signal.",
+  "description": "Plans multi-day trips offline, for travelers without signal.",
   "summary": "CLAUDE.md's opening paragraph: what it is, who it is for, the one thing it must do well.",
   "issues": "Linear team \"Personal\", project \"Trips\"",
-  "merging": "Daniel pushes, marks ready and merges; agents open drafts",
+  "merging": "The owner pushes, marks ready and merges; agents open drafts",
   "repository": "https://github.com/owner/trip-planner",
-  "issue": "PER-40",
-  "kickoff": [{ "question": "Public or private repo?", "answer": "Private", "assumed": false }],
+  "issue": "ABC-40",
+  "kickoff": [{ "question": "Public or private repo?", "answer": "Private", "source": "stated" }],
   "changed": [{ "area": "Styling", "to": "vanilla-extract", "why": "Semantic class names in production" }],
   "architecture": [{ "choice": "Routing", "line": "TanStack Router, file-based" }],
   "alternatives": [{ "option": "TanStack Start with SSR", "why": "No page needs SEO" }],
@@ -95,8 +176,9 @@ one, else `$TMPDIR`). Every field is a string unless shown otherwise:
 - `description` is one sentence: it becomes the README's opening, the HTML
   description and the manifest's.
 - `kickoff` answers every question of "Every project" and the stack's section,
-  each question copied verbatim from kickoff.md. `assumed: true` marks a
-  default the user accepted without being asked. Setup answers don't go here.
+  each question copied verbatim from kickoff.md. `source` is `stated`,
+  `inferred` or `default`, as it stood after the user's reply; the ADR
+  shows it. Setup answers don't go here.
 - `changed` lists only defaults you change in the new repo during this
   bootstrap, `area` spelled as in the stack README's defaults table. A change
   for later is a `followUps` entry.
@@ -108,14 +190,14 @@ one, else `$TMPDIR`). Every field is a string unless shown otherwise:
   at least one entry, and no string in an entry may be blank.
 
 Check the file with
-`node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES --dry-run`.
-Always pass `--baselines`: the script's own default only holds in a
-claude-improvements checkout, not an installed copy. It reports every problem
-at once, each naming its fix; fix the file and rerun until it passes.
+`NODE SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES --dry-run`.
+Always pass `--baselines` with the folder doctor named, so every step reads
+the same baselines. The check reports every problem at once, each naming
+its fix; fix the file and rerun until it passes.
 
 ## 4. Scaffold
 
-`node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES` copies
+`NODE SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES` copies
 `general/files/` and the stack's `template/`, renames the placeholders (each
 spells "replace me": web `replace-me`, `Replace Me`, `ReplaceMe` and the
 `Replace me: …` description; Rust the `replace-me` crates, folders and
@@ -132,7 +214,7 @@ placeholder (the new repo's CI would fail on it).
 The script fills every placeholder; some lines still depend on the answers.
 Read the new CLAUDE.md and adapt it, keeping it short:
 
-- Issues outside Linear: use the tracker's key form (`#12`, not `PER-12`) in
+- Issues outside Linear: use the tracker's key form (for example `#12` rather than `ABC-12`) in
   the TODO, branch and commit examples, and drop the `Linear:` line from the
   PR bullet and `.github/pull_request_template.md`.
 - Drop conventions for parts the project won't use (the web fragment's state
@@ -144,8 +226,9 @@ Read the new CLAUDE.md and adapt it, keeping it short:
 
 ## 6. Set up and verify
 
-Run `node SCRIPT setup DIR --stack STACK` in the background, STACK being the
-baseline from step 2 (`web`, `rust` or `python`): it takes minutes. Always
+Run `NODE SCRIPT setup DIR --stack STACK`, STACK being the baseline from
+step 2 (`web`, `rust` or `python`). It takes minutes, so run it in the
+background if you can, with a timeout of at least 15 minutes. Always
 pass `--stack`: a Rust tool with an npm wrapper or Python bindings holds more
 than one manifest, and setup won't guess between them. It runs `mise trust` and
 `mise install`, takes new majors, and verifies:

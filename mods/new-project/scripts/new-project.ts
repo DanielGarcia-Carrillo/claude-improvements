@@ -1,8 +1,14 @@
 /**
- * /new-project's hands. Node 23.6 or later runs it as is.
+ * The new-project skill's hands, for whichever agent runs it. Node 22.18 or
+ * later runs it as is.
  *
+ *   node new-project.ts doctor [--baselines DIR]
  *   node new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run]
  *   node new-project.ts setup DIR [--stack web|rust|python] [--keep-versions]
+ *
+ * The baselines folder is `--baselines`, else `$NEW_PROJECT_BASELINES`, else
+ * the claude-improvements checkout this script sits in. `doctor` names the
+ * one it found and checks the tools scaffold and setup need.
  *
  * `scaffold` checks the answers against the baselines, then copies
  * `general/files/` and the stack's `template/` into DIR (new, or empty but
@@ -62,10 +68,15 @@ import {
 
 type SourceFile = TemplateFile & { bytes: Buffer; mode: number; link?: string }
 
+// Node resolves links to the script, so a skill folder linked into an
+// agent's skills directory still finds the checkout.
 const HERE = import.meta.dirname
 // The mod sits at claude-improvements/mods/new-project; the baselines are
 // two folders up from it.
 const BESIDE_THE_MOD = resolve(HERE, '../../../baselines')
+const BASELINES_ENV = 'NEW_PROJECT_BASELINES'
+// A baselines folder is one that holds this file.
+const MARKER = 'general/kickoff.md'
 // A target may already hold these: a fresh `git clone` of an empty repo.
 const ALLOWED_IN_TARGET = new Set(['.git', '.DS_Store'])
 // Skipped when the baselines are not in a git checkout to ask what is tracked.
@@ -110,6 +121,60 @@ function listFiles(dir: string): string[] {
         return entry.isDirectory() ? walk(path) : [path]
       })
   return walk('')
+}
+
+/** The baselines folder and what named it, refused unless it holds kickoff.md. */
+function locateBaselines(flag: string | undefined): { dir: string; source: string } {
+  const fromEnv = process.env[BASELINES_ENV]?.trim()
+  const [path, source] =
+    flag !== undefined
+      ? [flag, '--baselines']
+      : fromEnv !== undefined && fromEnv !== ''
+        ? [fromEnv, `$${BASELINES_ENV}`]
+        : [BESIDE_THE_MOD, 'the checkout this script is in']
+  const dir = resolve(expandHome(path))
+  if (!existsSync(join(dir, MARKER)))
+    throw new UsageError(
+      `The baselines folder from ${source} is ${dir}, which has no ${MARKER}. Pass --baselines or set ${BASELINES_ENV} to the baselines folder of a claude-improvements checkout.`,
+    )
+  return { dir, source }
+}
+
+/** The first line `argv` prints, or undefined when it can't start or fails. */
+function versionOf(argv: readonly string[]): string | undefined {
+  const result = run(argv, process.cwd())
+  return result.status === 0 ? result.stdout.trim().split('\n')[0] : undefined
+}
+
+/** Names the baselines folder and checks the tools; 1 when a required one is missing. */
+function doctor(flag: string | undefined): number {
+  const lines: string[] = []
+  let isReady = true
+  const need = (label: string, found: string | undefined, fix: string) => {
+    if (found === undefined) isReady = false
+    lines.push(found === undefined ? `✗ ${label}: missing. ${fix}` : `✓ ${label}: ${found}`)
+  }
+
+  try {
+    const { dir, source } = locateBaselines(flag)
+    lines.push(`✓ Baselines: ${dir} (from ${source})`)
+  } catch (error) {
+    isReady = false
+    lines.push(`✗ Baselines: ${messageOf(error)}`)
+  }
+  // A Node too old to strip types never gets this far.
+  lines.push(`✓ Node: ${process.versions.node}`)
+  need('git', versionOf(['git', '--version']), 'Install git.')
+  need(
+    'mise',
+    versionOf(['mise', '--version']),
+    'Install it (https://mise.jdx.dev/installing-mise.html): it installs every stack tool from the template.',
+  )
+  const gh = versionOf(['gh', '--version'])
+  lines.push(gh === undefined ? '- gh: not found (optional: suggests the repository owner)' : `✓ gh: ${gh}`)
+
+  process.stdout.write(`${lines.join('\n')}\n`)
+  return isReady ? 0 : 1
 }
 
 function readTree(dir: string): SourceFile[] {
@@ -160,9 +225,9 @@ const today = () => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
-function scaffold(options: { answers: string; target: string; baselines: string; isDryRun: boolean }) {
+function scaffold(options: { answers: string; target: string; baselines: string | undefined; isDryRun: boolean }) {
   const target = resolve(expandHome(options.target))
-  const baselines = resolve(expandHome(options.baselines))
+  const baselines = locateBaselines(options.baselines).dir
   checkTarget(target)
 
   let raw: unknown
@@ -449,12 +514,13 @@ async function main(argv: string[]): Promise<number> {
     options: {
       answers: { type: 'string' },
       target: { type: 'string' },
-      baselines: { type: 'string', default: BESIDE_THE_MOD },
+      baselines: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
       stack: { type: 'string' },
       'keep-versions': { type: 'boolean', default: false },
     },
   })
+  if (command === 'doctor') return doctor(values.baselines)
   if (command === 'scaffold') {
     if (values.answers === undefined || values.target === undefined)
       throw new UsageError('scaffold needs --answers FILE and --target DIR.')
@@ -472,7 +538,7 @@ async function main(argv: string[]): Promise<number> {
     return setup(dir, values.stack, values['keep-versions'])
   }
   throw new UsageError(
-    'Usage: new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run] | setup DIR [--stack web|rust|python] [--keep-versions]',
+    'Usage: new-project.ts doctor [--baselines DIR] | scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run] | setup DIR [--stack web|rust|python] [--keep-versions]',
   )
 }
 
