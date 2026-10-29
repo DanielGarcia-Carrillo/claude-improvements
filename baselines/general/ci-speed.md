@@ -53,8 +53,9 @@ and [Rust](../rust/template/) templates already do them.
 - **Per-step timings in the run summary**, so a slow step shows up before
   it's expensive.
 - **A quick local check beside the full gate.** The web template's
-  `pnpm verify:changed` typechecks, lints and formats only changed files,
-  and runs the Vitest tests the change reaches. `pnpm verify` stays the
+  `pnpm verify:changed` typechecks the project (`tsc -b` is incremental),
+  lints and format-checks only the changed files, and runs the Vitest tests
+  the change reaches. `pnpm verify` stays the
   gate before handoff, and CI runs everything.
 - **Tests a module graph can see.** Prefer in-process unit tests, which
   Vitest selects soundly. Keep tests that start processes or load files
@@ -152,7 +153,7 @@ Checked in October 2026.
 | Approach | Fit |
 |---|---|
 | Bazel, Buck2 | No: BUILD files everywhere, and the payoff needs hundreds of targets |
-| Pants | No Rust support |
+| Pants | No: its Rust backend is experimental |
 | Nx (`nx affected`) | Plausible for JS; Cargo only through a community plugin. Its value is Nx Cloud's cache |
 | Turborepo (`--affected`) | JS monorepos. Its remote cache can be self-hosted on R2 |
 | moon (`--affected`, v2) | The best fit for Rust plus JS: one binary, per-task inputs, local and remote cache. Untried; its v2 toolchain plugins are new |
