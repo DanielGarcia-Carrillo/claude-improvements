@@ -37,3 +37,36 @@ test('opens offline once the service worker is installed', async ({ home, page, 
   await page.reload()
   await expect(home.heading).toHaveText('About')
 })
+
+// The injected browser callback coordinates the offline transition with the test runner.
+declare global {
+  interface Window {
+    disconnectAfterWorkerUpdate: () => Promise<void>
+  }
+}
+
+test('stays quiet when the connection drops during a worker update check', async ({
+  home,
+  page,
+  context,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Playwright drives service workers in Chromium only')
+  await page.exposeFunction('disconnectAfterWorkerUpdate', () => context.setOffline(true))
+  await page.addInitScript(() => {
+    const register = navigator.serviceWorker.register.bind(navigator.serviceWorker)
+    navigator.serviceWorker.register = async (...args) => {
+      const registration = await register(...args)
+      const update = registration.update.bind(registration)
+      registration.update = async () => {
+        const updated = await update()
+        await window.disconnectAfterWorkerUpdate()
+        return updated
+      }
+      return registration
+    }
+  })
+  await home.goto()
+  await page.waitForFunction(() => !navigator.onLine)
+  await expect(home.heading).toHaveText('Replace Me')
+})
