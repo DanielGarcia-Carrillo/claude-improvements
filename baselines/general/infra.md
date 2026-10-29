@@ -211,7 +211,14 @@ templates ship a `.claude/settings.json` wired this way:
 [rust](../rust/template/.claude/settings.json),
 [python](../python/template/.claude/settings.json).
 
-Git hooks are optional. Claude Code hooks catch problems earlier inside the
-agent loop; CI is the gate for everything else. Add a thin lefthook
-pre-commit (format and lint staged files, under five seconds) only once
-humans or other agents commit to the repo too.
+Every language template includes a pinned Lefthook pre-commit: format staged
+files and lint where a file-level check is available. typos checks American
+English spelling. Independent jobs
+run in parallel; formatting precedes lint when both touch the same files. Fixes are re-staged, and unstaged edits in partially
+staged files are hidden while checks run. Install hooks in every clone:
+web's `pnpm install` runs `prepare`; Rust and Python use `just bootstrap`
+after `mise install`. The new-project setup runs these after `git init`.
+
+Aim for under five seconds with dependencies installed. Clippy, type checks,
+and tests stay in verify, the agent hooks and CI; no pre-push hook is added.
+`git commit --no-verify` bypasses pre-commit, so CI remains the gate.

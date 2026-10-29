@@ -21,6 +21,7 @@ Versions and statuses were checked on 2026-10-20.
    test) and `ReplaceMe` (the manifest's short name, at most 12 characters).
    `git grep --untracked -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
    fails while any remain.
+   Run `git init -b main` if this is not already a Git repository.
 3. `mise install && pnpm install && pnpm exec playwright install chromium webkit`.
    The template has no lockfile, so this resolves the newest release each
    range allows: a caret on 0.x takes patches only, and StyleX is pinned
@@ -32,6 +33,15 @@ Versions and statuses were checked on 2026-10-20.
    the tools in your global mise config and uninstalls their old versions.
 5. Build `CLAUDE.md` from [`CLAUDE.template.md`](../general/CLAUDE.template.md)
    plus [`CLAUDE.stack.md`](CLAUDE.stack.md); `ln -s CLAUDE.md AGENTS.md`.
+
+Pre-commit uses Lefthook (pinned in `mise.toml`) on staged files only, with
+independent jobs in parallel and formatter fixes re-staged. typos checks
+American English spelling. `pnpm install` installs hooks through `prepare`. oxfmt runs before type-aware oxlint
+(warnings denied).
+
+The target is under five seconds after installing dependencies. A commit with
+no matching files skips the corresponding jobs. `git commit --no-verify`
+bypasses hooks; full verify and CI remain required.
 
 ## The stack
 

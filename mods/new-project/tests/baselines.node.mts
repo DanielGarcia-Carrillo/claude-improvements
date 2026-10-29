@@ -349,3 +349,29 @@ exec "$PINNED_TYPOS" "$@"
     assert.equal(hook('before-stop').status, 0)
   })
 }
+
+test('setup installs Git hooks in every stack before verify, including --keep-versions', () => {
+  const bin = join(scratch, 'setup-hooks-bin')
+  mkdirSync(bin)
+  const calls = join(scratch, 'setup-hooks-calls')
+  writeFileSync(join(bin, 'mise'), `#!/bin/sh\necho "$*" >> '${calls}'\n`, { mode: 0o755 })
+  for (const [stack, manifest] of [
+    ['web', 'package.json'],
+    ['rust', 'Cargo.toml'],
+    ['python', 'pyproject.toml'],
+  ] as const) {
+    const repo = join(scratch, `setup-hooks-${stack}`)
+    mkdirSync(repo)
+    writeFileSync(join(repo, manifest), '')
+    const result = spawnSync(process.execPath, [SCRIPT, 'setup', repo, '--keep-versions'], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: bin },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const steps = readFileSync(calls, 'utf8').trim().split('\n')
+    const install = steps.indexOf(stack === 'web' ? 'exec -- pnpm install' : 'exec -- just bootstrap')
+    assert.ok(install > steps.indexOf('install'), `${stack}: hooks need installed tools`)
+    assert.ok(install < steps.length - 1, `${stack}: hooks must be installed before verify`)
+    rmSync(calls)
+  }
+})

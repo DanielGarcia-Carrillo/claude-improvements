@@ -19,7 +19,8 @@ Versions and statuses were checked on 2026-10-20.
    in `Cargo.toml`, and `replace_me_core` in `use` paths.
    `git grep --untracked -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
    fails while any remain.
-3. `mise install && cargo generate-lockfile`. Requirements like `"4.6.7"`
+   Run `git init -b main` if this is not already a Git repository.
+3. `mise install && cargo generate-lockfile && just bootstrap`. Requirements like `"4.6.7"`
    are carets (`^4.6.7`), and the template has no lockfile, so this resolves
    the newest compatible releases.
 4. Take new majors too: set `rust-toolchain.toml` to the current stable
@@ -34,6 +35,17 @@ Versions and statuses were checked on 2026-10-20.
 6. Point agents at Microsoft's
    [Pragmatic Rust Guidelines for agents](https://microsoft.github.io/rust-guidelines/agents/all.txt)
    (one file, about 34k tokens) for review-only rules the lints can't check.
+
+Pre-commit uses Lefthook (pinned in `mise.toml`) on staged files only, with
+independent jobs in parallel and formatter fixes re-staged. typos checks
+American English spelling. Run
+`just bootstrap` in every clone to install hooks. rustfmt uses the 2024
+edition from `rustfmt.toml` and does not follow unstaged modules. Clippy stays
+in `just verify` and CI.
+
+The target is under five seconds after installing dependencies. A commit with
+no matching files skips the corresponding jobs. `git commit --no-verify`
+bypasses hooks; full verify and CI remain required.
 
 ## The defaults
 

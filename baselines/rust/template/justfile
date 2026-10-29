@@ -5,6 +5,10 @@
 # RUSTFLAGS=-D warnings causes. Local `cargo build` stays warn-only.
 export CARGO_BUILD_WARNINGS := "deny"
 
+# Install Git hooks in every clone after `mise install`.
+bootstrap:
+    lefthook install
+
 verify: spellcheck fmt-check deny lint test doc shear
 
 spellcheck:
