@@ -13,22 +13,30 @@ Claude Code, `$new-project …` in Codex, or just ask for a new project).
 ## Install
 
 Clone claude-improvements: the skill reads the baselines from the checkout.
-Then link the skill into your agent:
+
+**Inside claude-improvements**, nothing needs installing. The repo links the
+skill at `.agents/skills/new-project` (Codex) and `.claude/skills/new-project`
+(Claude Code), so each worktree runs its own copy of the skill, script and
+baselines.
+
+**From any other folder**, link the skill into your agent. Link it rather
+than copying it: the skill's `scripts` link is relative.
 
 ```bash
-ln -s ~/src/claude-improvements/mods/new-project/skills/new-project ~/.agents/skills/new-project
+mkdir -p ~/.agents/skills && ln -s ~/src/claude-improvements/mods/new-project/skills/new-project ~/.agents/skills/new-project
 ```
 
 ```bash
-ln -s ~/src/claude-improvements/mods/new-project ~/.claude/skills/new-project
+mkdir -p ~/.claude/skills && ln -s ~/src/claude-improvements/mods/new-project ~/.claude/skills/new-project
 ```
 
 The first is for Codex and any agent that reads `~/.agents/skills`. The
-second is for Claude Code, and links the whole mod, so its hook and its
-**Baselines folder** option come too. Linking only the skill folder into
-`~/.claude/skills` works as well.
+second is for Claude Code. It links the whole mod, so its hook and its
+**Baselines folder** option come too; linking only the skill folder works as
+well. A link like this runs the code of the checkout it points at, so point it
+at a checkout you keep on `main`, not at a worktree you edit.
 
-The first run checks the tools: Node 23.6 or later, git and mise. If any is
+The first run checks the tools: Node 22.18 or later, git and mise. If any is
 missing, it offers to install it. Every stack tool after that comes from the
 template's own pins.
 
@@ -94,7 +102,7 @@ one.
 
 ## Needs
 
-Node 23.6 or later for the script, git and mise. The stacks' own tools (pnpm,
+Node 22.18 or later for the script, git and mise. The stacks' own tools (pnpm,
 Playwright's browsers, Rust, just, nextest, cargo-deny, cargo-shear, uv,
 Python, ruff, ty) come from each template's `mise.toml`, toolchain files and
 lockfiles.

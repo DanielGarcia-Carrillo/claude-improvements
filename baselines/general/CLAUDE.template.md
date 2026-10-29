@@ -27,11 +27,11 @@ every handoff and never hand off red.
 
 - **Issues** live in <Linear team "X", project "Y" | GitHub Issues>. File
   bugs and follow-ups there, never as bare TODOs: a TODO names its issue,
-  `TODO(PER-12): …`.
+  `TODO(ABC-12): …`.
 - **Branches**: one issue per branch, `<track>/per-<n>-<slug>`. Stack
   dependent branches with Graphite (`gt create`, `gt restack`).
 - **Commits**: imperative subject ending in the issue key,
-  `Add offline banner (PER-12)`. A refactor and a behaviour change are
+  `Add offline banner (ABC-12)`. A refactor and a behavior change are
   separate commits.
 - **PRs**: one branch each, title carries the key, body has the `Linear:`
   (or `Closes #n`) line, how it was verified and, for a visible change, a

@@ -7,11 +7,19 @@ Propose an answer to every question from the brief, and mark where each one
 came from: **stated** (the brief says it), **inferred** (it follows from
 the brief) or **default** (the baseline's pick). Then ask, in one batch,
 only the open ones: those the brief leaves unclear, and those that are
-costly to undo and weren't stated. Examples are public or private, auth,
-personal data, offline, server-side data and publishing. Give a recommended
-answer for each, and list the rest so the user can override any of them.
-Record every answer with its source in the new repo's
-`docs/adr/0001-stack.md`.
+costly to undo and weren't stated. The costly ones are:
+- public or private;
+- auth;
+- personal data;
+- offline;
+- server-side data;
+- publishing;
+- hard constraints;
+- the stack itself.
+
+Give a recommended answer for each open question, and list the rest so the
+user can override any of them. Record every answer with its source in the
+new repo's `docs/adr/0001-stack.md`.
 
 ## Every project
 

@@ -216,6 +216,23 @@ test('doctor takes --baselines over $NEW_PROJECT_BASELINES over the checkout, an
   assert.match(noMise.stdout, /✗ mise: missing\. Install it/)
 })
 
+test('scaffold finds the baselines the way doctor does', () => {
+  const answers = join(scratch, 'env-web.json')
+  writeFileSync(answers, JSON.stringify(answersFor('web')))
+  const dryRunWith = (target: string, env: Record<string, string>) =>
+    spawnSync(process.execPath, [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--dry-run'], {
+      cwd: scratch,
+      encoding: 'utf8',
+      env: { ...process.env, ...env },
+    })
+
+  const fromEnv = dryRunWith(join(scratch, 'env-target'), { NEW_PROJECT_BASELINES: baselinesCopy('env') })
+  assert.equal(fromEnv.status, 0, fromEnv.stderr)
+  const wrong = dryRunWith(join(scratch, 'env-wrong-target'), { NEW_PROJECT_BASELINES: scratch })
+  assert.equal(wrong.status, 1)
+  assert.match(wrong.stderr, /from \$NEW_PROJECT_BASELINES is .*, which has no general\/kickoff\.md/)
+})
+
 test('setup needs --stack for a folder holding both manifests, and runs the stack named', () => {
   // A Rust tool with an npm wrapper holds both.
   const repo = join(scratch, 'both')

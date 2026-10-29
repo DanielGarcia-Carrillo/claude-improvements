@@ -1,5 +1,5 @@
 /**
- * The new-project skill's hands, for whichever agent runs it. Node 23.6 or
+ * The new-project skill's hands, for whichever agent runs it. Node 22.18 or
  * later runs it as is.
  *
  *   node new-project.ts doctor [--baselines DIR]

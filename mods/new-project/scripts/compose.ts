@@ -331,6 +331,29 @@ const PYTHON_KEYWORDS = new Set(
   ).split(' '),
 )
 
+// Python 3.15's `sys.stdlib_module_names` that a slug can spell. A package
+// folder named after one is shadowed by the standard library's module.
+const PYTHON_STDLIB = new Set(
+  (
+    'abc annotationlib antigravity argparse array ast asyncio atexit base64 bdb binascii bisect builtins bz2 ' +
+    'calendar cmath cmd code codecs codeop collections colorsys compileall compression concurrent configparser ' +
+    'contextlib contextvars copy copyreg csv ctypes curses dataclasses datetime dbm decimal difflib dis doctest ' +
+    'email encodings ensurepip enum errno faulthandler fcntl filecmp fileinput fnmatch fractions ftplib functools ' +
+    'gc genericpath getopt getpass gettext glob graphlib grp gzip hashlib heapq hmac html http idlelib imaplib ' +
+    'importlib inspect io ipaddress itertools json keyword linecache locale logging lzma mailbox marshal math ' +
+    'mimetypes mmap modulefinder msvcrt multiprocessing netrc nt ntpath nturl2path numbers opcode operator optparse' +
+    ' os pathlib pdb pickle pickletools pkgutil platform plistlib poplib posix posixpath pprint profile profiling ' +
+    'pstats pty pwd py_compile pyclbr pydoc pydoc_data pyexpat queue quopri random re readline reprlib resource ' +
+    'rlcompleter runpy sched secrets select selectors shelve shlex shutil signal site smtplib socket socketserver ' +
+    'sqlite3 ssl stat statistics string stringprep struct subprocess symtable sys sysconfig syslog tabnanny tarfile' +
+    ' tempfile termios textwrap this threading time timeit tkinter token tokenize tomllib trace traceback ' +
+    'tracemalloc tty turtle turtledemo types typing unicodedata unittest urllib uuid venv warnings wave weakref ' +
+    'webbrowser winreg winsound wsgiref xml xmlrpc zipapp zipfile zipimport zlib zoneinfo '
+  )
+    .trim()
+    .split(' '),
+)
+
 const isRepositoryUrl = (url: string) =>
   /^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(url) && URL.canParse(url) && new URL(url).hostname !== ''
 
@@ -413,6 +436,8 @@ export function parseAnswers(raw: unknown): Answers {
     problems.push(`\`slug\` "${slug}" is a Rust keyword or sysroot crate; pick another name.`)
   if (slug !== undefined && stack === 'python' && PYTHON_KEYWORDS.has(slug.replaceAll('-', '_')))
     problems.push(`\`slug\` "${slug}" is a Python keyword; pick another name.`)
+  if (slug !== undefined && stack === 'python' && PYTHON_STDLIB.has(slug.replaceAll('-', '_')))
+    problems.push(`\`slug\` "${slug}" is a standard-library module, which would shadow the package; pick another name.`)
 
   const shortName = text('shortName', true)
   if (shortName !== undefined && (shortName.length > SHORT_NAME_MAX || /[<>{}"\\\r\n]/.test(shortName)))
@@ -753,14 +778,18 @@ export function composeAgentFile(template: string, fragment: string, answers: An
     ['<Who may push, mark ready and merge.>', sentence(answers.merging)],
     ['- <Choice>: <one line>. [ADR 0001](docs/adr/0001-stack.md)', architecture],
   ]
-  for (const [placeholder, value] of fills) {
+  // Checked before the answers go in, so an answer such as "Turns an <input>
+  // file into a plan" doesn't read as a placeholder left behind.
+  let skeleton = text
+  for (const [placeholder] of fills) {
     if (!text.includes(placeholder))
       throw new Error(`CLAUDE.template.md no longer holds ${placeholder}; update the fills in composeAgentFile.`)
-    text = text.replaceAll(placeholder, () => value)
+    skeleton = skeleton.replaceAll(placeholder, '')
   }
-
-  const left = unfilled(text)
+  const left = unfilled(skeleton)
   if (left.length > 0) throw new Error(`CLAUDE.md still has placeholders: ${left.join(', ')}.`)
+
+  for (const [placeholder, value] of fills) text = text.replaceAll(placeholder, () => value)
   return `${text.replace(/\n{3,}/g, '\n\n').trim()}\n`
 }
 

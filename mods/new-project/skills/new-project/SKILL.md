@@ -20,23 +20,33 @@ multiple-choice tool holds too few questions for the kickoff.
 - Single-quote each path you put in a command: a folder the user names may
   hold spaces.
 
-Run `node --version`. The script needs Node 23.6 or later, which runs
-TypeScript as is. If Node is missing or older, see whether mise is
-installed (`mise --version`). Then ask before installing anything, since it
-changes the user's machine:
+**NODE** is how you run the script.
 
-- with mise, `mise use -g node@lts`;
-- without it, mise first (`brew install mise`, or the
-  [installer](https://mise.jdx.dev/installing-mise.html)), then Node.
+- It's plain `node` when `node --version` is 22.18 or later. Those
+  versions run TypeScript as is.
+- Otherwise it's `mise exec node@lts -- node`. That installs Node into
+  mise's cache for these commands only, and changes no global setting,
+  since other projects and worktrees on the machine depend on those.
 
-Then run `node SCRIPT doctor`. If this prompt starts with
-`Baselines folder: DIR`, a plugin hook found the baselines, so add
-`--baselines DIR`. Doctor names the **BASELINES** folder and where it came
-from, and checks git and mise. For anything marked ✗, fix it with the
-user's go-ahead and run doctor again. Don't start the kickoff until doctor
-passes. If the baselines can't be found, ask the user for the `baselines`
-folder of a claude-improvements checkout, and pass it as `--baselines` from
-then on.
+Setup also needs `mise` on PATH.
+
+- If mise is missing, ask before installing it: `brew install mise`, or the
+  [installer](https://mise.jdx.dev/installing-mise.html).
+- The installer puts it in `~/.local/bin`. If that isn't on PATH, start
+  each command below with `PATH="$HOME/.local/bin:$PATH"`.
+- Don't run `mise use -g` or edit shell profiles.
+
+Then run `NODE SCRIPT doctor`.
+
+- If this prompt starts with `Baselines folder: DIR`, the Claude Code
+  plugin's `baselines` option names a folder, so add `--baselines DIR`.
+- Doctor names the **BASELINES** folder and where it came from, and checks
+  git and mise.
+- For anything marked ✗, fix it with the user's go-ahead and run doctor
+  again. Don't start the kickoff until doctor passes.
+- If the baselines can't be found, ask the user for the `baselines` folder
+  of a claude-improvements checkout, and pass it as `--baselines` from then
+  on.
 
 ## 1. Propose the kickoff, and ask only what's open
 
@@ -69,7 +79,7 @@ The setup values are:
   (`https://github.com/<owner>/<slug>`; `gh api user --jq .login` gives the
   owner).
 
-Ask about "Every project", then the stack's own section, each question in
+Cover "Every project", then the stack's own section, each question in
 kickoff.md's words. If the brief makes the kind clear (a web app, a Rust or
 Python tool), answer only that stack's section and say which stack you
 assumed. If it doesn't, the stack itself is an open question.
@@ -134,8 +144,9 @@ for it now.
 
 ## 3. Write the answers file
 
-Write JSON to a file outside the target (a scratch or temporary folder,
-such as `$TMPDIR`). Every field is a string unless shown otherwise:
+Write JSON to a new file outside the target, named uniquely so another
+session on the machine can't overwrite it: `mktemp "${TMPDIR:-/tmp}/new-project.XXXXXX"`.
+Every field is a string unless shown otherwise:
 
 ```json
 {
@@ -143,12 +154,12 @@ such as `$TMPDIR`). Every field is a string unless shown otherwise:
   "name": "Trip Planner",
   "slug": "trip-planner",
   "shortName": "Trips",
-  "description": "Plans multi-day trips offline, for travellers without signal.",
+  "description": "Plans multi-day trips offline, for travelers without signal.",
   "summary": "CLAUDE.md's opening paragraph: what it is, who it is for, the one thing it must do well.",
   "issues": "Linear team \"Personal\", project \"Trips\"",
   "merging": "Daniel pushes, marks ready and merges; agents open drafts",
   "repository": "https://github.com/owner/trip-planner",
-  "issue": "PER-40",
+  "issue": "ABC-40",
   "kickoff": [{ "question": "Public or private repo?", "answer": "Private", "source": "stated" }],
   "changed": [{ "area": "Styling", "to": "vanilla-extract", "why": "Semantic class names in production" }],
   "architecture": [{ "choice": "Routing", "line": "TanStack Router, file-based" }],
@@ -177,14 +188,14 @@ such as `$TMPDIR`). Every field is a string unless shown otherwise:
   at least one entry, and no string in an entry may be blank.
 
 Check the file with
-`node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES --dry-run`.
+`NODE SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES --dry-run`.
 Always pass `--baselines` with the folder doctor named, so every step reads
 the same baselines. The check reports every problem at once, each naming
 its fix; fix the file and rerun until it passes.
 
 ## 4. Scaffold
 
-`node SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES` copies
+`NODE SCRIPT scaffold --answers FILE --target DIR --baselines BASELINES` copies
 `general/files/` and the stack's `template/`, renames the placeholders (each
 spells "replace me": web `replace-me`, `Replace Me`, `ReplaceMe` and the
 `Replace me: …` description; Rust the `replace-me` crates, folders and
@@ -201,7 +212,7 @@ placeholder (the new repo's CI would fail on it).
 The script fills every placeholder; some lines still depend on the answers.
 Read the new CLAUDE.md and adapt it, keeping it short:
 
-- Issues outside Linear: use the tracker's key form (`#12`, not `PER-12`) in
+- Issues outside Linear: use the tracker's key form (`#12`, not `ABC-12`) in
   the TODO, branch and commit examples, and drop the `Linear:` line from the
   PR bullet and `.github/pull_request_template.md`.
 - Drop conventions for parts the project won't use (the web fragment's state
@@ -213,7 +224,7 @@ Read the new CLAUDE.md and adapt it, keeping it short:
 
 ## 6. Set up and verify
 
-Run `node SCRIPT setup DIR --stack STACK`, STACK being the baseline from
+Run `NODE SCRIPT setup DIR --stack STACK`, STACK being the baseline from
 step 2 (`web`, `rust` or `python`). It takes minutes, so run it in the
 background if you can, with a timeout of at least 15 minutes. Always
 pass `--stack`: a Rust tool with an npm wrapper or Python bindings holds more
