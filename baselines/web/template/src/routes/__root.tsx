@@ -29,7 +29,8 @@ function Root() {
       <main {...stylex.props(styles.main)}>
         <Outlet />
       </main>
-      <UpdatePrompt />
+      {/* A kill-switch build registers no worker; see src/kill-switch/sw.ts. */}
+      {!import.meta.env.SW_KILL_SWITCH && <UpdatePrompt />}
     </div>
   )
 }

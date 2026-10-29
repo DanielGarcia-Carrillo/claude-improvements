@@ -51,7 +51,7 @@ Versions and statuses were checked on 2026-10-20.
 | Contrast | APCA via `colorjs.io` in a unit test | Fails the build with the pair and its Lc. `apca-w3`'s licence restricts shipping it | — |
 | Icons | Lucide (`lucide-react`) | ISC, about 1,900 icons, per-icon imports; `aria-hidden` unless labelled | Tabler for breadth; `unplugin-icons` for several sets |
 | Fonts | System stack in the template | Neutral starting point | Self-host one Latin-only variable family from `@fontsource-variable` (about 20–50 KB) and precache it once the design has a typeface |
-| PWA | vite-plugin-pwa 2 with Workbox 7, `injectManifest`, `registerType: 'prompt'` | The worker is source (`src/sw.ts`) built from Workbox modules, ready for custom handlers; updates wait for consent | `generateSW` (Workbox writes the whole worker from config) when it will only ever precache, fall back to the shell and cache by URL pattern. Serwist (`@serwist/vite`), a maintained Workbox fork, if Workbox stalls. Workbox's last release was 7.4.1 in 2026-05; Serwist's was 9.5.13 in 2026-10 |
+| PWA | vite-plugin-pwa 2 with Workbox 7, `injectManifest`, `registerType: 'prompt'` | The worker is source (`src/sw.ts`) built from Workbox modules, ready for custom handlers; updates wait for consent, unless `public/update-policy.json` forces them, and a kill switch removes a broken worker ([recipe](#recover-from-a-broken-service-worker)) | `generateSW` (Workbox writes the whole worker from config) when it will only ever precache, fall back to the shell and cache by URL pattern. Serwist (`@serwist/vite`), a maintained Workbox fork, if Workbox stalls. Workbox's last release was 7.4.1 in 2026-05; Serwist's was 9.5.13 in 2026-10 |
 | Server state | TanStack Query v5 (add when there are requests) | Caching, retries, offline mutation queue | — |
 | Client state | Jotai 3, installed | Atoms beside the feature instead of prop drilling or context; derived state without a store | — |
 | Requests | Hono RPC + Zod 4 (`zod/mini` in the client) | Typed client with no codegen, native to Workers | oRPC when an OpenAPI contract is needed; `openapi-fetch` for third-party APIs |
@@ -237,6 +237,43 @@ Leave out attw (`@arethetypeswrong/cli`): it brings its own copy of
 TypeScript, and the type test covers the same ground. Bring in tsdown only
 when the package needs a real bundle (inlined dependencies, CJS, or a single
 file); see [explorations/tsdown](../explorations/tsdown.md).
+
+### Recover from a broken service worker
+
+An installed worker keeps serving its precached app until a newer worker
+takes over. Browsers check `/sw.js` on every navigation, and `public/_headers`
+keeps it uncached, so a fixed worker is found on the next visit. Whether it
+takes over depends on how broken the old one is. Pick the mildest of these
+that works:
+
+1. **The app still runs and shows its update prompt.** Ship the fix as
+   usual. Users see "A new version is available", and tabs left open check
+   hourly.
+2. **Everyone must leave an old build now** (it loses data, or has a
+   security hole), but its page still runs. In the fix's PR, set
+   `public/update-policy.json` to `{ "forceUpdateBefore": "<now, in UTC>" }`.
+   Open copies of any build made before that instant install the fix and
+   reload without asking, on their next load or hourly check. Reloading
+   drops unsaved state in other tabs, so keep it for real emergencies, and
+   set the field back to `null` in a later PR. Only builds that already have
+   `src/lib/update-policy.ts` can read the policy.
+3. **The page can't update** (it never renders, or every navigation fails).
+   Use the kill switch. Run the ci workflow on `main` from the Actions tab
+   with **kill switch** checked. It deploys main's app with
+   `src/kill-switch/sw.ts` as `/sw.js`. On each user's next visit, that
+   worker:
+   - installs without the prompt;
+   - deletes the app's Cache Storage;
+   - unregisters;
+   - reloads open tabs from the network.
+
+   IndexedDB, localStorage and cookies stay. The kill-switch page registers
+   no worker, so the app runs online-only until the next push to `main`
+   deploys the real worker again. Land the fix that way.
+
+The kill switch also deletes any Cache Storage the app filled itself, and it
+can't reach a browser that never visits again. `tests/e2e/service-worker.spec.ts`
+covers all three cases against real builds.
 
 ## Sources
 

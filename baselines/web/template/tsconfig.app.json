@@ -8,5 +8,5 @@
   "include": ["src"],
   // The service worker runs in a different global scope; tsconfig.sw.json
   // checks it against the WebWorker library instead of the DOM.
-  "exclude": ["src/sw.ts"]
+  "exclude": ["src/sw.ts", "src/kill-switch/sw.ts"]
 }
