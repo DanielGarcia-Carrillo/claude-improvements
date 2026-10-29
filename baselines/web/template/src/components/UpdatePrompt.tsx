@@ -1,6 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
+import { useEffect, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
+import { fetchMustUpdate } from '../lib/update-policy.ts'
 import { color, radius, space } from '../theme/tokens.stylex.ts'
 import { Button } from './Button.tsx'
 
@@ -15,16 +17,33 @@ const UPDATE_CHECK_MS = 60 * 60 * 1000
  * project whose other tabs can hold unsaved state can pass `onNeedReload` to
  * prompt there instead, and then has to cope with chunks failing to load.
  * The live region is always mounted so screen readers announce the prompt.
+ *
+ * When public/update-policy.json says this build is too old, the update is
+ * taken without asking (src/lib/update-policy.ts).
  */
 export function UpdatePrompt() {
+  const [isForced, setIsForced] = useState(false)
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
-      if (registration) setInterval(() => void registration.update(), UPDATE_CHECK_MS)
+      if (!registration) return
+      const check = async () => {
+        // Offline there is nothing to fetch, and a failed request logs an error.
+        if (!navigator.onLine) return
+        // Mid-install an update check can fail; the next one retries.
+        await registration.update().catch(() => undefined)
+        if (await fetchMustUpdate(import.meta.env.BUILD_TIME)) setIsForced(true)
+      }
+      void check()
+      setInterval(() => void check(), UPDATE_CHECK_MS)
     },
   })
+
+  useEffect(() => {
+    if (isForced && needRefresh) void updateServiceWorker(true)
+  }, [isForced, needRefresh, updateServiceWorker])
 
   return (
     <div role="status" {...stylex.props(needRefresh && styles.toast)}>
