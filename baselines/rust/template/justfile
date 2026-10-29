@@ -8,7 +8,7 @@ export CARGO_BUILD_WARNINGS := "deny"
 verify: spellcheck fmt-check deny lint test doc shear
 
 spellcheck:
-    typos
+    mise exec -- typos
 
 fmt-check:
     cargo fmt --all --check

@@ -560,6 +560,7 @@ export function kickoffFor(sections: readonly KickoffSection[], stack: Stack): K
   })
 }
 
+/** Compares kickoff questions independent of case, Markdown emphasis and whitespace. */
 const normalize = (question: string) => question.toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim()
 
 function findAnswer(answers: readonly KickoffAnswer[], question: string): KickoffAnswer | undefined {

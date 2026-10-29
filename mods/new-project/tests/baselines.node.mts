@@ -2,7 +2,7 @@
  * The scaffold over the real baselines, which the plugin test kit cannot
  * read (it offers no file system). Run it with Node, not `claude plugin test`:
  *
- *   node --test mods/new-project/tests/baselines.node.mts
+ *   mise exec -- node --test mods/new-project/tests/baselines.node.mts
  *
  * Each stack is scaffolded into a temporary folder, then checked with the
  * template CI's own placeholder step, so a placeholder the baselines gain
@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { after, test } from 'node:test'
 
 import type { Stack } from '../scripts/compose.ts'
@@ -51,6 +51,7 @@ function answersFor(stack: Stack) {
   }
 }
 
+/** Generates a named scratch project from the real baseline without installing dependencies. */
 function scaffold(stack: Stack, name: string = stack): string {
   const answers = join(scratch, `${name}.json`)
   writeFileSync(answers, JSON.stringify(answersFor(stack)))
@@ -307,6 +308,23 @@ for (const stack of ['rust', 'python'] as const) {
     mkdirSync(bin)
     for (const tool of ['rustfmt', 'cargo', 'uv'])
       writeFileSync(join(bin, tool), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    // Model mise exposing the pinned binary to a process with no typos on PATH.
+    const located = run('mise', ['which', 'typos'], resolve(BASELINES, '..'))
+    assert.equal(located.status, 0, located.stderr)
+    const typosDir = dirname(located.stdout.trim())
+    const path = (process.env['PATH'] ?? '')
+      .split(delimiter)
+      .filter((dir) => !existsSync(join(dir, 'typos')))
+      .join(delimiter)
+    writeFileSync(
+      join(bin, 'mise'),
+      `#!/bin/sh
+[ "$1" = exec ] && [ "$2" = -- ] && [ "$3" = typos ] || exit 99
+shift 2
+PATH=${JSON.stringify(typosDir)}:"$PATH" exec "$@"
+`,
+      { mode: 0o755 },
+    )
     const nested = join(repo, 'nested')
     mkdirSync(nested)
     const file = join(repo, 'README.md')
@@ -316,7 +334,7 @@ for (const stack of ['rust', 'python'] as const) {
         cwd: nested,
         input: JSON.stringify({ cwd: nested, tool_input: { file_path: file }, stop_hook_active: retry }),
         encoding: 'utf8',
-        env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, CLAUDE_PROJECT_DIR: scratch },
+        env: { ...process.env, PATH: `${bin}${delimiter}${path}`, CLAUDE_PROJECT_DIR: scratch },
       })
     const edited = hook('after-edit')
     assert.equal(edited.status, 2, edited.stderr)

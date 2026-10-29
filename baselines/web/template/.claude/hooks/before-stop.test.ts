@@ -33,7 +33,7 @@ describe('before-stop', () => {
     expect(stop()).toEqual({
       status: 0,
       stderr: '',
-      calls: [`${repo.root}|-s typecheck`, `${repo.root}|-s lint`, `${repo.root}|-s spellcheck`],
+      calls: [`${repo.root}|-s typecheck`, `${repo.root}|-s lint`, `${repo.root}|mise exec -- typos`],
     })
   })
 
@@ -54,7 +54,7 @@ describe('before-stop', () => {
 
   it('blocks the stop on spelling errors', () => {
     repo.write('README.md')
-    const result = stop({ STUB_FAIL: 'spellcheck', STUB_OUTPUT: 'Use American English' })
+    const result = stop({ STUB_FAIL: 'typos', STUB_OUTPUT: 'Use American English' })
     expect(result.status).toBe(2)
     expect(result.stderr).toBe('`pnpm spellcheck` failed. Fix these before finishing:\nUse American English\n')
   })
@@ -84,6 +84,6 @@ describe('before-stop', () => {
   it('checks the checkout Claude is in, from its top level', () => {
     repo.write('src/app.ts')
     const { calls } = stop({ CLAUDE_PROJECT_DIR: repo.base }, { cwd: join(repo.root, 'src') })
-    expect(calls).toEqual([`${repo.root}|-s typecheck`, `${repo.root}|-s lint`, `${repo.root}|-s spellcheck`])
+    expect(calls).toEqual([`${repo.root}|-s typecheck`, `${repo.root}|-s lint`, `${repo.root}|mise exec -- typos`])
   })
 })

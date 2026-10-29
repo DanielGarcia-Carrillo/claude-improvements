@@ -9,9 +9,9 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "validate": "claude plugin validate .",
-    "test": "claude plugin test . && node --test tests/baselines.node.mts",
+    "test": "claude plugin test . && mise exec -- node --test tests/baselines.node.mts",
     "verify": "pnpm spellcheck && pnpm typecheck && pnpm lint && pnpm format:check && pnpm validate && pnpm test",
-    "spellcheck": "cd ../.. && typos"
+    "spellcheck": "cd ../.. && mise exec -- typos"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

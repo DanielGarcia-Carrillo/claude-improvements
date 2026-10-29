@@ -17,7 +17,7 @@ cd "$root" || exit 1
 [ -z "$(git status --porcelain)" ] && exit 0
 
 # All run, so one stop reports every problem.
-spelling=$(typos 2>&1) && spelling_ok=1 || spelling_ok=0
+spelling=$(mise exec -- typos 2>&1) && spelling_ok=1 || spelling_ok=0
 lint=$(uv run --frozen ruff check --output-format concise 2>&1) && lint_ok=1 || lint_ok=0
 types=$(uv run --frozen ty check --output-format concise 2>&1) && types_ok=1 || types_ok=0
 [ "$spelling_ok$lint_ok$types_ok" = 111 ] && exit 0

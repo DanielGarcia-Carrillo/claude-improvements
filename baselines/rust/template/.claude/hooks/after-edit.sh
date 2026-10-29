@@ -23,6 +23,6 @@ esac
 case "${file//\\//}" in
   "${root//\\//}"/*)
     cd "$root"
-    typos --force-exclude -- "$file" >&2 || exit 2
+    mise exec -- typos --force-exclude -- "$file" >&2 || exit 2
     ;;
 esac

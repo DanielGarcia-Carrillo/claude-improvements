@@ -38,7 +38,7 @@ describe('after-edit', () => {
         `${repo.root}|exec oxlint --fix ${file}`,
         `${repo.root}|exec oxfmt --no-error-on-unmatched-pattern ${file}`,
         `${repo.root}|exec oxlint ${file}`,
-        `${repo.root}|-s spellcheck --force-exclude -- ${file}`,
+        `${repo.root}|mise exec -- typos --force-exclude -- ${file}`,
       ],
     })
   })
@@ -49,7 +49,7 @@ describe('after-edit', () => {
       const file = repo.write(path)
       expect(edit(file).calls).toEqual([
         `${repo.root}|exec oxfmt --no-error-on-unmatched-pattern ${file}`,
-        `${repo.root}|-s spellcheck --force-exclude -- ${file}`,
+        `${repo.root}|mise exec -- typos --force-exclude -- ${file}`,
       ])
     },
   )
@@ -61,7 +61,7 @@ describe('after-edit', () => {
       expect(edit(file)).toEqual({
         status: 0,
         stderr: '',
-        calls: [`${repo.root}|-s spellcheck --force-exclude -- ${file}`],
+        calls: [`${repo.root}|mise exec -- typos --force-exclude -- ${file}`],
       })
     },
   )
@@ -121,7 +121,7 @@ describe('after-edit', () => {
 
   it('hands spelling failures back to Claude', () => {
     const file = repo.write('notes.txt')
-    const result = edit(file, { STUB_FAIL: 'spellcheck', STUB_OUTPUT: 'Use American English' })
+    const result = edit(file, { STUB_FAIL: 'typos', STUB_OUTPUT: 'Use American English' })
     expect(result.status).toBe(2)
     expect(result.stderr).toBe('typos: problems in notes.txt:\nUse American English\n')
   })

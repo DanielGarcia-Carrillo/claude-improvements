@@ -1,6 +1,6 @@
 /**
  * A throwaway git checkout for the hook tests, which run each hook as Claude
- * Code does: `node <hook>` with the payload on stdin. `pnpm` on PATH is a stub
+ * Code does: `node <hook>` with the payload on stdin. `pnpm` and `mise` on PATH are stubs
  * that logs each call as `<cwd>|<args>`, and fails, printing $STUB_OUTPUT, when
  * one of its arguments is $STUB_FAIL. No test waits on the real tools.
  *
@@ -32,7 +32,7 @@ done
 export interface HookRun {
   status: number | null
   stderr: string
-  /** Each pnpm call, as `<cwd>|<args>`. */
+  /** Each tool call, as `<cwd>|<args>`. */
   calls: string[]
 }
 
@@ -55,6 +55,7 @@ export interface ScratchCheckout {
   remove(): void
 }
 
+/** Creates isolated tool stubs and a checkout for exercising real hook processes. */
 export function scratchCheckout(): ScratchCheckout {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'hook-test-')))
   const root = join(base, 'repo')
@@ -65,6 +66,8 @@ export function scratchCheckout(): ScratchCheckout {
   spawnSync('git', ['init', '-q'], { cwd: root })
   writeFileSync(join(stubs, 'pnpm'), PNPM_STUB)
   chmodSync(join(stubs, 'pnpm'), 0o755)
+  writeFileSync(join(stubs, 'mise'), PNPM_STUB.replace('"$*"', '"mise $*"'))
+  chmodSync(join(stubs, 'mise'), 0o755)
   const git = spawnSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim()
   symlinkSync(git, join(pathWithoutPnpm, 'git'))
 

@@ -9,7 +9,7 @@ export UV_LOCKED := "1"
 verify: spellcheck fmt-check lint types deps test
 
 spellcheck:
-    typos
+    mise exec -- typos
 
 fmt-check:
     uv run ruff format --check

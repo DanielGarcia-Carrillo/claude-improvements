@@ -16,7 +16,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$root" || exit 1
 [ -z "$(git status --porcelain)" ] && exit 0
 
-if ! output=$(typos 2>&1 && CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features --message-format short 2>&1); then
+if ! output=$(mise exec -- typos 2>&1 && CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features --message-format short 2>&1); then
   if [ "$(jq -r '.stop_hook_active // false' <<<"$payload")" = true ]; then
     printf '`typos` or `cargo clippy` still fails:\n%s\n' "$(tail -n 40 <<<"$output")" >&2
     exit 1

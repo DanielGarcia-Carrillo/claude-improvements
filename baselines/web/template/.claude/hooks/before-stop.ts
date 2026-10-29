@@ -45,7 +45,7 @@ const run = (cmd: string, args: string[]) => spawnSync(cmd, args, { cwd: root, e
 if (run('git', ['status', '--porcelain']).stdout.trim() === '') process.exit(0)
 
 for (const script of ['typecheck', 'lint', 'spellcheck']) {
-  const result = run('pnpm', ['-s', script])
+  const result = script === 'spellcheck' ? run('mise', ['exec', '--', 'typos']) : run('pnpm', ['-s', script])
   if (result.status !== 0) {
     const output = printed(result).trim().split('\n').slice(-80).join('\n')
     if (retry) {

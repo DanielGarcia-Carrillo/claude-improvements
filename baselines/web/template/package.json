@@ -22,7 +22,7 @@
     "screenshots": "SCREENSHOT_DIR=screenshots vitest run --project storybook && SCREENSHOT_DIR=screenshots playwright test screens",
     "verify": "pnpm spellcheck && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm e2e",
     "verify:changed": "node scripts/verify-changed.ts",
-    "spellcheck": "typos"
+    "spellcheck": "mise exec -- typos"
   },
   "dependencies": {
     "@stylexjs/stylex": "0.19.1",
