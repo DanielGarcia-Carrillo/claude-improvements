@@ -4,10 +4,17 @@ import { expect, test } from 'claude-code/testing'
 import type { Answers } from '../scripts/compose.ts'
 import {
   AnswersError,
+  composeAgentFile,
   kickoffFor,
+  leftoverPlaceholders,
   missingKickoff,
   parseAnswers,
+  parseDefaults,
   parseKickoff,
+  renameFile,
+  renderAdr,
+  tsString,
+  unknownAreas,
 } from '../scripts/compose.ts'
 
 const SKILL_BODY = '# Bootstrap a new project'
@@ -107,6 +114,16 @@ const KICKOFF = `# Kickoff questions
 1. Pick the baseline.
 `
 
+const README = `# Web baseline
+
+## The stack
+
+| Area | Default | Why | Instead, when |
+|---|---|---|---|
+| Styling | StyleX | Build-time atomic CSS | vanilla-extract |
+| Hosting | Cloudflare Workers static assets | Free static hosting | See [infra.md](../general/infra.md) |
+`
+
 function webAnswers(overrides: Record<string, unknown> = {}): Answers {
   return parseAnswers({
     stack: 'web',
@@ -170,6 +187,142 @@ test('every kickoff question of the stack needs an answer', async () => {
   expect(missing[0]).toContain('"What is it, in one sentence, and who uses it?" (Every project)')
 })
 
+test('string literals take the quote oxfmt would', async () => {
+  expect(tsString('Trips')).toBe("'Trips'")
+  expect(tsString("Dan's Trips")).toBe(`"Dan's Trips"`)
+  expect(tsString(`Dan's "best"`)).toBe(`'Dan\\'s "best"'`)
+  expect(tsString(`Dan's trip's "pick"`)).toBe(`'Dan\\'s trip\\'s "pick"'`)
+  expect(tsString(`Dan's trip's "pick`)).toBe(`"Dan's trip's \\"pick"`)
+})
+
+test('renames the web placeholders for each kind of file', async () => {
+  const answers = webAnswers({ name: 'Trips & Tours', shortName: 'Trips', description: 'Plans "real" trips.' })
+  const rename = (path: string, text: string) => renameFile({ path, text }, answers).text
+
+  expect(
+    rename(
+      'vite.config.ts',
+      "name: 'Replace Me',\nshort_name: 'ReplaceMe',\ndescription: 'Replace me: a one-line description',",
+    ),
+  ).toBe(`name: 'Trips & Tours',\nshort_name: 'Trips',\ndescription: 'Plans "real" trips.',`)
+  expect(rename('src/routes/index.tsx', '<h1>Replace Me</h1>')).toBe('<h1>Trips &amp; Tours</h1>')
+  expect(
+    rename(
+      'index.html',
+      '<meta name="description" content="Replace me: a one-line description" />\n<title>Replace Me</title>',
+    ),
+  ).toBe('<meta name="description" content="Plans &quot;real&quot; trips." />\n<title>Trips &amp; Tours</title>')
+  expect(rename('package.json', '{ "name": "replace-me" }')).toBe('{ "name": "dans-trips" }')
+  expect(rename('wrangler.jsonc', '{ "name": "replace-me" }')).toBe('{ "name": "dans-trips" }')
+  expect(rename('tests/e2e/app.spec.ts', "toHaveText('Replace Me')")).toBe("toHaveText('Trips & Tours')")
+  // Without a short name, a long display name gives its first word.
+  const long = webAnswers({ name: 'Weekend Trip Planner' })
+  expect(renameFile({ path: 'vite.config.ts', text: "short_name: 'ReplaceMe'," }, long).text).toBe(
+    "short_name: 'Weekend',",
+  )
+})
+
+test('renames the Rust crates, folders and identifiers', async () => {
+  const answers = parseAnswers({
+    ...webAnswers(),
+    stack: 'rust',
+    slug: 'line-width',
+    repository: 'https://github.com/someone/line-width',
+  })
+
+  const cli = renameFile(
+    {
+      path: 'crates/replace-me/tests/cli.rs',
+      text: 'fn replace_me() -> Command {\n    get_cargo_bin("replace-me")\n}\nreplace_me().args([])',
+    },
+    answers,
+  )
+  expect(cli.path).toBe('crates/line-width/tests/cli.rs')
+  expect(cli.text).toBe('fn line_width() -> Command {\n    get_cargo_bin("line-width")\n}\nline_width().args([])')
+
+  const core = renameFile({ path: 'crates/replace-me-core/src/lib.rs', text: 'use replace_me_core::check;' }, answers)
+  expect(core).toEqual({ path: 'crates/line-width-core/src/lib.rs', text: 'use line_width_core::check;' })
+
+  const snapshot = renameFile(
+    { path: 'crates/replace-me/tests/snapshots/cli__findings.snap', text: 'source: crates/replace-me/tests/cli.rs' },
+    answers,
+  )
+  expect(snapshot).toEqual({
+    path: 'crates/line-width/tests/snapshots/cli__findings.snap',
+    text: 'source: crates/line-width/tests/cli.rs',
+  })
+
+  const manifest = renameFile(
+    {
+      path: 'Cargo.toml',
+      text: 'repository = "https://github.com/replace-me-owner/replace-me"\nreplace-me-core = { path = "crates/replace-me-core" }',
+    },
+    answers,
+  )
+  expect(manifest.text).toBe(
+    'repository = "https://github.com/someone/line-width"\nline-width-core = { path = "crates/line-width-core" }',
+  )
+  expect(leftoverPlaceholders([cli, core, snapshot, manifest])).toEqual([])
+})
+
+test('answers holding $ patterns land as written', async () => {
+  // A replacement string would turn these into `$`, the match, or the text before or after it.
+  const name = "Save $$ $& $` $'"
+  const description = "Costs $$, $& or $` and $' at most."
+  const web = webAnswers({ name, shortName: "$' $$", description })
+  const vite = renameFile(
+    {
+      path: 'vite.config.ts',
+      text: "name: 'Replace Me',\nshort_name: 'ReplaceMe',\ndescription: 'Replace me: a one-line description',",
+    },
+    web,
+  )
+  // Each holds a single quote, so takes double quotes.
+  expect(vite.text).toBe(`name: "${name}",\nshort_name: "$' $$",\ndescription: "${description}",`)
+  const html = renameFile(
+    {
+      path: 'index.html',
+      text: '<meta name="description" content="Replace me: a one-line description" />\n<title>Replace Me</title>',
+    },
+    web,
+  )
+  expect(html.text).toBe(
+    "<meta name=\"description\" content=\"Costs $$, $&amp; or $` and $' at most.\" />\n<title>Save $$ $&amp; $` $'</title>",
+  )
+  expect(leftoverPlaceholders([vite, html])).toEqual([])
+
+  for (const repository of ['https://example.com/r/$$-tool', 'https://example.com/r/$&-tool', "https://example.com/r/$'-tool"]) {
+    const rust = parseAnswers({ ...webAnswers(), stack: 'rust', slug: 'line-width', repository })
+    const manifest = renameFile(
+      { path: 'Cargo.toml', text: 'repository = "https://github.com/replace-me-owner/replace-me"\nname = "replace-me"' },
+      rust,
+    )
+    expect(manifest.text).toBe(`repository = "${repository}"\nname = "line-width"`)
+    expect(leftoverPlaceholders([manifest])).toEqual([])
+  }
+})
+
+test('flags every spelling of the placeholder that no rename covers', async () => {
+  const answers = webAnswers()
+  const files = [
+    renameFile({ path: 'docs/notes.md', text: 'Welcome.\nWelcome to Replace Me.' }, answers),
+    { path: 'src/replace_me.ts', text: 'export const replaceMe = 1' },
+    // The comment on the CI step that looks for placeholders spells one; only that line is exempt.
+    {
+      path: '.github/workflows/ci.yml',
+      text: `# Template placeholders all spell "replace me"; fail until they're filled.\nrun: git grep -niE 'replace[-_ ]?me([^a-z]|$)'\nrun: cargo build -p replace-me`,
+    },
+    // Neither "replacement" nor "replace memory" is a placeholder.
+    { path: 'README.md', text: 'The replacement. Replace memory.' },
+  ]
+  expect(leftoverPlaceholders(files)).toEqual([
+    'docs/notes.md:2 still holds a template placeholder: Welcome to Replace Me. (teach renameFile in compose.ts this use)',
+    'src/replace_me.ts: the path still holds a template placeholder; teach renameFile in compose.ts this use.',
+    'src/replace_me.ts:1 still holds a template placeholder: export const replaceMe = 1 (teach renameFile in compose.ts this use)',
+    '.github/workflows/ci.yml:3 still holds a template placeholder: run: cargo build -p replace-me (teach renameFile in compose.ts this use)',
+  ])
+})
+
 test("refuses answers the new repo's placeholder check would fail on", async () => {
   const problems = problemsOf({
     ...webAnswers(),
@@ -182,4 +335,103 @@ test("refuses answers the new repo's placeholder check would fail on", async () 
     '`kickoff[0].answer` "replace_me" reads as a template placeholder to the new repo\'s CI; reword it.',
     '`followUps[0]` "Replace-me tokens in docs" reads as a template placeholder to the new repo\'s CI; reword it.',
   ])
+})
+const TEMPLATE = `<!--
+Skeleton instructions.
+-->
+
+# <Project name>
+
+<One paragraph: what it is, who it is for, the one thing it must do well.>
+
+## Commands
+
+<!-- stack fragment: Commands -->
+
+\`<verify command>\` is the gate.
+
+- **Issues** live in <Linear team "X", project "Y" | GitHub Issues>.
+- **Branches**: \`<track>/per-<n>-<slug>\`.
+- Open as draft. <Who may push, mark ready and merge.>
+
+## Architecture
+
+<!-- One line per key choice, each linking its ADR. -->
+
+- <Choice>: <one line>. [ADR 0001](docs/adr/0001-stack.md)
+
+## Traps
+
+<!-- stack fragment: Traps -->
+`
+
+const FRAGMENT = `<!--
+Fragment instructions.
+-->
+
+## Commands
+
+\`\`\`bash
+pnpm verify   # the gate
+\`\`\`
+
+## Traps
+
+- **A trap.** Avoid it.
+`
+
+test('builds CLAUDE.md from the skeleton and the stack fragment', async () => {
+  const text = composeAgentFile(TEMPLATE, FRAGMENT, webAnswers())
+  expect(text.startsWith("# Dan's Trips\n\nPlans trips offline for travellers.\n")).toBe(true)
+  expect(text).toContain('```bash\npnpm verify   # the gate\n```\n\n`pnpm verify` is the gate.')
+  expect(text).toContain('- **Issues** live in GitHub Issues.')
+  expect(text).toContain('Open as draft. Daniel merges.')
+  expect(text).toContain('- Styling: StyleX. [ADR 0001](docs/adr/0001-stack.md)')
+  expect(text).toContain('<!-- One line per key choice, each linking its ADR. -->')
+  expect(text.endsWith('- **A trap.** Avoid it.\n')).toBe(true)
+  expect(text.includes('Skeleton instructions')).toBe(false)
+  expect(text.includes('Fragment instructions')).toBe(false)
+})
+
+test('a skeleton or fragment that drifted fails loudly', async () => {
+  const noTraps = FRAGMENT.replace(/## Traps[\s\S]*$/, '')
+  expect(() => composeAgentFile(TEMPLATE, noTraps, webAnswers())).toThrow('no "## Traps" section')
+  expect(() => composeAgentFile(TEMPLATE, `${FRAGMENT}\n## Commands\n\nMore.\n`, webAnswers())).toThrow(
+    'two "## Commands" sections',
+  )
+  expect(() => composeAgentFile(`${TEMPLATE}\n<New placeholder>\n`, FRAGMENT, webAnswers())).toThrow('<New placeholder>')
+  expect(() => composeAgentFile(TEMPLATE.replace('<Project name>', 'X'), FRAGMENT, webAnswers())).toThrow(
+    'no longer holds <Project name>',
+  )
+})
+
+test('the ADR records the answers and each default kept or changed', async () => {
+  const defaults = parseDefaults(README)
+  expect(defaults[1]?.why).toBe('Free static hosting')
+
+  const answers = webAnswers({ changed: [{ area: 'Styling', to: 'vanilla-extract', why: 'Semantic class names' }] })
+  expect(unknownAreas(answers, defaults)).toEqual([])
+  const unknown = webAnswers({ changed: [{ area: 'Style', to: 'x', why: 'y' }] })
+  expect(unknownAreas(unknown, defaults)[0]).toContain('not one of: Styling, Hosting')
+  // Each area has one row, so a second change to it, or a change to no area, would drop out of the ADR.
+  expect(problemsOf({ ...answers, changed: [...answers.changed, { area: 'Styling', to: 'x', why: 'y' }] })).toEqual([
+    '`changed[1]` names area "Styling" again; merge it into `changed[0]`.',
+  ])
+  // Malformed items get one problem each, not a crash in the repeat check.
+  expect(problemsOf({ ...answers, changed: [null, 'Styling'] }).length).toBe(2)
+
+  const input = {
+    date: '2026-10-20',
+    kickoff: kickoffFor(parseKickoff(KICKOFF), 'web'),
+    defaults,
+    baseline: { sha: 'e12caf4', isDirty: false },
+  }
+  expect(() => renderAdr(unknown, input)).toThrow('names area "Style", which is not one of')
+  const adr = renderAdr(answers, input)
+  expect(adr).toContain('- Date: 2026-10-20')
+  expect(adr).toContain('| Public or private repo? | Private (assumed) |')
+  expect(adr).toContain('(`baselines/web` at `e12caf4`)')
+  expect(adr).toContain('| Styling | StyleX | Build-time atomic CSS | Changed: vanilla-extract. Semantic class names. |')
+  expect(adr).toContain('| Hosting | Cloudflare Workers static assets | Free static hosting | Kept |')
+  expect(adr).toContain('- **SSR**: No SEO.')
 })
