@@ -16,6 +16,7 @@ strict, local, fast checks whose failures say how to fix them.
 | [explorations/](explorations/README.md) | Options under evaluation, not yet defaults: Renovate, UI primitives, visual regression, Blacksmith, observability, tsrs and smaller ones |
 | [web/](web/README.md) | React PWA on Cloudflare: stack decisions, agent fragment, runnable template |
 | [rust/](rust/README.md) | Rust CLI/library workspace: defaults, agent fragment, runnable template |
+| [python/](python/README.md) | Python tool, script or pipeline on uv, ruff and ty: defaults, agent fragment, runnable template |
 
 ## Starting a project
 
@@ -52,9 +53,11 @@ Each stack README ends with its sources, and
   so Claude Code does not load them as instructions while working in this
   repo. The templates' `.claude/settings.json` and workflows are inert here
   for the same reason: only a repo root's copies take effect.
-- Both templates passed their full verify from a fresh copy on 2026-10-23
-  (web: `pnpm verify`, 47 unit and story tests plus 7 end-to-end; Rust:
-  `just verify`, 19 tests plus a doctest, cargo-deny, cargo-shear). Re-run
+- The web and Rust templates passed their full verify from a fresh copy on
+  2026-10-23 (web: `pnpm verify`, 47 unit and story tests plus 7 end-to-end;
+  Rust: `just verify`, 19 tests plus a doctest, cargo-deny, cargo-shear), and
+  the Python template on 2026-10-27 (`just verify`, 24 tests plus a doctest,
+  ruff, ty, deptry). Re-run
   that check when changing a template: copy it to a scratch directory,
   install, verify.
 - Versions, prices and "still beta" notes are dated. When a decision rests

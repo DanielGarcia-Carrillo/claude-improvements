@@ -45,9 +45,21 @@ the user can accept defaults quickly.
 | Async or network I/O needed? | Whether tokio comes in at all |
 | Config files or environment variables? | Config crate and error reporting for bad input |
 
+## Python tools
+
+| Question | Decides |
+|---|---|
+| CLI, library, or a pipeline of scripts? | The template's CLI as is, or a package without `[project.scripts]` |
+| Who runs it: humans, agents, CI? | Output contract: human text, `--json`, exit codes |
+| Published to PyPI, or used in place? | The `Private` classifier, `requires-python` range, a CI leg per Python, trusted publishing |
+| Which Python versions must it run on? | `.python-version` and `requires-python` |
+| Native dependencies (GDAL, Cairo, CUDA)? | System packages in CI and the README; whether uv's wheels cover every platform |
+| Does it validate outside data (files, APIs)? | Pydantic or msgspec at the boundary, or plain dataclasses |
+
 ## After the answers
 
-1. Pick the baseline ([web](../web/README.md), [rust](../rust/README.md)) and
+1. Pick the baseline ([web](../web/README.md), [rust](../rust/README.md),
+   [python](../python/README.md)) and
    copy its `template/` into the new repo (see the [README](../README.md#starting-a-project)).
 2. Write `docs/adr/0001-stack.md` with the answers and every default you
    kept or changed.

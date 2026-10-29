@@ -5,7 +5,7 @@
  * erasable TypeScript, so Node runs it without a build step.
  */
 
-export type Stack = 'web' | 'rust'
+export type Stack = 'web' | 'rust' | 'python'
 
 export type KickoffAnswer = { question: string; answer: string; assumed?: boolean }
 export type ChangedDefault = { area: string; to: string; why: string }
@@ -28,7 +28,7 @@ export type Answers = {
   issues: string
   /** Who may push, mark ready and merge. */
   merging: string
-  /** Rust only: Cargo.toml's `repository`. */
+  /** Rust and Python only: Cargo.toml's `repository`, pyproject.toml's `Repository` URL. */
   repository?: string | undefined
   /** The ADR's Issue line. */
   issue?: string | undefined
@@ -60,12 +60,14 @@ export type Baseline = { sha?: string; isDirty: boolean }
  * even with `--local` uninstalls each old version, which other projects may
  * use; `mise-tools` rewrites the repo's own pins and installs them instead.
  */
-export type Step = { run: readonly string[]; isMajor?: true } | { bump: 'mise-tools' | 'rust-toolchain'; isMajor: true }
+export type Step =
+  | { run: readonly string[]; isMajor?: true }
+  | { bump: 'mise-tools' | 'rust-toolchain' | 'python'; isMajor: true }
 
 /**
  * What each baseline needs here. `install` and `verify` mirror the "Using it"
  * steps of `baselines/<stack>/README.md`; `steps` is the same run, with its
- * pnpm, cargo and just commands through `mise exec` so the pinned tools win
+ * pnpm, cargo, uv and just commands through `mise exec` so the pinned tools win
  * over whatever is on PATH, and after
  * `mise trust`, which a fresh checkout needs before mise reads its config
  * without asking. Majors come before anything is built on the old versions,
@@ -73,6 +75,10 @@ export type Step = { run: readonly string[]; isMajor?: true } | { bump: 'mise-to
  * stays. Before verify, the repo's own formatter lays out what the scaffold
  * wrote once: names longer than the placeholders, and the ADR's tables, which
  * oxfmt pads. `manifests` are the files a major lands in.
+ *
+ * Python's dependency groups give floors without caps, so its first `uv lock`
+ * already takes every new major; `--keep-versions` keeps only uv, just and
+ * the Python release as the template pins them.
  */
 export const STACKS = {
   web: {
@@ -111,6 +117,23 @@ export const STACKS = {
       { run: ['mise', 'exec', '--', 'just', 'verify'] },
     ],
   },
+  python: {
+    shape: 'a Python package for a tool, script or pipeline: a thin CLI over typed modules',
+    kickoffSection: 'Python tools',
+    marker: 'pyproject.toml',
+    install: 'mise install && uv lock',
+    verify: 'just verify',
+    manifests: ['mise.toml', '.python-version', 'pyproject.toml'],
+    steps: [
+      { run: ['mise', 'trust'] },
+      { run: ['mise', 'install'] },
+      { bump: 'mise-tools', isMajor: true },
+      { bump: 'python', isMajor: true },
+      { run: ['mise', 'exec', '--', 'uv', 'lock'] },
+      { run: ['mise', 'exec', '--', 'uv', 'run', 'ruff', 'format'] },
+      { run: ['mise', 'exec', '--', 'just', 'verify'] },
+    ],
+  },
 } as const satisfies Record<Stack, { steps: readonly Step[]; manifests: readonly string[] } & Record<string, unknown>>
 
 // A TOML table heading, and a mise.toml `[tools]` line pinned to a version number.
@@ -133,9 +156,21 @@ export function misePins(text: string): { tool: string; version: string }[] {
   return miseLines(text).flatMap(({ pin }) => (pin === undefined ? [] : [{ tool: pin.tool, version: pin.version }]))
 }
 
+/** Compares two dotted version numbers part by part: negative when `a` is older. */
+function compareVersions(a: string, b: string): number {
+  const [left, right] = [a.split('.').map(Number), b.split('.').map(Number)]
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const difference = (left[i] ?? 0) - (right[i] ?? 0)
+    if (difference !== 0) return difference
+  }
+  return 0
+}
+
 /**
  * The mise.toml with each pin moved to its tool's latest release, at the
- * pin's own precision, as `mise up --bump` writes it: `26` stays a major.
+ * pin's own precision, as `mise up --bump` writes it: `26` stays a major. A
+ * pin newer than what mise calls latest, which its cached release list can
+ * lag behind, stays.
  */
 export function bumpMiseToml(text: string, latest: Readonly<Record<string, string>>): string {
   return miseLines(text)
@@ -143,6 +178,7 @@ export function bumpMiseToml(text: string, latest: Readonly<Record<string, strin
       const release = pin === undefined ? undefined : latest[pin.tool]
       if (pin === undefined || release === undefined) return line
       const bumped = release.split('.').slice(0, pin.version.split('.').length).join('.')
+      if (compareVersions(bumped, pin.version) <= 0) return line
       return `${pin.prefix}"${bumped}"${pin.rest}`
     })
     .join('\n')
@@ -178,7 +214,7 @@ function tomlString(text: string, table: string, key: string) {
   return { value, set }
 }
 
-/** A Rust release's minor: `1.99` of `1.99.1`. */
+/** A release's minor: `1.99` of `1.99.1`. */
 const minorOf = (release: string) => release.split('.').slice(0, 2).join('.')
 
 /**
@@ -200,6 +236,44 @@ export function pinRust(files: { toolchain: string; cargo: string }, version: st
   return {
     toolchain: channel.set(version),
     cargo: msrv.value === minorOf(channel.value) ? msrv.set(minorOf(version)) : files.cargo,
+  }
+}
+
+/**
+ * The newest stable CPython release in `uv python list --only-downloads
+ * --output-format json`, as a minor: `3.15`. Pre-releases don't count.
+ */
+export function newestPython(listing: string): string {
+  const entries: unknown = JSON.parse(listing)
+  if (!Array.isArray(entries)) throw new Error('`uv python list` did not print a JSON array; has its format changed?')
+  const minors = entries.flatMap((entry: unknown) => {
+    if (!isRecord(entry) || entry['implementation'] !== 'cpython') return []
+    const version = entry['version']
+    const release = typeof version === 'string' ? /^(\d+\.\d+)\.\d+$/.exec(version)?.[1] : undefined
+    return release === undefined ? [] : [release]
+  })
+  const [newest] = minors.toSorted((a, b) => compareVersions(b, a))
+  if (newest === undefined) throw new Error('`uv python list` offers no stable CPython release.')
+  return newest
+}
+
+/**
+ * Pins `.python-version` to `version`, a minor such as `3.16`, never to an
+ * older one. `requires-python` moves with it only while it is `>=` the old
+ * pin: an application supports the one Python it runs on, but a lower floor,
+ * such as a published library's, was set on purpose and stays. Throws when
+ * either file has moved, so a bump never half lands.
+ */
+export function pinPython(files: { pythonVersion: string; pyproject: string }, version: string) {
+  const current = files.pythonVersion.trim()
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(current))
+    throw new Error(`.python-version holds "${current}"; pin a release such as 3.15 to bump.`)
+  const floor = tomlString(files.pyproject, 'project', 'requires-python')
+  if (floor === undefined) throw new Error('pyproject.toml has no `requires-python = "…"` line in [project] to bump.')
+  if (compareVersions(version, minorOf(current)) <= 0) return files
+  return {
+    pythonVersion: `${version}\n`,
+    pyproject: floor.value === `>=${minorOf(current)}` ? floor.set(`>=${version}`) : files.pyproject,
   }
 }
 
@@ -242,6 +316,14 @@ const RUST_RESERVED = new Set(
 
 // URL characters only: a repository lands inside a quoted TOML string. They
 // also spell non-URLs such as `https://?`, so it must parse, with a host.
+// A Python slug becomes the package's import name, so it cannot be a keyword.
+const PYTHON_KEYWORDS = new Set(
+  (
+    'and as assert async await break class continue def del elif else except finally for from global if import in ' +
+    'is lambda nonlocal not or pass raise return try while with yield'
+  ).split(' '),
+)
+
 const isRepositoryUrl = (url: string) =>
   /^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(url) && URL.canParse(url) && new URL(url).hostname !== ''
 
@@ -309,7 +391,7 @@ export function parseAnswers(raw: unknown): Answers {
   }
 
   const stack = raw['stack']
-  if (!isStack(stack)) problems.push('`stack` must be "web" or "rust".')
+  if (!isStack(stack)) problems.push('`stack` must be "web", "rust" or "python".')
 
   const name = text('name')
   if (name !== undefined && /[<>{}"\\\r\n]/.test(name))
@@ -322,6 +404,8 @@ export function parseAnswers(raw: unknown): Answers {
     )
   if (slug !== undefined && stack === 'rust' && RUST_RESERVED.has(slug.replaceAll('-', '_')))
     problems.push(`\`slug\` "${slug}" is a Rust keyword or sysroot crate; pick another name.`)
+  if (slug !== undefined && stack === 'python' && PYTHON_KEYWORDS.has(slug.replaceAll('-', '_')))
+    problems.push(`\`slug\` "${slug}" is a Python keyword; pick another name.`)
 
   const shortName = text('shortName', true)
   if (shortName !== undefined && (shortName.length > SHORT_NAME_MAX || /[<>{}"\\\r\n]/.test(shortName)))
@@ -337,7 +421,7 @@ export function parseAnswers(raw: unknown): Answers {
   const issue = text('issue', true)
   const consequences = text('consequences')
 
-  const repository = text('repository', stack !== 'rust')
+  const repository = text('repository', stack !== 'rust' && stack !== 'python')
   if (repository !== undefined && !isRepositoryUrl(repository))
     problems.push(
       '`repository` must be an https URL with a host, such as https://github.com/owner/name, without quotes, backslashes or spaces.',
@@ -511,8 +595,8 @@ const WEB = {
   description: 'Replace me: a one-line description',
 }
 
-/** The Rust template's placeholders, as `baselines/rust/README.md` lists them. */
-const RUST = {
+/** The Rust and Python templates' placeholders, as their READMEs list them. */
+const PACKAGE = {
   slug: 'replace-me',
   snake: 'replace_me',
   repository: 'https://github.com/replace-me-owner/replace-me',
@@ -540,29 +624,33 @@ function renameWeb(file: TemplateFile, answers: Answers): TemplateFile {
   return { ...file, text }
 }
 
-function renameRust(file: TemplateFile, answers: Answers): TemplateFile {
+function renamePackage(file: TemplateFile, answers: Answers): TemplateFile {
+  const snake = answers.slug.replaceAll('-', '_')
+  // Rust's crate folders spell the slug (`replace-me-core`); Python's
+  // package folder is the import name (`src/replace_me`).
   const path = file.path
     .split('/')
-    .map((segment) =>
-      segment === RUST.slug || segment.startsWith(`${RUST.slug}-`)
-        ? `${answers.slug}${segment.slice(RUST.slug.length)}`
-        : segment,
-    )
+    .map((segment) => {
+      if (segment === PACKAGE.slug || segment.startsWith(`${PACKAGE.slug}-`))
+        return `${answers.slug}${segment.slice(PACKAGE.slug.length)}`
+      return segment === PACKAGE.snake ? snake : segment
+    })
     .join('/')
   if (file.text === undefined) return { ...file, path }
 
-  // `replace_me` is an identifier (`replace_me_core`, the CLI test's
-  // `replace_me()`); `replace-me` is a crate's or the binary's name.
+  // `replace_me` is an identifier (`replace_me_core`, a Python import, the
+  // CLI test's `replace_me()`); `replace-me` is a crate's, project's or
+  // program's name.
   const text = file.text
-    .replaceAll(RUST.repository, () => answers.repository ?? '')
-    .replaceAll(RUST.snake, () => answers.slug.replaceAll('-', '_'))
-    .replaceAll(RUST.slug, () => answers.slug)
+    .replaceAll(PACKAGE.repository, () => answers.repository ?? '')
+    .replaceAll(PACKAGE.snake, () => snake)
+    .replaceAll(PACKAGE.slug, () => answers.slug)
   return { path, text }
 }
 
 /** Renames one template file's path and placeholders for the answers' stack. */
 export function renameFile(file: TemplateFile, answers: Answers): TemplateFile {
-  return answers.stack === 'web' ? renameWeb(file, answers) : renameRust(file, answers)
+  return answers.stack === 'web' ? renameWeb(file, answers) : renamePackage(file, answers)
 }
 
 /**
@@ -626,7 +714,7 @@ const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`)
  */
 export function composeAgentFile(template: string, fragment: string, answers: Answers): string {
   const stack = STACKS[answers.stack]
-  const renamed = answers.stack === 'rust' ? (renameRust({ path: '', text: fragment }, answers).text ?? '') : fragment
+  const renamed = answers.stack === 'web' ? fragment : (renamePackage({ path: '', text: fragment }, answers).text ?? '')
   const sections = fragmentSections(renamed)
   const used = new Set<string>()
 

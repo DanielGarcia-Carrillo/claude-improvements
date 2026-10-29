@@ -11,9 +11,11 @@ import {
   leftoverPlaceholders,
   misePins,
   missingKickoff,
+  newestPython,
   parseAnswers,
   parseDefaults,
   parseKickoff,
+  pinPython,
   pinRust,
   renameFile,
   renderAdr,
@@ -171,6 +173,10 @@ test('reports every answer problem at once', async () => {
   expect(problems.some((p) => p.startsWith('`repository`'))).toBe(true)
   expect(problems.some((p) => p.startsWith('`summary`'))).toBe(true)
   expect(problems.some((p) => p.startsWith('`kickoff`'))).toBe(true)
+  const python = problemsOf({ ...webAnswers(), stack: 'python', slug: 'lambda' })
+  expect(python.some((p) => p.includes('Python keyword'))).toBe(true)
+  expect(python.some((p) => p.startsWith('`repository`'))).toBe(true)
+  expect(problemsOf({ ...webAnswers(), stack: 'go' })).toEqual(['`stack` must be "web", "rust" or "python".'])
   expect(problemsOf({ ...webAnswers(), slug: 'Trip_Planner' }).some((p) => p.startsWith('`slug`'))).toBe(true)
   expect(problemsOf({ ...webAnswers(), name: 'A <b>' }).some((p) => p.startsWith('`name`'))).toBe(true)
   // A carriage return would break the generated TypeScript string literal.
@@ -275,6 +281,55 @@ test('renames the Rust crates, folders and identifiers', async () => {
     'repository = "https://github.com/someone/line-width"\nline-width-core = { path = "crates/line-width-core" }',
   )
   expect(leftoverPlaceholders([cli, core, snapshot, manifest])).toEqual([])
+})
+
+test('renames the Python package folder, imports and names', async () => {
+  const answers = parseAnswers({
+    ...webAnswers(),
+    stack: 'python',
+    slug: 'line-width',
+    repository: 'https://github.com/someone/line-width',
+  })
+
+  const cli = renameFile(
+    {
+      path: 'src/replace_me/cli.py',
+      text: 'from replace_me import check\nparser = _Parser(prog="replace-me")\nversion("replace-me")',
+    },
+    answers,
+  )
+  expect(cli).toEqual({
+    path: 'src/line_width/cli.py',
+    text: 'from line_width import check\nparser = _Parser(prog="line-width")\nversion("line-width")',
+  })
+
+  const pyproject = renameFile(
+    {
+      path: 'pyproject.toml',
+      text: [
+        'name = "replace-me"',
+        'Repository = "https://github.com/replace-me-owner/replace-me"',
+        'replace-me = "replace_me.cli:main"',
+        '"src/replace_me/_output.py" = ["T201"]',
+      ].join('\n'),
+    },
+    answers,
+  )
+  expect(pyproject.text).toBe(
+    [
+      'name = "line-width"',
+      'Repository = "https://github.com/someone/line-width"',
+      'line-width = "line_width.cli:main"',
+      '"src/line_width/_output.py" = ["T201"]',
+    ].join('\n'),
+  )
+
+  const helper = renameFile(
+    { path: 'tests/test_cli.py', text: 'def replace_me(*args: str) -> Run:\n    [sys.executable, "-m", "replace_me"]' },
+    answers,
+  )
+  expect(helper.text).toBe('def line_width(*args: str) -> Run:\n    [sys.executable, "-m", "line_width"]')
+  expect(leftoverPlaceholders([cli, pyproject, helper])).toEqual([])
 })
 
 test('answers holding $ patterns land as written', async () => {
@@ -407,12 +462,46 @@ test("bumps mise.toml's pins at their own precision, and nothing else", async ()
   const bumped = bumpMiseToml(toml, { node: '28.1.0', 'aqua:nextest-rs/nextest/cargo-nextest': '0.10.2', jobs: '9' })
   expect(bumped).toBe(toml.replace('"26"', '"28"').replace('"0.9.148"', '"0.10.2"'))
   expect(bumpMiseToml(toml, {})).toBe(toml)
+  // mise's cached release list can lag a pin made from a newer one; the pin stays.
+  expect(bumpMiseToml(toml, { 'aqua:nextest-rs/nextest/cargo-nextest': '0.9.147', node: '26.2.0' })).toBe(toml)
+})
+
+test('pins Python to the newest stable release uv offers, never an older one', async () => {
+  const listing = JSON.stringify([
+    { implementation: 'cpython', version: '3.16.0a1' },
+    { implementation: 'cpython', version: '3.15.2' },
+    { implementation: 'pypy', version: '3.17.0' },
+    { implementation: 'cpython', version: '3.9.25' },
+    { implementation: 'cpython', version: '3.14.10' },
+  ])
+  expect(newestPython(listing)).toBe('3.15')
+  expect(() => newestPython('[]')).toThrow('no stable CPython release')
+  expect(() => newestPython('{}')).toThrow('did not print a JSON array')
+
+  const pyproject = '[project]\nname = "tool"\nrequires-python = ">=3.15"\n'
+  expect(pinPython({ pythonVersion: '3.15\n', pyproject }, '3.16')).toEqual({
+    pythonVersion: '3.16\n',
+    pyproject: pyproject.replace('>=3.15', '>=3.16'),
+  })
+  // A lower floor was chosen, as a published library's is, so it stays.
+  const library = pyproject.replace('>=3.15', '>=3.12')
+  expect(pinPython({ pythonVersion: '3.15\n', pyproject: library }, '3.16')).toEqual({
+    pythonVersion: '3.16\n',
+    pyproject: library,
+  })
+  const same = { pythonVersion: '3.15\n', pyproject }
+  expect(pinPython(same, '3.15')).toBe(same)
+  expect(pinPython(same, '3.14')).toBe(same)
+  expect(() => pinPython({ pythonVersion: 'pypy@3.11\n', pyproject }, '3.16')).toThrow('pin a release such as 3.15')
+  expect(() => pinPython({ pythonVersion: '3.15\n', pyproject: '[project]\n' }, '3.16')).toThrow(
+    'no `requires-python = "…"` line in [project]',
+  )
 })
 
 const label = (step: Step) => ('run' in step ? step.run.join(' ') : step.bump)
 
 test('setup takes majors only in the steps marked so', async () => {
-  for (const stack of ['web', 'rust'] as const) {
+  for (const stack of ['web', 'rust', 'python'] as const) {
     const steps: readonly Step[] = STACKS[stack].steps
     const majors = steps.filter((step) => step.isMajor === true).map(label)
     const kept = steps.filter((step) => step.isMajor !== true).map(label)

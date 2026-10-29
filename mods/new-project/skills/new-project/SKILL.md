@@ -1,6 +1,6 @@
 ---
 name: new-project
-description: Bootstrap a new repository from the claude-improvements project baselines (a React PWA on Cloudflare, or a Rust CLI workspace). Asks the kickoff questions in one batch, copies and renames the template, writes CLAUDE.md, AGENTS.md and the stack ADR, then installs and runs verify. Use when the user wants to start, create, scaffold or bootstrap a new project or repository.
+description: Bootstrap a new repository from the claude-improvements project baselines (a React PWA on Cloudflare, a Rust CLI workspace, or a Python package on uv, ruff and ty). Asks the kickoff questions in one batch, copies and renames the template, writes CLAUDE.md, AGENTS.md and the stack ADR, then installs and runs verify. Use when the user wants to start, create, scaffold or bootstrap a new project or repository.
 argument-hint: '[what it is] [where it goes]'
 ---
 
@@ -21,25 +21,26 @@ goes.
 ## 1. Ask the kickoff, in one batch
 
 Read `BASELINES/general/kickoff.md`, then the stack READMEs
-(`BASELINES/web/README.md`, `BASELINES/rust/README.md`) for each default and
+(`BASELINES/web/README.md`, `BASELINES/rust/README.md`,
+`BASELINES/python/README.md`) for each default and
 when another shape fits.
 
 Send one message holding every question, then stop and wait for the reply.
 Don't use AskUserQuestion: it takes four questions and the batch is longer.
 
 - **Setup** first: display name; slug (lowercase words joined by hyphens: the
-  package, Worker or crate name); target folder (new or empty, and outside any git repository; recommend
+  package, Worker, crate or project name); target folder (new or empty, and outside any git repository; recommend
   `<parent of the main checkout>/<slug>` unless the brief names one, where
   the main checkout is the parent of
   `git rev-parse --path-format=absolute --git-common-dir`, so a worktree
   session doesn't pick a folder inside the repo); for web,
-  a short name of at most 12 characters for the installed app; for Rust, the
-  repository URL (`https://github.com/<owner>/<slug>`; `gh api user --jq .login`
+  a short name of at most 12 characters for the installed app; for Rust and
+  Python, the repository URL (`https://github.com/<owner>/<slug>`; `gh api user --jq .login`
   gives the owner).
 - **Every project**, then the stack's own section, each question in
-  kickoff.md's words. If the brief makes the kind clear (a web app, or a CLI or
-  library), include only that stack's section and say which stack you assumed;
-  otherwise include both, each headed with when it applies.
+  kickoff.md's words. If the brief makes the kind clear (a web app, a Rust or
+  Python tool), include only that stack's section and say which stack you
+  assumed; otherwise include each that could fit, headed with when it applies.
 - A recommended answer for every question, from the brief and the baseline's
   defaults. Where the brief already answers one, give that answer and mark it
   "from your brief".
@@ -54,8 +55,10 @@ reply "ok", or "ok except 3: public, 9: multi-device sync".
   as is, name the shape the web README's "Choosing the shape" gives, and ask
   whether to start from the SPA anyway or stop.
 - **rust** for a CLI, library or developer tool in Rust.
-- Neither (a mobile app, a Python service): say there is no baseline for it
-  and stop. Don't force one.
+- **python** for a CLI, library, script or data pipeline in Python. A web
+  service (FastAPI, Django) is not one: the template has no server.
+- None of them (a mobile app, a Python web service): say there is no baseline
+  for it and stop. Don't force one.
 
 An API, server state or anything else under a README's recipes or "Add when
 needed" doesn't change the baseline: it's a follow-up, unless the user asked
@@ -88,7 +91,7 @@ one, else `$TMPDIR`). Every field is a string unless shown otherwise:
 ```
 
 - `shortName` is web only and optional; `repository` is required for Rust
-  only; `issue` (the ADR's Issue line) is optional.
+  and Python only; `issue` (the ADR's Issue line) is optional.
 - `description` is one sentence: it becomes the README's opening, the HTML
   description and the manifest's.
 - `kickoff` answers every question of "Every project" and the stack's section,
@@ -116,7 +119,9 @@ at once, each naming its fix; fix the file and rerun until it passes.
 `general/files/` and the stack's `template/`, renames the placeholders (each
 spells "replace me": web `replace-me`, `Replace Me`, `ReplaceMe` and the
 `Replace me: …` description; Rust the `replace-me` crates, folders and
-packages, `replace_me` identifiers and `repository`), writes CLAUDE.md with
+packages, `replace_me` identifiers and `repository`; Python the `replace-me`
+project and script, the `replace_me` package folder and imports, and
+`Repository`), writes CLAUDE.md with
 AGENTS.md linked to it, `docs/adr/0001-stack.md` and README.md, and runs
 `git init`. It writes nothing unless every check passes, refuses a target
 inside another git repository, and refuses an answer that reads as a
@@ -134,15 +139,15 @@ Read the new CLAUDE.md and adapt it, keeping it short:
   line or Storybook, for example).
 - Make each `changed` default real in the code (a CI matrix, a dependency),
   and keep the ADR in step.
-- A public repo with a chosen licence gets a LICENSE file, and Rust's
-  `license` in Cargo.toml matches it.
+- A public repo with a chosen license gets a LICENSE file, and Rust's
+  `license` in Cargo.toml or Python's in pyproject.toml matches it.
 
 ## 6. Set up and verify
 
 Run `node SCRIPT setup DIR --stack STACK` in the background, STACK being the
-baseline from step 2 (`web` or `rust`): it takes minutes. Always pass
-`--stack`: a Rust tool with an npm wrapper holds both package.json and
-Cargo.toml, and setup won't guess between them. It runs `mise trust` and
+baseline from step 2 (`web`, `rust` or `python`): it takes minutes. Always
+pass `--stack`: a Rust tool with an npm wrapper or Python bindings holds more
+than one manifest, and setup won't guess between them. It runs `mise trust` and
 `mise install`, takes new majors, and verifies:
 
 - web: moves mise.toml's pins to their latest releases (what the README's
@@ -151,9 +156,14 @@ Cargo.toml, and setup won't guess between them. It runs `mise trust` and
   WebKit, `pnpm format`, `pnpm verify`;
 - Rust: pins `rust-toolchain.toml` to the current stable (and `rust-version`,
   unless step 5 set an older MSRV), `cargo generate-lockfile`,
-  `cargo upgrade --incompatible`, `cargo fmt --all`, `just verify`.
+  `cargo upgrade --incompatible`, `cargo fmt --all`, `just verify`;
+- Python: moves mise.toml's uv and just to their latest releases, pins
+  `.python-version` to the newest Python uv offers (and `requires-python`,
+  unless step 5 set a lower floor), `uv lock` (which takes the newest of every
+  dependency, majors included: the template gives floors only),
+  `ruff format`, `just verify`.
 
-Each pnpm, cargo and just command goes through `mise exec` so the pinned tools
+Each pnpm, cargo, uv and just command goes through `mise exec` so the pinned tools
 win, and the run stops at the first failure. It lists the version lines the majors changed. Don't run
 `mise up` yourself: it upgrades the user's global tools too.
 

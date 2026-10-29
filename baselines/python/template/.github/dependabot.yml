@@ -1,0 +1,28 @@
+# Dependabot keeps pyproject.toml, uv.lock and the SHA-pinned Actions
+# current. Known gaps: mise.toml isn't read, so bump uv and just there by
+# hand, and neither is .python-version. Renovate covers both; see
+# baselines/explorations/renovate in claude-improvements.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # A new release waits three days before Dependabot proposes it.
+    cooldown:
+      default-days: 3
+    groups:
+      non-major:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ['*']

@@ -2,7 +2,7 @@
  * /new-project's hands. Node 23.6 or later runs it as is.
  *
  *   node new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run]
- *   node new-project.ts setup DIR [--stack web|rust] [--keep-versions]
+ *   node new-project.ts setup DIR [--stack web|rust|python] [--keep-versions]
  *
  * `scaffold` checks the answers against the baselines, then copies
  * `general/files/` and the stack's `template/` into DIR (new, or empty but
@@ -13,9 +13,9 @@
  * `setup` installs the stack's toolchain and dependencies in DIR, takes new
  * majors (`--keep-versions` skips that, after reverting one that broke), and
  * runs its verify command, stopping at the first step that fails. `--stack`
- * names the stack; without it, setup infers it from package.json or
- * Cargo.toml, and refuses a folder that holds both (a Rust tool with an npm
- * wrapper does).
+ * names the stack; without it, setup infers it from package.json, Cargo.toml
+ * or pyproject.toml, and refuses a folder that holds more than one (a Rust
+ * tool with an npm wrapper or Python bindings does).
  */
 import { spawnSync } from 'node:child_process'
 import {
@@ -48,6 +48,8 @@ import {
   parseAnswers,
   parseDefaults,
   parseKickoff,
+  newestPython,
+  pinPython,
   pinRust,
   renameFile,
   renderAdr,
@@ -67,7 +69,19 @@ const BESIDE_THE_MOD = resolve(HERE, '../../../baselines')
 // A target may already hold these: a fresh `git clone` of an empty repo.
 const ALLOWED_IN_TARGET = new Set(['.git', '.DS_Store'])
 // Skipped when the baselines are not in a git checkout to ask what is tracked.
-const BUILD_OUTPUT = new Set(['node_modules', 'target', 'dist', 'storybook-static', 'test-results', '.DS_Store'])
+const BUILD_OUTPUT = new Set([
+  'node_modules',
+  'target',
+  'dist',
+  'storybook-static',
+  'test-results',
+  '.venv',
+  '__pycache__',
+  '.pytest_cache',
+  '.ruff_cache',
+  '.hypothesis',
+  '.DS_Store',
+])
 
 class UsageError extends Error {}
 
@@ -253,12 +267,16 @@ function scaffold(options: { answers: string; target: string; baselines: string;
   )
 }
 
+/** `a`, `a or b`, `a, b or c`. */
+const either = (items: readonly string[]) =>
+  items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} or ${items.at(-1)}`
+
 /** The stack `--stack` names, once `dir` holds its marker; without it, the one stack whose marker `dir` holds. */
 function stackOf(dir: string, named: string | undefined): Stack {
   const stacks = Object.keys(STACKS).filter(isStack)
   if (named !== undefined) {
     const stack = stacks.find((s) => s === named)
-    if (stack === undefined) throw new UsageError(`--stack must be ${stacks.join(' or ')}, not "${named}".`)
+    if (stack === undefined) throw new UsageError(`--stack must be ${either(stacks)}, not "${named}".`)
     const { marker } = STACKS[stack]
     if (!existsSync(join(dir, marker)))
       throw new UsageError(
@@ -267,13 +285,17 @@ function stackOf(dir: string, named: string | undefined): Stack {
     return stack
   }
   const found = stacks.filter((stack) => existsSync(join(dir, STACKS[stack].marker)))
-  if (found.length > 1)
+  if (found.length > 1) {
+    const markers = found.map((stack) => STACKS[stack].marker)
     throw new UsageError(
-      `${dir} holds both package.json and Cargo.toml; pass --stack rust or --stack web to name its baseline.`,
+      `${dir} holds ${markers.slice(0, -1).join(', ')} and ${markers.at(-1)}; pass ${either(found.map((s) => `--stack ${s}`))} to name its baseline.`,
     )
+  }
   const [stack] = found
   if (stack === undefined)
-    throw new UsageError(`${dir} holds neither package.json nor Cargo.toml; name the folder scaffold wrote.`)
+    throw new UsageError(
+      `${dir} holds no ${either(stacks.map((s) => STACKS[s].marker))}; name the folder scaffold wrote.`,
+    )
   return stack
 }
 
@@ -334,9 +356,36 @@ async function bumpRustToolchain(dir: string): Promise<string | undefined> {
   return installed.status === 0 ? undefined : `\`rustup toolchain install\` failed (exit ${installed.status})`
 }
 
+/**
+ * Pins `.python-version` to the newest stable Python uv offers, and
+ * `requires-python` with it when it tracks the pin. uv installs it on its
+ * next run. Returns what went wrong, if anything.
+ */
+function bumpPython(dir: string): string | undefined {
+  const listed = run(['mise', 'exec', '--', 'uv', 'python', 'list', '--only-downloads', '--output-format', 'json'], dir)
+  if (listed.status !== 0) return `\`uv python list\` failed: ${listed.stderr.trim()}`
+  let version: string
+  try {
+    version = newestPython(listed.stdout)
+    const versionPath = join(dir, '.python-version')
+    const pyprojectPath = join(dir, 'pyproject.toml')
+    const pinned = pinPython(
+      { pythonVersion: readFileSync(versionPath, 'utf8'), pyproject: readFileSync(pyprojectPath, 'utf8') },
+      version,
+    )
+    writeFileSync(versionPath, pinned.pythonVersion)
+    writeFileSync(pyprojectPath, pinned.pyproject)
+  } catch (error) {
+    return `Could not pin the newest Python: ${messageOf(error)}`
+  }
+  process.stdout.write(`Python ${version} is the newest release uv offers.\n`)
+  return undefined
+}
+
 const BUMPS = {
   'mise-tools': "pin mise.toml's tools to their latest releases",
   'rust-toolchain': 'pin rust-toolchain.toml to the current stable',
+  python: 'pin .python-version to the newest Python uv offers',
 } as const
 
 async function setup(dirArgument: string, named: string | undefined, keepVersions: boolean): Promise<number> {
@@ -374,7 +423,12 @@ async function setup(dirArgument: string, named: string | undefined, keepVersion
       if (result.error !== undefined) failure = `Could not start ${command}: ${result.error.message}. Install it`
       else if (result.status !== 0) failure = `\`${label}\` failed (exit ${result.status})`
     } else {
-      failure = step.bump === 'mise-tools' ? bumpMiseTools(dir) : await bumpRustToolchain(dir)
+      failure =
+        step.bump === 'mise-tools'
+          ? bumpMiseTools(dir)
+          : step.bump === 'rust-toolchain'
+            ? await bumpRustToolchain(dir)
+            : bumpPython(dir)
     }
     if (failure !== undefined) {
       reportMajors(true)
@@ -418,7 +472,7 @@ async function main(argv: string[]): Promise<number> {
     return setup(dir, values.stack, values['keep-versions'])
   }
   throw new UsageError(
-    'Usage: new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run] | setup DIR [--stack web|rust] [--keep-versions]',
+    'Usage: new-project.ts scaffold --answers FILE --target DIR [--baselines DIR] [--dry-run] | setup DIR [--stack web|rust|python] [--keep-versions]',
   )
 }
 
