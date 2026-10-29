@@ -1,0 +1,15 @@
+{
+  // The web template's strictness, referenced so the two cannot drift.
+  //
+  // One program with Node's types: compose.ts runs under Node and in the
+  // engine, and Node's URL stands in for the engine's. Whether register.ts
+  // keeps to the engine's environment is `claude plugin validate`'s check.
+  // A mod with a tsconfig of its own gets none from the engine, so this
+  // also serves editors, with claude-code.d.ts in place of the engine's API.
+  "extends": "../../baselines/web/template/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "types": ["node"]
+  },
+  "include": ["claude-code.d.ts", "hooks", "scripts", "tests"]
+}

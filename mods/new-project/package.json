@@ -1,0 +1,26 @@
+{
+  "name": "new-project",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity=error",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "validate": "claude plugin validate .",
+    "test": "claude plugin test . && node --test tests/baselines.node.mts",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm validate && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
+  "packageManager": "pnpm@12.14.0"
+}

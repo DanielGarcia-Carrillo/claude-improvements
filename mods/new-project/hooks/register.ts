@@ -42,14 +42,16 @@ export async function locateBaselines($: EngineInterface, configured: string): P
 }
 
 const isOwnSkill = ($: EngineInterface, skill: string, path: string | undefined) =>
-  (skill === SKILL || skill === `${$.plugin.name}:${SKILL}`) && (path === undefined || path.startsWith(`${$.plugin.root}/`))
+  (skill === SKILL || skill === `${$.plugin.name}:${SKILL}`) &&
+  (path === undefined || path.startsWith(`${$.plugin.root}/`))
 
 /**
  * Tells /new-project where the baselines are, or, when they cannot be found,
  * replaces its instructions with how to point the mod at them.
  */
 export const register: Register = (on, options) => {
-  const configured = typeof options.baselines === 'string' ? options.baselines : ''
+  const baselines = options['baselines']
+  const configured = typeof baselines === 'string' ? baselines : ''
 
   on('skill.prompt', async ($, e, next) => {
     const expanded = await next(e)
@@ -61,7 +63,7 @@ export const register: Register = (on, options) => {
         text: [
           `The new-project mod cannot find the project baselines: ${located.source} is \`${located.dir}\`, which has no \`${MARKER}\`.`,
           '',
-          'Do not start the kickoff. Tell the user that, and that the fix is to set the new-project mod\'s `baselines` option to the `baselines` folder of a claude-improvements checkout (the folder holding `general/kickoff.md`), then run /new-project again.',
+          "Do not start the kickoff. Tell the user that, and that the fix is to set the new-project mod's `baselines` option to the `baselines` folder of a claude-improvements checkout (the folder holding `general/kickoff.md`), then run /new-project again.",
         ].join('\n'),
       }
     }

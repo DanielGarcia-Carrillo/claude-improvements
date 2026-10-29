@@ -19,7 +19,7 @@ export type Answers = {
   /** Package, Worker and crate name: `trip-planner`. */
   slug: string
   /** Web only: the installed app's label, at most 12 characters. */
-  shortName?: string
+  shortName?: string | undefined
   /** One sentence: what it is and who uses it. */
   description: string
   /** CLAUDE.md's opening: what it is, who it is for, the one thing it must do well. */
@@ -29,9 +29,9 @@ export type Answers = {
   /** Who may push, mark ready and merge. */
   merging: string
   /** Rust only: Cargo.toml's `repository`. */
-  repository?: string
+  repository?: string | undefined
   /** The ADR's Issue line. */
-  issue?: string
+  issue?: string | undefined
   kickoff: KickoffAnswer[]
   changed: ChangedDefault[]
   architecture: ArchitectureLine[]
@@ -44,7 +44,7 @@ export type TemplateFile = {
   /** Relative to the new repo's root, `/`-separated. */
   path: string
   /** Absent for a binary file, which is copied untouched. */
-  text?: string
+  text?: string | undefined
 }
 
 export type KickoffSection = { title: string; questions: string[] }
@@ -113,6 +113,106 @@ export const STACKS = {
   },
 } as const satisfies Record<Stack, { steps: readonly Step[]; manifests: readonly string[] } & Record<string, unknown>>
 
+// A TOML table heading, and a mise.toml `[tools]` line pinned to a version number.
+const TOML_TABLE = /^\s*\[([^\]]+)\]/
+const MISE_PIN = /^(\s*"?([^"=\s]+)"?\s*=\s*)"(\d+(?:\.\d+)*)"(.*)$/
+
+/** Each line of a mise.toml, with its pin when it is one under `[tools]`. */
+function miseLines(text: string) {
+  let isTools = false
+  return text.split('\n').map((line) => {
+    const table = TOML_TABLE.exec(line)
+    if (table) isTools = table[1]?.trim() === 'tools'
+    const [, prefix = '', tool = '', version = '', rest = ''] = (isTools && MISE_PIN.exec(line)) || []
+    return { line, pin: tool === '' ? undefined : { prefix, tool, version, rest } }
+  })
+}
+
+/** The tools a mise.toml pins to a version number: `node = "26"`. */
+export function misePins(text: string): { tool: string; version: string }[] {
+  return miseLines(text).flatMap(({ pin }) => (pin === undefined ? [] : [{ tool: pin.tool, version: pin.version }]))
+}
+
+/**
+ * The mise.toml with each pin moved to its tool's latest release, at the
+ * pin's own precision, as `mise up --bump` writes it: `26` stays a major.
+ */
+export function bumpMiseToml(text: string, latest: Readonly<Record<string, string>>): string {
+  return miseLines(text)
+    .map(({ line, pin }) => {
+      const release = pin === undefined ? undefined : latest[pin.tool]
+      if (pin === undefined || release === undefined) return line
+      const bumped = release.split('.').slice(0, pin.version.split('.').length).join('.')
+      return `${pin.prefix}"${bumped}"${pin.rest}`
+    })
+    .join('\n')
+}
+
+/** Where rustup's stable channel says which release it is. */
+export const RUST_STABLE_MANIFEST = 'https://static.rust-lang.org/dist/channel-rust-stable.toml'
+
+/** The release the stable channel manifest names: `1.99.1`. */
+export function rustStableVersion(manifest: string): string {
+  const version = /^\[pkg\.rust\]\nversion = "(\d+\.\d+\.\d+) /m.exec(manifest)?.[1]
+  if (version === undefined)
+    throw new Error(`${RUST_STABLE_MANIFEST} has no [pkg.rust] version; has its format changed?`)
+  return version
+}
+
+/**
+ * The `key = "…"` line of a TOML file's `[table]`, if it has one: its value,
+ * and the file with that line set to another.
+ */
+function tomlString(text: string, table: string, key: string) {
+  const line = new RegExp(`^${key} = "([^"]*)"`)
+  const lines = text.split('\n')
+  let current: string | undefined
+  const at = lines.findIndex((row) => {
+    current = TOML_TABLE.exec(row)?.[1]?.trim() ?? current
+    return current === table && line.test(row)
+  })
+  const value = line.exec(lines[at] ?? '')?.[1]
+  if (value === undefined) return undefined
+  const set = (next: string) =>
+    lines.map((row, i) => (i === at ? row.replace(line, `${key} = "${next}"`) : row)).join('\n')
+  return { value, set }
+}
+
+/** A Rust release's minor: `1.99` of `1.99.1`. */
+const minorOf = (release: string) => release.split('.').slice(0, 2).join('.')
+
+/**
+ * Pins the toolchain file's channel to `version`. The project's
+ * `rust-version` moves to its minor only while it equals the old channel's:
+ * a binary-only tool's MSRV is the pinned channel, but an older one, such as
+ * a published library's, was set on purpose and stays. That MSRV is the one
+ * in `[workspace.package]`, which members inherit, else a single crate's in
+ * `[package]`; a root package beside a workspace MSRV keeps its own. Throws
+ * when either line has moved, so a bump never half lands.
+ */
+export function pinRust(files: { toolchain: string; cargo: string }, version: string) {
+  const channel = tomlString(files.toolchain, 'toolchain', 'channel')
+  if (channel === undefined) throw new Error('rust-toolchain.toml has no `channel = "…"` line in [toolchain] to bump.')
+  const msrv =
+    tomlString(files.cargo, 'workspace.package', 'rust-version') ?? tomlString(files.cargo, 'package', 'rust-version')
+  if (msrv === undefined)
+    throw new Error('Cargo.toml has no `rust-version = "…"` line in [workspace.package] or [package] to bump.')
+  return {
+    toolchain: channel.set(version),
+    cargo: msrv.value === minorOf(channel.value) ? msrv.set(minorOf(version)) : files.cargo,
+  }
+}
+
+/** The lines a step changed in a file, `-` before and `+` after, for undoing one major. */
+export function changedLines(before: string, after: string): string[] {
+  const old = before.split('\n')
+  const now = after.split('\n')
+  return [
+    ...old.filter((line) => !now.includes(line)).map((line) => `- ${line.trim()}`),
+    ...now.filter((line) => !old.includes(line)).map((line) => `+ ${line.trim()}`),
+  ]
+}
+
 const EVERY_PROJECT = 'Every project'
 const SHORT_NAME_MAX = 12
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -128,6 +228,7 @@ export const PLACEHOLDER = /replace[-_ ]?me(?:[^a-z]|$)/i
 export const PLACEHOLDER_EXEMPT = '.github/workflows/ci.yml'
 /** The one line of PLACEHOLDER_EXEMPT that spells the placeholder: the comment naming what its step looks for. */
 const PLACEHOLDER_EXEMPT_LINE = /^\s*# Template placeholders all spell "replace me"/
+const isExempt = (path: string, line: string) => path === PLACEHOLDER_EXEMPT && PLACEHOLDER_EXEMPT_LINE.test(line)
 
 // A Rust slug becomes a function name in the CLI test and a crate name, so
 // it cannot be a keyword or shadow a sysroot crate.
@@ -139,12 +240,17 @@ const RUST_RESERVED = new Set(
   ).split(' '),
 )
 
+// URL characters only: a repository lands inside a quoted TOML string. They
+// also spell non-URLs such as `https://?`, so it must parse, with a host.
+const isRepositoryUrl = (url: string) =>
+  /^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(url) && URL.canParse(url) && new URL(url).hostname !== ''
+
 /** Answers that cannot build a repo, each problem naming its fix. */
 export class AnswersError extends Error {
   readonly problems: readonly string[]
 
   constructor(problems: readonly string[]) {
-    super(`The answers need fixing before anything is written:\n${problems.map(p => `- ${p}`).join('\n')}`)
+    super(`The answers need fixing before anything is written:\n${problems.map((p) => `- ${p}`).join('\n')}`)
     this.name = 'AnswersError'
     this.problems = problems
   }
@@ -152,6 +258,11 @@ export class AnswersError extends Error {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string')
+
+export const isStack = (value: unknown): value is Stack => typeof value === 'string' && Object.hasOwn(STACKS, value)
 
 /** Every string in a JSON value, with its path: `kickoff[2].answer`. */
 function strings(value: unknown, path = ''): [string, string][] {
@@ -183,18 +294,22 @@ export function parseAnswers(raw: unknown): Answers {
       problems.push(`\`${key}\` must be a non-empty array of { ${fields.join(', ')} }.`)
       return []
     }
-    value.forEach((item: unknown, i) => {
-      const missing = fields.filter(f => {
+    const missingFields = (item: unknown) =>
+      fields.filter((f) => {
         const field = isRecord(item) ? item[f] : undefined
         return typeof field !== 'string' || field.trim() === ''
       })
-      if (missing.length > 0) problems.push(`\`${key}[${i}]\` needs ${missing.map(f => `\`${f}\``).join(', ')}.`)
+    const isComplete = (item: unknown): item is T => missingFields(item).length === 0
+    value.forEach((item: unknown, i) => {
+      const missing = missingFields(item)
+      if (missing.length > 0) problems.push(`\`${key}[${i}]\` needs ${missing.map((f) => `\`${f}\``).join(', ')}.`)
     })
-    return value as T[]
+    // An item missing a field is reported above, which refuses the answers.
+    return value.filter(isComplete)
   }
 
   const stack = raw['stack']
-  if (stack !== 'web' && stack !== 'rust') problems.push('`stack` must be "web" or "rust".')
+  if (!isStack(stack)) problems.push('`stack` must be "web" or "rust".')
 
   const name = text('name')
   if (name !== undefined && /[<>{}"\\\r\n]/.test(name))
@@ -223,28 +338,23 @@ export function parseAnswers(raw: unknown): Answers {
   const consequences = text('consequences')
 
   const repository = text('repository', stack !== 'rust')
-  // URL characters only: the value lands inside a quoted TOML string. They
-  // also spell non-URLs such as `https://?`, so it must parse, with a host.
-  const isUrl = (url: string) =>
-    /^https:\/\/[\w\-.~:/?#[\]@!$&'()*+,;=%]+$/.test(url) && URL.canParse(url) && new URL(url).hostname !== ''
-  if (repository !== undefined && !isUrl(repository))
-    problems.push('`repository` must be an https URL with a host, such as https://github.com/owner/name, without quotes, backslashes or spaces.')
+  if (repository !== undefined && !isRepositoryUrl(repository))
+    problems.push(
+      '`repository` must be an https URL with a host, such as https://github.com/owner/name, without quotes, backslashes or spaces.',
+    )
 
   const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer'])
   const changed = list<ChangedDefault>('changed', ['area', 'to', 'why'], true)
-  // The ADR has one row per area, so a second change to one would drop out
-  // of it. `list` hands back the malformed items it reported, too.
-  const areas = changed.map(change => (isRecord(change) ? change['area'] : undefined))
+  // The ADR has one row per area, so a second change to one would drop out of it.
+  const areas = changed.map((change) => change.area)
   areas.forEach((area, i) => {
     const first = areas.indexOf(area)
-    if (typeof area === 'string' && first < i)
-      problems.push(`\`changed[${i}]\` names area "${area}" again; merge it into \`changed[${first}]\`.`)
+    if (first < i) problems.push(`\`changed[${i}]\` names area "${area}" again; merge it into \`changed[${first}]\`.`)
   })
   const architecture = list<ArchitectureLine>('architecture', ['choice', 'line'])
   const alternatives = list<Alternative>('alternatives', ['option', 'why'])
   const followUps = raw['followUps'] ?? []
-  if (!Array.isArray(followUps) || followUps.some(f => typeof f !== 'string'))
-    problems.push('`followUps` must be an array of strings.')
+  if (!isStringArray(followUps)) problems.push('`followUps` must be an array of strings.')
 
   // Every answer lands somewhere in the new repo, whose CI fails on anything
   // that reads as a placeholder.
@@ -252,25 +362,38 @@ export function parseAnswers(raw: unknown): Answers {
     if (PLACEHOLDER.test(value))
       problems.push(`\`${key}\` "${value}" reads as a template placeholder to the new repo's CI; reword it.`)
 
-  if (problems.length > 0) throw new AnswersError(problems)
+  // Each check that failed left a problem; the rest of this test tells TypeScript what passed.
+  if (
+    problems.length > 0 ||
+    !isStack(stack) ||
+    name === undefined ||
+    slug === undefined ||
+    description === undefined ||
+    summary === undefined ||
+    issues === undefined ||
+    merging === undefined ||
+    consequences === undefined ||
+    !isStringArray(followUps)
+  )
+    throw new AnswersError(problems)
 
   return {
-    stack: stack as Stack,
-    name: name as string,
-    slug: slug as string,
+    stack,
+    name,
+    slug,
     shortName,
-    description: description as string,
-    summary: summary as string,
-    issues: issues as string,
-    merging: merging as string,
+    description,
+    summary,
+    issues,
+    merging,
     repository,
     issue,
     kickoff,
     changed,
     architecture,
     alternatives,
-    consequences: consequences as string,
-    followUps: followUps as string[],
+    consequences,
+    followUps,
   }
 }
 
@@ -281,10 +404,10 @@ function cells(row: string): string[] {
     .replace(/^\|/, '')
     .replace(/\|$/, '')
     .split(/(?<!\\)\|/)
-    .map(cell => cell.trim())
+    .map((cell) => cell.trim())
 }
 
-const isTableRule = (row: string[]) => row.every(cell => /^:?-+:?$/.test(cell))
+const isTableRule = (row: string[]) => row.every((cell) => /^:?-+:?$/.test(cell))
 
 /** Every `##` section of kickoff.md that holds a question table. */
 export function parseKickoff(markdown: string): KickoffSection[] {
@@ -302,13 +425,13 @@ export function parseKickoff(markdown: string): KickoffSection[] {
     if (isTableRule(row) || row[0] === 'Question' || row[0] === undefined) continue
     current.questions.push(row[0])
   }
-  return sections.filter(section => section.questions.length > 0)
+  return sections.filter((section) => section.questions.length > 0)
 }
 
 /** The kickoff sections a stack asks: every project's, then its own. */
 export function kickoffFor(sections: readonly KickoffSection[], stack: Stack): KickoffSection[] {
-  return [EVERY_PROJECT, STACKS[stack].kickoffSection].map(title => {
-    const section = sections.find(s => s.title === title)
+  return [EVERY_PROJECT, STACKS[stack].kickoffSection].map((title) => {
+    const section = sections.find((s) => s.title === title)
     if (section === undefined)
       throw new Error(
         `kickoff.md has no "## ${title}" question table; update STACKS in compose.ts to the section's new name.`,
@@ -317,35 +440,29 @@ export function kickoffFor(sections: readonly KickoffSection[], stack: Stack): K
   })
 }
 
-const normalise = (question: string) =>
-  question
-    .toLowerCase()
-    .replace(/[`*_]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+const normalise = (question: string) => question.toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim()
 
 function findAnswer(answers: readonly KickoffAnswer[], question: string): KickoffAnswer | undefined {
   const key = normalise(question)
-  return answers.find(a => normalise(a.question) === key)
+  return answers.find((a) => normalise(a.question) === key)
 }
 
 /** The kickoff questions the answers leave out, as problems. */
 export function missingKickoff(answers: Answers, sections: readonly KickoffSection[]): string[] {
-  return sections.flatMap(section =>
+  return sections.flatMap((section) =>
     section.questions
-      .filter(question => findAnswer(answers.kickoff, question) === undefined)
-      .map(question => `\`kickoff\` has no answer to "${question}" (${section.title}). Copy the question verbatim.`),
+      .filter((question) => findAnswer(answers.kickoff, question) === undefined)
+      .map((question) => `\`kickoff\` has no answer to "${question}" (${section.title}). Copy the question verbatim.`),
   )
 }
 
 /** `[text](target)` becomes `text` unless the target is a full URL, which survives a copy. */
-const keepAbsoluteLinks = (markdown: string) =>
-  markdown.replace(/\[([^\]]+)\]\((?!https?:)[^)]*\)/g, '$1')
+const keepAbsoluteLinks = (markdown: string) => markdown.replace(/\[([^\]]+)\]\((?!https?:)[^)]*\)/g, '$1')
 
 /** The defaults table of a stack README: the first table headed `| Area | Default |`. */
 export function parseDefaults(readme: string): Default[] {
   const lines = readme.split('\n')
-  const start = lines.findIndex(line => {
+  const start = lines.findIndex((line) => {
     const row = cells(line)
     return line.startsWith('|') && row[0] === 'Area' && row[1] === 'Default'
   })
@@ -364,10 +481,10 @@ export function parseDefaults(readme: string): Default[] {
 
 /** Changed defaults that name no area of the stack's table, as problems. */
 export function unknownAreas(answers: Answers, defaults: readonly Default[]): string[] {
-  const areas = defaults.map(d => d.area)
+  const areas = defaults.map((d) => d.area)
   return answers.changed
-    .filter(change => !areas.includes(change.area))
-    .map(change => `\`changed\` names area "${change.area}", which is not one of: ${areas.join(', ')}.`)
+    .filter((change) => !areas.includes(change.area))
+    .map((change) => `\`changed\` names area "${change.area}", which is not one of: ${areas.join(', ')}.`)
 }
 
 export function defaultShortName(name: string): string {
@@ -426,7 +543,7 @@ function renameWeb(file: TemplateFile, answers: Answers): TemplateFile {
 function renameRust(file: TemplateFile, answers: Answers): TemplateFile {
   const path = file.path
     .split('/')
-    .map(segment =>
+    .map((segment) =>
       segment === RUST.slug || segment.startsWith(`${RUST.slug}-`)
         ? `${answers.slug}${segment.slice(RUST.slug.length)}`
         : segment,
@@ -455,8 +572,7 @@ export function renameFile(file: TemplateFile, answers: Answers): TemplateFile {
  */
 export function leftoverPlaceholders(files: readonly TemplateFile[]): string[] {
   const teach = 'teach renameFile in compose.ts this use'
-  const isExempt = (path: string, line: string) => path === PLACEHOLDER_EXEMPT && PLACEHOLDER_EXEMPT_LINE.test(line)
-  return files.flatMap(file => [
+  return files.flatMap((file) => [
     ...(PLACEHOLDER.test(file.path) ? [`${file.path}: the path still holds a template placeholder; ${teach}.`] : []),
     ...(file.text ?? '')
       .split('\n')
@@ -498,7 +614,7 @@ function unfilled(markdown: string): string[] {
     .replace(/```[\s\S]*?```/g, '')
     .replace(/`[^`\n]*`/g, '')
     .replace(/<!--[\s\S]*?-->/g, '')
-  return [...prose.matchAll(/<[^<>\n]+>/g)].map(match => match[0])
+  return [...prose.matchAll(/<[^<>\n]+>/g)].map((match) => match[0])
 }
 
 const sentence = (text: string) => (/[.!?]$/.test(text) ? text : `${text}.`)
@@ -518,11 +634,12 @@ export function composeAgentFile(template: string, fragment: string, answers: An
   let text = template.replace(/^<!--[\s\S]*?-->\n*/, '')
   text = text.replace(/<!-- stack fragment: ([^>]+?) -->/g, (_marker, name: string) => {
     const body = sections.get(name)
-    if (body === undefined) throw new Error(`The stack fragment has no "## ${name}" section for CLAUDE.template.md's marker.`)
+    if (body === undefined)
+      throw new Error(`The stack fragment has no "## ${name}" section for CLAUDE.template.md's marker.`)
     used.add(name)
     return body
   })
-  const unused = [...sections.keys()].filter(name => !used.has(name))
+  const unused = [...sections.keys()].filter((name) => !used.has(name))
   if (unused.length > 0)
     throw new Error(`CLAUDE.template.md has no marker for the stack fragment's sections: ${unused.join(', ')}.`)
 
@@ -561,18 +678,18 @@ export function renderAdr(
   if (unknown.length > 0) throw new AnswersError(unknown)
   const stack = STACKS[answers.stack]
 
-  const asked = input.kickoff.flatMap(section => section.questions)
-  const extra = answers.kickoff.filter(a => !asked.some(q => normalise(q) === normalise(a.question)))
+  const asked = input.kickoff.flatMap((section) => section.questions)
+  const extra = answers.kickoff.filter((a) => !asked.some((q) => normalise(q) === normalise(a.question)))
   const rows = [
-    ...asked.map(question => ({ question, found: findAnswer(answers.kickoff, question) })),
-    ...extra.map(found => ({ question: found.question, found })),
+    ...asked.map((question) => ({ question, found: findAnswer(answers.kickoff, question) })),
+    ...extra.map((found) => ({ question: found.question, found })),
   ].map(({ question, found }) => {
     const answer = found === undefined ? 'Not asked' : `${found.answer}${found.assumed === true ? ' (assumed)' : ''}`
     return `| ${cell(question)} | ${cell(answer)} |`
   })
 
-  const defaults = input.defaults.map(d => {
-    const change = answers.changed.find(c => c.area === d.area)
+  const defaults = input.defaults.map((d) => {
+    const change = answers.changed.find((c) => c.area === d.area)
     const here = change === undefined ? 'Kept' : `Changed: ${sentence(change.to)} ${sentence(change.why)}`
     return `| ${cell(d.area)} | ${cell(d.value)} | ${cell(d.why)} | ${cell(here)} |`
   })
@@ -582,13 +699,13 @@ export function renderAdr(
     input.baseline.sha === undefined ? undefined : `at \`${input.baseline.sha}\``,
     input.baseline.isDirty ? 'with uncommitted changes' : undefined,
   ]
-    .filter(part => part !== undefined)
+    .filter((part) => part !== undefined)
     .join(' ')
 
   const followUps =
     answers.followUps.length === 0
       ? []
-      : ['', 'Follow-ups this leaves:', '', ...answers.followUps.map(f => `- ${sentence(f)}`)]
+      : ['', 'Follow-ups this leaves:', '', ...answers.followUps.map((f) => `- ${sentence(f)}`)]
 
   return [
     `# 0001. Stack: the ${answers.stack} baseline`,
@@ -617,7 +734,7 @@ export function renderAdr(
     '',
     '## Alternatives considered',
     '',
-    ...answers.alternatives.map(a => `- **${a.option}**: ${sentence(a.why)}`),
+    ...answers.alternatives.map((a) => `- **${a.option}**: ${sentence(a.why)}`),
     '',
     '## Consequences',
     '',
