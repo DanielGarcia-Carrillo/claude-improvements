@@ -72,7 +72,7 @@ test('a relative baselines option is refused', { options: { baselines: 'src/base
 })
 
 test(
-  'missing baselines replace the skill with how to fix it',
+  'missing baselines leave the skill running, with how to fix them',
   { options: { baselines: '/nowhere' } },
   async ($, on) => {
     engine(on)
@@ -80,7 +80,8 @@ test(
     expect(result.text).toContain('cannot find the project baselines')
     expect(result.text).toContain('`baselines` option')
     expect(result.text).toContain('/nowhere')
-    expect(result.text.includes(SKILL_BODY)).toBe(false)
+    expect(result.text.startsWith('Baselines folder:')).toBe(false)
+    expect(result.text.endsWith(`\n\n${SKILL_BODY}`)).toBe(true)
   },
 )
 
@@ -146,9 +147,9 @@ function webAnswers(overrides: Record<string, unknown> = {}): Answers {
     issues: 'GitHub Issues',
     merging: 'Daniel merges',
     kickoff: [
-      { question: 'What is it, in one sentence, and who uses it?', answer: 'A trip planner' },
-      { question: 'public or private   repo?', answer: 'Private', assumed: true },
-      { question: 'Does it need to work offline?', answer: 'Yes' },
+      { question: 'What is it, in one sentence, and who uses it?', answer: 'A trip planner', source: 'stated' },
+      { question: 'public or private   repo?', answer: 'Private', source: 'default' },
+      { question: 'Does it need to work offline?', answer: 'Yes', source: 'inferred' },
     ],
     architecture: [{ choice: 'Styling', line: 'StyleX' }],
     alternatives: [{ option: 'SSR', why: 'No SEO' }],
@@ -194,12 +195,21 @@ test('reports every answer problem at once', async () => {
   expect(problemsOf(webAnswers())).toEqual([])
 })
 
+test('every kickoff answer says where it came from', async () => {
+  const [first, ...rest] = webAnswers().kickoff
+  const answer = { question: first?.question, answer: first?.answer }
+  expect(problemsOf({ ...webAnswers(), kickoff: [answer, ...rest] })).toEqual(['`kickoff[0]` needs `source`.'])
+  expect(problemsOf({ ...webAnswers(), kickoff: [{ ...answer, source: 'assumed' }, ...rest] })).toEqual([
+    '`kickoff[0].source` must be "stated", "inferred" or "default", not "assumed".',
+  ])
+})
+
 test('every kickoff question of the stack needs an answer', async () => {
   const sections = kickoffFor(parseKickoff(KICKOFF), 'web')
   expect(sections.map((s) => s.title)).toEqual(['Every project', 'Web apps'])
   expect(missingKickoff(webAnswers(), sections)).toEqual([])
 
-  const short = webAnswers({ kickoff: [{ question: 'Public or private repo?', answer: 'Public' }] })
+  const short = webAnswers({ kickoff: [{ question: 'Public or private repo?', answer: 'Public', source: 'stated' }] })
   const missing = missingKickoff(short, sections)
   expect(missing.length).toBe(2)
   expect(missing[0]).toContain('"What is it, in one sentence, and who uses it?" (Every project)')
@@ -402,7 +412,7 @@ test("refuses answers the new repo's placeholder check would fail on", async () 
     ...webAnswers(),
     name: 'Replace Me Later',
     followUps: ['Replace-me tokens in docs'],
-    kickoff: [{ question: 'Public or private repo?', answer: 'replace_me' }],
+    kickoff: [{ question: 'Public or private repo?', answer: 'replace_me', source: 'stated' }],
   })
   expect(problems).toEqual([
     '`name` "Replace Me Later" reads as a template placeholder to the new repo\'s CI; reword it.',
@@ -624,7 +634,9 @@ test('the ADR records the answers and each default kept or changed', async () =>
   expect(() => renderAdr(unknown, input)).toThrow('names area "Style", which is not one of')
   const adr = renderAdr(answers, input)
   expect(adr).toContain('- Date: 2026-10-20')
-  expect(adr).toContain('| Public or private repo? | Private (assumed) |')
+  expect(adr).toContain('| Question | Answer | Source |')
+  expect(adr).toContain('| Public or private repo? | Private | default |')
+  expect(adr).toContain('| Does it need to work offline? | Yes | inferred |')
   expect(adr).toContain('(`baselines/web` at `e12caf4`)')
   expect(adr).toContain(
     '| Styling | StyleX | Build-time atomic CSS | Changed: vanilla-extract. Semantic class names. |',

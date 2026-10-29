@@ -1,12 +1,17 @@
 # Kickoff questions
 
-Ask these before choosing infrastructure. Each answer selects something
-concrete; the right column says what. Skip a question when the answer is
-already obvious from the brief, and say which default you assumed instead.
-Record the answers in the new repo's `docs/adr/0001-stack.md`.
+Settle these before choosing infrastructure. Each answer selects something
+concrete; the right column says what.
 
-Ask in one batch, grouped as below, with a recommended answer for each so
-the user can accept defaults quickly.
+Propose an answer to every question from the brief, and mark where each one
+came from: **stated** (the brief says it), **inferred** (it follows from
+the brief) or **default** (the baseline's pick). Then ask, in one batch,
+only the open ones: those the brief leaves unclear, and those that are
+costly to undo and weren't stated. Examples are public or private, auth,
+personal data, offline, server-side data and publishing. Give a recommended
+answer for each, and list the rest so the user can override any of them.
+Record every answer with its source in the new repo's
+`docs/adr/0001-stack.md`.
 
 ## Every project
 

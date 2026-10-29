@@ -7,7 +7,14 @@
 
 export type Stack = 'web' | 'rust' | 'python'
 
-export type KickoffAnswer = { question: string; answer: string; assumed?: boolean }
+/**
+ * Where a kickoff answer came from: the user said it (in the brief or a
+ * reply), the agent read it from the brief and the user let it stand, or it
+ * is the baseline's default and neither of them raised it.
+ */
+export type AnswerSource = 'stated' | 'inferred' | 'default'
+export const ANSWER_SOURCES: readonly AnswerSource[] = ['stated', 'inferred', 'default']
+export type KickoffAnswer = { question: string; answer: string; source: AnswerSource }
 export type ChangedDefault = { area: string; to: string; why: string }
 export type ArchitectureLine = { choice: string; line: string }
 export type Alternative = { option: string; why: string }
@@ -427,7 +434,11 @@ export function parseAnswers(raw: unknown): Answers {
       '`repository` must be an https URL with a host, such as https://github.com/owner/name, without quotes, backslashes or spaces.',
     )
 
-  const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer'])
+  const kickoff = list<KickoffAnswer>('kickoff', ['question', 'answer', 'source'])
+  kickoff.forEach((answer, i) => {
+    if (!ANSWER_SOURCES.includes(answer.source))
+      problems.push(`\`kickoff[${i}].source\` must be "stated", "inferred" or "default", not "${answer.source}".`)
+  })
   const changed = list<ChangedDefault>('changed', ['area', 'to', 'why'], true)
   // The ADR has one row per area, so a second change to one would drop out of it.
   const areas = changed.map((change) => change.area)
@@ -771,10 +782,11 @@ export function renderAdr(
   const rows = [
     ...asked.map((question) => ({ question, found: findAnswer(answers.kickoff, question) })),
     ...extra.map((found) => ({ question: found.question, found })),
-  ].map(({ question, found }) => {
-    const answer = found === undefined ? 'Not asked' : `${found.answer}${found.assumed === true ? ' (assumed)' : ''}`
-    return `| ${cell(question)} | ${cell(answer)} |`
-  })
+  ].map(({ question, found }) =>
+    found === undefined
+      ? `| ${cell(question)} | Not asked | |`
+      : `| ${cell(question)} | ${cell(found.answer)} | ${found.source} |`,
+  )
 
   const defaults = input.defaults.map((d) => {
     const change = answers.changed.find((c) => c.area === d.area)
@@ -806,10 +818,10 @@ export function renderAdr(
     '',
     answers.summary,
     '',
-    'The kickoff questions, answered when the repository was created. "(assumed)" marks a default taken without asking.',
+    "The kickoff questions, answered when the repository was created. Source says where each answer came from: *stated* by the user, *inferred* from their brief and left standing, or the baseline's *default*, which nobody raised.",
     '',
-    '| Question | Answer |',
-    '| --- | --- |',
+    '| Question | Answer | Source |',
+    '| --- | --- | --- |',
     ...rows,
     '',
     '## Decision',

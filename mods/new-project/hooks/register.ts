@@ -46,8 +46,9 @@ const isOwnSkill = ($: EngineInterface, skill: string, path: string | undefined)
   (path === undefined || path.startsWith(`${$.plugin.root}/`))
 
 /**
- * Tells /new-project where the baselines are, or, when they cannot be found,
- * replaces its instructions with how to point the mod at them.
+ * Tells /new-project where the baselines are. When they cannot be found
+ * there, the skill still runs: its doctor step looks at
+ * `$NEW_PROJECT_BASELINES` too, and asks the user when that fails.
  */
 export const register: Register = (on, options) => {
   const baselines = options['baselines']
@@ -58,15 +59,9 @@ export const register: Register = (on, options) => {
     if (!isOwnSkill($, e.skill, e.path)) return expanded
 
     const located = await locateBaselines($, configured)
-    if (!located.isFound) {
-      return {
-        text: [
-          `The new-project mod cannot find the project baselines: ${located.source} is \`${located.dir}\`, which has no \`${MARKER}\`.`,
-          '',
-          "Do not start the kickoff. Tell the user that, and that the fix is to set the new-project mod's `baselines` option to the `baselines` folder of a claude-improvements checkout (the folder holding `general/kickoff.md`), then run /new-project again.",
-        ].join('\n'),
-      }
-    }
-    return { text: `Baselines folder: ${located.dir}\n\n${expanded.text}` }
+    const note = located.isFound
+      ? `Baselines folder: ${located.dir}`
+      : `The new-project mod cannot find the project baselines: ${located.source} is \`${located.dir}\`, which has no \`${MARKER}\`. Run doctor without \`--baselines\`. If it can't find them either, tell the user to set the new-project mod's \`baselines\` option to the \`baselines\` folder of a claude-improvements checkout.`
+    return { text: `${note}\n\n${expanded.text}` }
   })
 }

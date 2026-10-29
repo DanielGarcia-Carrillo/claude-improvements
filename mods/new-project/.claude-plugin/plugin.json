@@ -1,7 +1,7 @@
 {
   "name": "new-project",
   "version": "0.1.0",
-  "description": "/new-project bootstraps a repository from the claude-improvements baselines: asks the kickoff questions, copies the web, Rust or Python template, writes CLAUDE.md and the stack ADR, then installs and runs verify",
+  "description": "/new-project bootstraps a repository from the claude-improvements baselines, in Claude Code or Codex: proposes the kickoff answers from your description and asks only the open ones, copies the web, Rust or Python template, writes CLAUDE.md and the stack ADR, then installs and runs verify",
   "author": {
     "name": "Daniel Garcia Carrillo"
   },
