@@ -9,6 +9,7 @@ export CARGO_BUILD_WARNINGS := "deny"
 bootstrap:
     lefthook install
 
+[default]
 verify: spellcheck fmt-check deny lint test doc shear
 
 spellcheck:

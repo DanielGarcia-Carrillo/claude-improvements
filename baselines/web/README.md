@@ -35,13 +35,17 @@ Versions and statuses were checked on 2026-10-20.
    plus [`CLAUDE.stack.md`](CLAUDE.stack.md); `ln -s CLAUDE.md AGENTS.md`.
 
 Pre-commit uses Lefthook (pinned in `mise.toml`) on staged files only, with
-independent jobs in parallel and formatter fixes re-staged. typos checks
+independent jobs in parallel and formatter fixes re-staged. Spelling runs
+after formatting on the same files. typos checks
 American English spelling. `pnpm install` installs hooks through `prepare`. oxfmt runs before type-aware oxlint
 (warnings denied).
 
 The target is under five seconds after installing dependencies. A commit with
 no matching files skips the corresponding jobs. `git commit --no-verify`
-bypasses hooks; full verify and CI remain required.
+bypasses hooks; full verify and CI remain required. If installation reports a
+configured `core.hooksPath`, follow the deliberate recovery steps in
+[Git hook setup](../general/infra.md#git-hook-setup); setup never forces or
+resets an existing hook path automatically.
 
 ## The stack
 

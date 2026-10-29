@@ -1,11 +1,19 @@
 # Lefthook hides unstaged edits in partially staged files while these jobs run.
 # Fixers re-stage their changes. Keep whole-project checks in verify and CI.
+# Spelling follows writes to the same files; other files can be checked in parallel.
 pre-commit:
   parallel: true
   jobs:
     - name: python
       glob: "*.{py,pyi}"
-      run: mise exec -- uv run --locked ruff check --fix {staged_files} && mise exec -- uv run --locked ruff format {staged_files}
-      stage_fixed: true
-    - name: spelling
+      group:
+        piped: true
+        jobs:
+          - name: format
+            run: mise exec -- uv run --locked ruff check --fix {staged_files} && mise exec -- uv run --locked ruff format {staged_files}
+            stage_fixed: true
+          - name: spelling
+            run: mise exec -- typos --force-exclude {staged_files}
+    - name: spelling-other
+      exclude: "*.{py,pyi}"
       run: mise exec -- typos --force-exclude {staged_files}

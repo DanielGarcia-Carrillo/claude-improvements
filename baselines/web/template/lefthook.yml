@@ -1,18 +1,22 @@
 # Lefthook hides unstaged edits in partially staged files while these jobs run.
 # Fixers re-stage their changes. Keep whole-project checks in verify and CI.
+# Spelling follows writes to the same files; other files can be checked in parallel.
 pre-commit:
   parallel: true
   jobs:
     - name: web
+      glob: '*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,css,scss,html,vue,yml,yaml,md,mdx}'
       group:
         piped: true
         jobs:
           - name: format
-            glob: '*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,css,scss,html,vue,yml,yaml,md,mdx}'
-            run: mise exec -- pnpm exec oxfmt {staged_files}
+            run: mise exec -- pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
             stage_fixed: true
           - name: lint
             glob: '*.{ts,tsx}'
-            run: mise exec -- pnpm exec oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity=error {staged_files}
-    - name: spelling
+            run: mise exec -- pnpm exec oxlint --no-error-on-unmatched-pattern --type-aware --deny-warnings --report-unused-disable-directives-severity=error {staged_files}
+          - name: spelling
+            run: mise exec -- typos --force-exclude {staged_files}
+    - name: spelling-other
+      exclude: '*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,css,scss,html,vue,yml,yaml,md,mdx}'
       run: mise exec -- typos --force-exclude {staged_files}

@@ -10,6 +10,7 @@ export UV_LOCKED := "1"
 bootstrap:
     lefthook install
 
+[default]
 verify: spellcheck fmt-check lint types deps test
 
 spellcheck:

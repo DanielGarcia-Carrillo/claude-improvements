@@ -30,14 +30,18 @@ Versions and statuses were checked on 2026-10-27.
    plus [`CLAUDE.stack.md`](CLAUDE.stack.md); `ln -s CLAUDE.md AGENTS.md`.
 
 Pre-commit uses Lefthook (pinned in `mise.toml`) on staged files only, with
-independent jobs in parallel and formatter fixes re-staged. typos checks
+independent jobs in parallel and formatter fixes re-staged. Spelling runs
+after fixes on the same files. typos checks
 American English spelling. Run
 `just bootstrap` in every clone to install hooks. Ruff applies safe lint fixes
 and then formats staged Python files; type checks and tests stay in `just verify` and CI.
 
 The target is under five seconds after installing dependencies. A commit with
 no matching files skips the corresponding jobs. `git commit --no-verify`
-bypasses hooks; full verify and CI remain required.
+bypasses hooks; full verify and CI remain required. If installation reports a
+configured `core.hooksPath`, follow the deliberate recovery steps in
+[Git hook setup](../general/infra.md#git-hook-setup); setup never forces or
+resets an existing hook path automatically.
 
 ## The defaults
 
