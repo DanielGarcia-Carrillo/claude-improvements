@@ -1,0 +1,13 @@
+[files]
+# Include agent hooks and CI files; keep build output and VCS data excluded.
+ignore-hidden = false
+extend-exclude = [".git", "node_modules", "target", "dist", ".venv", "uv.lock", "pnpm-lock.yaml"]
+
+[default]
+locale = "en-us"
+
+[default.extend-words]
+# Accessibility library, deliberate unknown-option fixture, non-ASCII test word.
+axe = "axe"
+widht = "widht"
+caf = "caf"

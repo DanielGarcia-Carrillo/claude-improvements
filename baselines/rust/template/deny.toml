@@ -1,4 +1,4 @@
-# cargo-deny: licences, advisories, duplicate and wildcard dependencies,
+# cargo-deny: licenses, advisories, duplicate and wildcard dependencies,
 # registries. `just deny` (part of `just verify`) and PR CI check all but
 # advisories; CI checks those on main and weekly, so a new advisory never
 # fails an unrelated PR. `just deny-all` checks everything now.

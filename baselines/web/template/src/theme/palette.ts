@@ -1,10 +1,10 @@
 /**
- * The colour roles, as plain values: the one source for both the StyleX
+ * The color roles, as plain values: the one source for both the StyleX
  * tokens (passed in through `env` in vite.config.ts) and the APCA test.
  * A `.stylex.ts` file can't be imported for its values outside the compiler,
  * which is why these live here. No StyleX import in this file.
  *
- * Pick colours in OKLCH so lightness steps are even across hues.
+ * Pick colors in OKLCH so lightness steps are even across hues.
  */
 export const palette = {
   light: {

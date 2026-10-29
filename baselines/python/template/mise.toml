@@ -2,5 +2,6 @@
 # pytest, deptry) from uv.lock. mise pins the two tools outside the project,
 # each a prebuilt binary, so every checkout and CI agree.
 [tools]
+typos = "1.51.1"
 uv = "0.13.6"
 just = "1.59.0"

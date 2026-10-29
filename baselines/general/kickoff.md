@@ -27,7 +27,7 @@ new repo's `docs/adr/0001-stack.md`.
 |---|---|
 | What is it, in one sentence, and who uses it? | README opening, naming, the agent file's first paragraph |
 | Prototype, personal tool, or something others depend on? | How much of the baseline to adopt now vs later (release tooling, ADRs, visual tests) |
-| Public or private repo? | CI minutes (free on public), secret handling, licence |
+| Public or private repo? | CI minutes (free on public), secret handling, license |
 | Where are issues filed (Linear team/project, GitHub Issues)? | The agent file's "Ways of working", commit and PR naming |
 | Solo, or other humans reviewing? | PR template, review gates, CODEOWNERS |
 | Any hard constraints: budget ceiling, existing accounts, data residency, compliance? | Hosting and database choice |

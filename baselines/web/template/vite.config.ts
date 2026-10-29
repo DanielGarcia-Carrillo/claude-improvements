@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => ({
       env: { colorTokens },
     }),
     react(),
-    // A component the compiler can't optimise fails the build instead of
+    // A component the compiler can't optimize fails the build instead of
     // silently shipping unmemoised; the error names the rule it breaks.
     babel({ presets: [reactCompilerPreset({ panicThreshold: 'all_errors' })] }),
     VitePWA({

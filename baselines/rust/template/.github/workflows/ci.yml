@@ -52,8 +52,9 @@ jobs:
       # The tools at mise.toml's versions, so CI and every checkout run the
       # same ones.
       - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: just spellcheck
       - run: cargo fmt --all --check
-      # Bans, licences and sources, as `just verify` checks them. It compiles
+      # Bans, licenses and sources, as `just verify` checks them. It compiles
       # nothing, so it runs before clippy.
       - run: just deny
       # Source checks no lint can express: no #[allow], every crate on the

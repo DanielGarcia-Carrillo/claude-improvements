@@ -10,7 +10,8 @@
     "format:check": "oxfmt --check",
     "validate": "claude plugin validate .",
     "test": "claude plugin test . && node --test tests/baselines.node.mts",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm validate && pnpm test"
+    "verify": "pnpm spellcheck && pnpm typecheck && pnpm lint && pnpm format:check && pnpm validate && pnpm test",
+    "spellcheck": "cd ../.. && typos"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

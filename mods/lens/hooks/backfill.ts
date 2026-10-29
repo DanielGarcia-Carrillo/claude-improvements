@@ -64,7 +64,7 @@ export function turnsFrom(rows: readonly SessionMessage[]): Turn[] {
 /**
  * The turns the lens already knows, with up to `limit` of the transcript's
  * earlier ones filled in around them, in transcript order. A known turn keeps
- * its id, time and files; it is recognised by its answer.
+ * its id, time and files; it is recognized by its answer.
  */
 export function withBackfill(known: Turn[], rebuilt: Turn[], limit: number): Turn[] {
   const byAnswer = new Map(known.map(t => [t.answer.trim(), t]))

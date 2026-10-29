@@ -51,10 +51,10 @@ function answersFor(stack: Stack) {
   }
 }
 
-function scaffold(stack: Stack): string {
-  const answers = join(scratch, `${stack}.json`)
+function scaffold(stack: Stack, name: string = stack): string {
+  const answers = join(scratch, `${name}.json`)
   writeFileSync(answers, JSON.stringify(answersFor(stack)))
-  const target = join(scratch, stack)
+  const target = join(scratch, name)
   const result = run(
     'node',
     [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', BASELINES],
@@ -282,3 +282,51 @@ test('setup needs --stack for a folder holding both manifests, and runs the stac
   rmSync(join(repo, 'pyproject.toml'))
   assert.match(setup().stderr, /holds no package\.json, Cargo\.toml or pyproject\.toml/)
 })
+
+for (const stack of ['web', 'rust', 'python'] as const) {
+  test(`${stack} scaffolds enforce American English, including hidden agent files`, () => {
+    const repo = scaffold(stack, `${stack}-spelling`)
+    assert.match(read(repo, 'mise.toml'), /typos = "1\.51\.1"/)
+    const clean = run('typos', [], repo)
+    assert.equal(clean.status, 0, clean.stdout + clean.stderr)
+    for (const path of ['README.md', '.claude/spelling.md']) {
+      writeFileSync(join(repo, path), ['col', 'our'].join('') + '\n')
+      const checked = run('typos', [], repo)
+      assert.equal(checked.status, 2, checked.stdout + checked.stderr)
+      assert.match(checked.stdout, /color/)
+      writeFileSync(join(repo, path), 'color\n')
+    }
+    assert.equal(run('typos', [], repo).status, 0)
+  })
+}
+
+for (const stack of ['rust', 'python'] as const) {
+  test(`${stack} hooks return spelling errors from the payload checkout`, () => {
+    const repo = scaffold(stack, `${stack}-hooks`)
+    const bin = join(scratch, `${stack}-hook-tools`)
+    mkdirSync(bin)
+    for (const tool of ['rustfmt', 'cargo', 'uv'])
+      writeFileSync(join(bin, tool), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    const nested = join(repo, 'nested')
+    mkdirSync(nested)
+    const file = join(repo, 'README.md')
+    writeFileSync(file, ['col', 'our'].join('') + '\n')
+    const hook = (name: string, retry = false) =>
+      spawnSync('bash', [join(repo, `.claude/hooks/${name}.sh`)], {
+        cwd: nested,
+        input: JSON.stringify({ cwd: nested, tool_input: { file_path: file }, stop_hook_active: retry }),
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, CLAUDE_PROJECT_DIR: scratch },
+      })
+    const edited = hook('after-edit')
+    assert.equal(edited.status, 2, edited.stderr)
+    assert.match(edited.stderr, /color/)
+    const stopped = hook('before-stop')
+    assert.equal(stopped.status, 2, stopped.stderr)
+    assert.match(stopped.stderr, /color/)
+    assert.equal(hook('before-stop', true).status, 1)
+    writeFileSync(file, 'color\n')
+    assert.equal(hook('after-edit').status, 0)
+    assert.equal(hook('before-stop').status, 0)
+  })
+}

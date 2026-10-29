@@ -2,7 +2,7 @@
 
 This project exists to improve the UX of the Claude desktop app (the Code
 tab), mainly through Claude Code mods: plugins, hooks, skills, status lines,
-panes and similar customisations, plus any settings or tooling that support
+panes and similar customizations, plus any settings or tooling that support
 them.
 
 ## Repository
@@ -18,3 +18,5 @@ them.
   questions, agent-file skeletons, web and Rust templates); start at
   [baselines/README.md](baselines/README.md). After changing a template,
   copy it to a scratch directory and run its verify command there.
+- Write American English in prose, comments and test names. Run `mise install`
+  once, then `mise exec -- typos` to check the repository.

@@ -6,7 +6,10 @@
 # being quietly re-resolved. `uv lock` updates the lockfile.
 export UV_LOCKED := "1"
 
-verify: fmt-check lint types deps test
+verify: spellcheck fmt-check lint types deps test
+
+spellcheck:
+    typos
 
 fmt-check:
     uv run ruff format --check
