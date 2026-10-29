@@ -7,8 +7,9 @@ that passes its verify command before the first commit, with an agent file and
 a first ADR that record why it looks the way it does.
 
 It's a skill, so Claude Code and Codex both run it: describe the project
-(`/new-project a habit tracker for my phone that works on the subway` in
-Claude Code, `$new-project …` in Codex, or just ask for a new project).
+after `/new-project` in Claude Code or `$new-project` in Codex, or just ask
+for a new project. For example: `/new-project a habit tracker for my phone
+that works on the subway`.
 
 ## Install
 
@@ -20,7 +21,8 @@ skill at `.agents/skills/new-project` (Codex) and `.claude/skills/new-project`
 baselines.
 
 **From any other folder**, link the skill into your agent. Link it rather
-than copying it: the skill's `scripts` link is relative.
+than copying it: the skill's `scripts` link is relative. In these commands,
+`~/src/claude-improvements` is an example: use the path of your clone.
 
 ```bash
 mkdir -p ~/.agents/skills && ln -s ~/src/claude-improvements/mods/new-project/skills/new-project ~/.agents/skills/new-project

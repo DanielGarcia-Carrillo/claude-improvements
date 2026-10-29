@@ -1,6 +1,6 @@
-<!-- Title: imperative summary ending with the issue key, e.g. "Add offline banner (ABC-12)" -->
+<!-- Title: imperative summary ending with the issue key. Example: "Add offline banner (ABC-12)" -->
 
-Linear: <!-- ABC-12 https://linear.app/... With GitHub Issues, make this line "Closes #12". -->
+Linear: <!-- The issue's key and URL. Example: ABC-12 https://linear.app/... With GitHub Issues, make this line "Closes #12" instead. -->
 
 ## What and why
 

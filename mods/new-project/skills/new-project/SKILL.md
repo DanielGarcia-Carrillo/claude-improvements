@@ -146,7 +146,9 @@ for it now.
 
 Write JSON to a new file outside the target, named uniquely so another
 session on the machine can't overwrite it: `mktemp "${TMPDIR:-/tmp}/new-project.XXXXXX"`.
-Every field is a string unless shown otherwise:
+Every field is a string unless shown otherwise. The values below are an
+example for a made-up trip planner. Take every value from the kickoff,
+never from this example:
 
 ```json
 {
@@ -157,7 +159,7 @@ Every field is a string unless shown otherwise:
   "description": "Plans multi-day trips offline, for travelers without signal.",
   "summary": "CLAUDE.md's opening paragraph: what it is, who it is for, the one thing it must do well.",
   "issues": "Linear team \"Personal\", project \"Trips\"",
-  "merging": "Daniel pushes, marks ready and merges; agents open drafts",
+  "merging": "The owner pushes, marks ready and merges; agents open drafts",
   "repository": "https://github.com/owner/trip-planner",
   "issue": "ABC-40",
   "kickoff": [{ "question": "Public or private repo?", "answer": "Private", "source": "stated" }],
@@ -212,7 +214,7 @@ placeholder (the new repo's CI would fail on it).
 The script fills every placeholder; some lines still depend on the answers.
 Read the new CLAUDE.md and adapt it, keeping it short:
 
-- Issues outside Linear: use the tracker's key form (`#12`, not `ABC-12`) in
+- Issues outside Linear: use the tracker's key form (for example `#12` rather than `ABC-12`) in
   the TODO, branch and commit examples, and drop the `Linear:` line from the
   PR bullet and `.github/pull_request_template.md`.
 - Drop conventions for parts the project won't use (the web fragment's state

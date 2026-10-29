@@ -21,9 +21,9 @@ export type Alternative = { option: string; why: string }
 
 export type Answers = {
   stack: Stack
-  /** Display name, as people read it: `Trip Planner`. */
+  /** Display name, as people read it, for example `Trip Planner`. */
   name: string
-  /** Package, Worker and crate name: `trip-planner`. */
+  /** Package, Worker and crate name, for example `trip-planner`. */
   slug: string
   /** Web only: the installed app's label, at most 12 characters. */
   shortName?: string | undefined
@@ -31,7 +31,7 @@ export type Answers = {
   description: string
   /** CLAUDE.md's opening: what it is, who it is for, the one thing it must do well. */
   summary: string
-  /** Where issues live, in the words CLAUDE.md uses: `Linear team "Personal", project "Trips"`. */
+  /** Where issues live, in the words CLAUDE.md uses, for example `Linear team "Personal", project "Trips"`. */
   issues: string
   /** Who may push, mark ready and merge. */
   merging: string
