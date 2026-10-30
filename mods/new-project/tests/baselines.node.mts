@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, dirname, join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { after, test } from 'node:test'
 
 import type { Stack } from '../scripts/compose.ts'
@@ -308,20 +308,16 @@ for (const stack of ['rust', 'python'] as const) {
     mkdirSync(bin)
     for (const tool of ['rustfmt', 'cargo', 'uv'])
       writeFileSync(join(bin, tool), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-    // Model mise exposing the pinned binary to a process with no typos on PATH.
+    // Reject direct calls without removing shared PATH directories (for example jq's).
     const located = run('mise', ['which', 'typos'], resolve(BASELINES, '..'))
     assert.equal(located.status, 0, located.stderr)
-    const typosDir = dirname(located.stdout.trim())
-    const path = (process.env['PATH'] ?? '')
-      .split(delimiter)
-      .filter((dir) => !existsSync(join(dir, 'typos')))
-      .join(delimiter)
+    writeFileSync(join(bin, 'typos'), '#!/bin/sh\necho "Use mise exec for typos" >&2\nexit 98\n', { mode: 0o755 })
     writeFileSync(
       join(bin, 'mise'),
       `#!/bin/sh
 [ "$1" = exec ] && [ "$2" = -- ] && [ "$3" = typos ] || exit 99
-shift 2
-PATH=${JSON.stringify(typosDir)}:"$PATH" exec "$@"
+shift 3
+exec "$PINNED_TYPOS" "$@"
 `,
       { mode: 0o755 },
     )
@@ -334,7 +330,12 @@ PATH=${JSON.stringify(typosDir)}:"$PATH" exec "$@"
         cwd: nested,
         input: JSON.stringify({ cwd: nested, tool_input: { file_path: file }, stop_hook_active: retry }),
         encoding: 'utf8',
-        env: { ...process.env, PATH: `${bin}${delimiter}${path}`, CLAUDE_PROJECT_DIR: scratch },
+        env: {
+          ...process.env,
+          PATH: `${bin}${delimiter}${process.env['PATH'] ?? ''}`,
+          PINNED_TYPOS: located.stdout.trim(),
+          CLAUDE_PROJECT_DIR: scratch,
+        },
       })
     const edited = hook('after-edit')
     assert.equal(edited.status, 2, edited.stderr)
