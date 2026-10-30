@@ -31,7 +31,9 @@ env:
 # workflow, since `ci` checks nothing out and its steps would fail to start.
 # It covers only `run` steps, so also prefix `<folder>/` to the junit path in
 # `hashFiles` and the artifact upload, and give the placeholder check
-# `working-directory: .` so it searches the whole repository.
+# `working-directory: .` so it searches the whole repository. The Stop hook
+# spellchecks the whole repository, so do the same here: `working-directory: .`
+# and `run: mise exec -- typos` in place of `just spellcheck`.
 jobs:
   verify:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}
