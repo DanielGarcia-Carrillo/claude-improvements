@@ -110,7 +110,7 @@ export const STACKS = {
     shape: 'a Rust workspace for a developer tool: a thin binary over a core library',
     kickoffSection: 'Rust tools',
     marker: 'Cargo.toml',
-    install: 'mise install && cargo generate-lockfile',
+    install: 'mise install && cargo generate-lockfile && just bootstrap',
     verify: 'just verify',
     manifests: ['rust-toolchain.toml', 'Cargo.toml'],
     steps: [
@@ -118,6 +118,7 @@ export const STACKS = {
       { run: ['mise', 'install'] },
       { bump: 'rust-toolchain', isMajor: true },
       { run: ['mise', 'exec', '--', 'cargo', 'generate-lockfile'] },
+      { run: ['mise', 'exec', '--', 'just', 'bootstrap'] },
       // cargo-edit is a one-off here, so mise fetches it without pinning it.
       { run: ['mise', 'exec', 'cargo:cargo-edit@latest', '--', 'cargo', 'upgrade', '--incompatible'], isMajor: true },
       { run: ['mise', 'exec', '--', 'cargo', 'fmt', '--all'] },
@@ -128,7 +129,7 @@ export const STACKS = {
     shape: 'a Python package for a tool, script or pipeline: a thin CLI over typed modules',
     kickoffSection: 'Python tools',
     marker: 'pyproject.toml',
-    install: 'mise install && uv lock',
+    install: 'mise install && uv lock && just bootstrap',
     verify: 'just verify',
     manifests: ['mise.toml', '.python-version', 'pyproject.toml'],
     steps: [
@@ -137,6 +138,7 @@ export const STACKS = {
       { bump: 'mise-tools', isMajor: true },
       { bump: 'python', isMajor: true },
       { run: ['mise', 'exec', '--', 'uv', 'lock'] },
+      { run: ['mise', 'exec', '--', 'just', 'bootstrap'] },
       { run: ['mise', 'exec', '--', 'uv', 'run', 'ruff', 'format'] },
       { run: ['mise', 'exec', '--', 'just', 'verify'] },
     ],
@@ -560,11 +562,12 @@ export function kickoffFor(sections: readonly KickoffSection[], stack: Stack): K
   })
 }
 
-const normalise = (question: string) => question.toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim()
+/** Compares kickoff questions independent of case, Markdown emphasis and whitespace. */
+const normalize = (question: string) => question.toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim()
 
 function findAnswer(answers: readonly KickoffAnswer[], question: string): KickoffAnswer | undefined {
-  const key = normalise(question)
-  return answers.find((a) => normalise(a.question) === key)
+  const key = normalize(question)
+  return answers.find((a) => normalize(a.question) === key)
 }
 
 /** The kickoff questions the answers leave out, as problems. */
@@ -807,7 +810,7 @@ export function renderAdr(
   const stack = STACKS[answers.stack]
 
   const asked = input.kickoff.flatMap((section) => section.questions)
-  const extra = answers.kickoff.filter((a) => !asked.some((q) => normalise(q) === normalise(a.question)))
+  const extra = answers.kickoff.filter((a) => !asked.some((q) => normalize(q) === normalize(a.question)))
   const rows = [
     ...asked.map((question) => ({ question, found: findAnswer(answers.kickoff, question) })),
     ...extra.map((found) => ({ question: found.question, found })),

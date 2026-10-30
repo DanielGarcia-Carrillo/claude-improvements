@@ -171,7 +171,7 @@ pub(crate) fn emit_parse_error(format: Format, error: &clap::Error) -> ExitCode 
         (Format::Json, _) => {
             // clap renders "error: " and what's wrong, a blank line, then any
             // tip, the usage line and a pointer to --help: the first paragraph
-            // is the message and the rest the hint. Rendering drops the colour.
+            // is the message and the rest the hint. Rendering drops the color.
             let rendered = error.render().to_string();
             let text = rendered.trim();
             let text = text.strip_prefix("error:").map_or(text, str::trim_start);
@@ -196,7 +196,7 @@ pub(crate) fn emit_parse_error(format: Format, error: &clap::Error) -> ExitCode 
     }
 }
 
-/// Serialises a path as a string, lossily, so a path that isn't valid
+/// Serializes a path as a string, lossily, so a path that isn't valid
 /// Unicode can't fail the whole document.
 fn lossy_path<S: Serializer>(path: &Path, serializer: S) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(&path.to_string_lossy())

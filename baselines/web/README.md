@@ -21,6 +21,7 @@ Versions and statuses were checked on 2026-10-20.
    test) and `ReplaceMe` (the manifest's short name, at most 12 characters).
    `git grep --untracked -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
    fails while any remain.
+   Run `git init -b main` if this is not already a Git repository.
 3. `mise install && pnpm install && pnpm exec playwright install chromium webkit`.
    The template has no lockfile, so this resolves the newest release each
    range allows: a caret on 0.x takes patches only, and StyleX is pinned
@@ -32,6 +33,19 @@ Versions and statuses were checked on 2026-10-20.
    the tools in your global mise config and uninstalls their old versions.
 5. Build `CLAUDE.md` from [`CLAUDE.template.md`](../general/CLAUDE.template.md)
    plus [`CLAUDE.stack.md`](CLAUDE.stack.md); `ln -s CLAUDE.md AGENTS.md`.
+
+Pre-commit uses Lefthook (pinned in `mise.toml`) on staged files only, with
+independent jobs in parallel and formatter fixes re-staged. Spelling runs
+after formatting on the same files. typos checks
+American English spelling. `pnpm install` installs hooks through `prepare`. oxfmt runs before type-aware oxlint
+(warnings denied).
+
+The target is under five seconds after installing dependencies. A commit with
+no matching files skips the corresponding jobs. `git commit --no-verify`
+bypasses hooks; full verify and CI remain required. If installation reports a
+configured `core.hooksPath`, follow the deliberate recovery steps in
+[Git hook setup](../general/infra.md#git-hook-setup); setup never forces or
+resets an existing hook path automatically.
 
 ## The stack
 
@@ -46,10 +60,10 @@ Versions and statuses were checked on 2026-10-20.
 | UI | React 19.3 + React Compiler | Largest ecosystem; the compiler removes manual memoisation | Preact for a tiny shell on low-end devices; Solid for heavy interactivity; Svelte for a greenfield project outside React; Astro for content sites |
 | Routing | TanStack Router, file-based | Paths, params, loaders and search params are typed end to end; search params validated by any Standard Schema | React Router 8 framework mode if adopting its server rendering |
 | Styling | StyleX | Build-time atomic CSS, typed style props, tokens as variables. Dev class names are readable (`Button__styles.root`) | — |
-| Primitives | Native elements: `<button>`, `<dialog>`, the Popover API | No JavaScript to ship; keyboard, focus and disabled behaviour come from the platform. React Aria cost 11.7 KB gzipped for one Button; a Menu is +28 KB with Radix, +48 KB with React Aria | A headless library per widget the platform lacks; see [explorations/ui-primitives](../explorations/ui-primitives.md) |
+| Primitives | Native elements: `<button>`, `<dialog>`, the Popover API | No JavaScript to ship; keyboard, focus and disabled behavior come from the platform. React Aria cost 11.7 KB gzipped for one Button; a Menu is +28 KB with Radix, +48 KB with React Aria | A headless library per widget the platform lacks; see [explorations/ui-primitives](../explorations/ui-primitives.md) |
 | Tokens | TypeScript (`palette.ts` → `defineVars` via `stylex.env`) | One source for StyleX and the APCA test; no DTCG pipeline until Figma interchange is needed | Style Dictionary or Terrazzo when a designer owns tokens |
-| Contrast | APCA via `colorjs.io` in a unit test | Fails the build with the pair and its Lc. `apca-w3`'s licence restricts shipping it | — |
-| Icons | Lucide (`lucide-react`) | ISC, about 1,900 icons, per-icon imports; `aria-hidden` unless labelled | Tabler for breadth; `unplugin-icons` for several sets |
+| Contrast | APCA via `colorjs.io` in a unit test | Fails the build with the pair and its Lc. `apca-w3`'s license restricts shipping it | — |
+| Icons | Lucide (`lucide-react`) | ISC, about 1,900 icons, per-icon imports; `aria-hidden` unless labeled | Tabler for breadth; `unplugin-icons` for several sets |
 | Fonts | System stack in the template | Neutral starting point | Self-host one Latin-only variable family from `@fontsource-variable` (about 20–50 KB) and precache it once the design has a typeface |
 | PWA | vite-plugin-pwa 2 with Workbox 7, `injectManifest`, `registerType: 'prompt'` | The worker is source (`src/sw.ts`) built from Workbox modules, ready for custom handlers; updates wait for consent, unless `public/update-policy.json` forces them, and a kill switch removes a broken worker ([recipe](#recover-from-a-broken-service-worker)) | `generateSW` (Workbox writes the whole worker from config) when it will only ever precache, fall back to the shell and cache by URL pattern. Serwist (`@serwist/vite`), a maintained Workbox fork, if Workbox stalls. Workbox's last release was 7.4.1 in 2026-05; Serwist's was 9.5.13 in 2026-10 |
 | Server state | TanStack Query v5 (add when there are requests) | Caching, retries, offline mutation queue | — |
@@ -168,7 +182,7 @@ precache, so declare the Latin file yourself in `src/index.css`. One
 `@font-face` for `'<Family> Variable'`, whose `src` is
 `url('@fontsource-variable/<family>/files/<family>-latin-wght-normal.woff2')`
 (Vite resolves the package path) and whose `font-weight` is the family's
-weight range (`100 900` for Inter; without it, bold is synthesised from the
+weight range (`100 900` for Inter; without it, bold is synthesized from the
 regular weight). Then one for a metric-matched
 `'<Family> Fallback'` (`src: local('Arial')` with `size-adjust` and
 `ascent-override`). Put both first in `font.body` in `tokens.stylex.ts`.

@@ -34,6 +34,8 @@ export function UpdatePrompt() {
         if (!navigator.onLine) return
         // Mid-install an update check can fail; the next one retries.
         await registration.update().catch(() => undefined)
+        // The connection can go offline while the worker update is pending.
+        if (!navigator.onLine) return
         if (await fetchMustUpdate(import.meta.env.BUILD_TIME)) setIsForced(true)
       }
       void check()

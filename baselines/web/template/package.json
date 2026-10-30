@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "mise exec -- lefthook install",
     "dev": "vite",
     "build": "vite build",
     "build:kill-switch": "SW_KILL_SWITCH=1 vite build",
@@ -20,8 +21,9 @@
     "storybook": "storybook dev -p 6006 --ci",
     "build-storybook": "storybook build",
     "screenshots": "SCREENSHOT_DIR=screenshots vitest run --project storybook && SCREENSHOT_DIR=screenshots playwright test screens",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm e2e",
-    "verify:changed": "node scripts/verify-changed.ts"
+    "verify": "pnpm spellcheck && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm e2e",
+    "verify:changed": "node scripts/verify-changed.ts",
+    "spellcheck": "mise exec -- typos"
   },
   "dependencies": {
     "@stylexjs/stylex": "0.19.1",

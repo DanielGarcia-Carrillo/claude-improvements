@@ -78,7 +78,7 @@ const contextFor = (list: Turn[], known: Record<string, View>, i: number) =>
     return view?.status === 'done' ? view.text : titleOf(t)
   })
 
-// Fills what the pane is about to show: the focused turn and its neighbours,
+// Fills what the pane is about to show: the focused turn and its neighbors,
 // and the session overview.
 async function refresh($: EngineInterface) {
   const list = await read($, turns)
@@ -112,7 +112,7 @@ async function retryOverview($: EngineInterface) {
 const shownBuckets = (d: Digest, p: Purpose) => BUCKETS.filter(b => (p === 'all' ? d[b.id].length > 0 : b.id === p))
 
 // A heading at a real size: SVG text where the surface draws SVG (the desktop),
-// else bold coloured text, as the terminal has one type size.
+// else bold colored text, as the terminal has one type size.
 function heading($: EngineInterface, e: ResolveInput, key: string, text: string, size: number, hue: Hue, columns: number) {
   // By surface, not by the table: every surface's table answers `in` for Svg.
   if (e.surface !== 'terminal') {
@@ -134,7 +134,7 @@ function heading($: EngineInterface, e: ResolveInput, key: string, text: string,
   )
 }
 
-// The digest's lists, one heading each in the list's own colour, as many as the
+// The digest's lists, one heading each in the list's own color, as many as the
 // purpose asks for. `all` skips empty ones.
 function sections($: EngineInterface, e: ResolveInput, d: Digest, p: Purpose, size: number, columns: number) {
   const { Box, Markdown } = $.ui.resolve(e)

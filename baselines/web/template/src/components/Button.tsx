@@ -5,12 +5,12 @@ import type { ComponentProps } from 'react'
 import { color, font, motion, radius, space } from '../theme/tokens.stylex.ts'
 
 export interface ButtonProps extends Omit<ComponentProps<'button'>, 'className' | 'style'> {
-  /** Placement from the caller. Colour, type and shape stay the button's own. */
+  /** Placement from the caller. Color, type and shape stay the button's own. */
   xstyle?: StyleXStyles<{ alignSelf?: string; marginBlockStart?: string; marginInlineStart?: string }>
 }
 
 /**
- * A native `<button>`: keyboard activation, focus and disabled behaviour come
+ * A native `<button>`: keyboard activation, focus and disabled behavior come
  * from the platform, at no bundle cost. `type` defaults to "button" so it
  * never submits a form by accident.
  */
@@ -23,7 +23,7 @@ const styles = stylex.create({
     appearance: 'none',
     borderWidth: 1,
     borderStyle: 'solid',
-    // Transparent, not absent: forced-colours mode paints it, so the button keeps an edge.
+    // Transparent, not absent: forced-colors mode paints it, so the button keeps an edge.
     borderColor: 'transparent',
     borderRadius: radius.control,
     paddingBlock: space.s2,

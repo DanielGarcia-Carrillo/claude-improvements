@@ -2,6 +2,9 @@
 # tools `just verify` runs, pinned so every checkout and CI agree. Each is a
 # prebuilt binary; a `cargo:` backend would compile the tool on every install.
 [tools]
+typos = "1.51.1"
+
+lefthook = "2.2.2"
 just = "1.59.0"
 cargo-insta = "1.49.0"
 "aqua:nextest-rs/nextest/cargo-nextest" = "0.9.148"

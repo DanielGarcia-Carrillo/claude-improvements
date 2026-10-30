@@ -97,8 +97,8 @@ fn a_file_name_reaches_the_logs_escaped() {
         .arg("check")
         .arg(&path)
         .env("RUST_LOG", "debug")
-        // The formatter colours its own output even into a pipe. Without
-        // colour, any ESC on stderr came from the file name.
+        // The formatter colors its own output even into a pipe. Without
+        // color, any ESC on stderr came from the file name.
         .env("NO_COLOR", "1")
         .output()
         .expect("the binary runs");

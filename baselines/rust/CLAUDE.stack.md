@@ -7,7 +7,7 @@ and delete these comments.
 ## Commands
 
 ```bash
-just verify                              # fmt, deny, clippy, tests, docs, shear: the gate
+just verify                              # spelling, fmt, deny, clippy, tests, docs, shear: the gate
 cargo nextest run -p replace-me-core NAME  # narrowest test first, then widen
 just fix                                 # clippy --fix, then rustfmt
 just snapshots                           # review changed insta snapshots
@@ -17,6 +17,13 @@ cargo run -p replace-me -- check FILE --json
 Rust comes from `rust-toolchain.toml`; `just`, nextest, cargo-deny,
 cargo-shear and cargo-insta from `mise.toml` (`mise install`). Never build
 with `--release` unless asked: it is slow and nothing here needs it.
+
+Spelling: `typos` enforces American English, including hooks and CI config.
+It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
+
+Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
+After `mise install`, run `just bootstrap` in every clone. Keep the full
+verify gate before handoff; the pre-commit is a fast file check.
 
 ## Conventions
 

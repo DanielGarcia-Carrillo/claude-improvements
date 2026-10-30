@@ -7,7 +7,7 @@ and `replace_me`, and delete these comments.
 ## Commands
 
 ```bash
-just verify                                # format, lint, types, deps, tests: the gate
+just verify                                # spelling, format, lint, types, deps, tests: the gate
 uv run pytest tests/test_width.py -k NAME  # narrowest test first, then widen
 just fix                                   # ruff's safe fixes, then formatting
 just snapshots                             # rewrite changed inline snapshots, then rerun
@@ -18,6 +18,13 @@ uv add NAME                                # or `uv add --dev NAME`; never pip i
 Python comes from `.python-version`, uv and just from `mise.toml`
 (`mise install`), and every other tool from `uv.lock`. Run them through
 `uv run` or `just`, never a global `python`, `pip` or `ruff`.
+
+Spelling: `typos` enforces American English, including hooks and CI config.
+It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
+
+Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
+After `mise install`, run `just bootstrap` in every clone. Keep the full
+verify gate before handoff; the pre-commit is a fast file check.
 
 ## Conventions
 

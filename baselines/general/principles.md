@@ -45,12 +45,12 @@ code) or removes a choice nobody should be making by hand.
   `URLPattern` before Safari 26). No lodash-style grab bags.
 - **In Rust, the bar is different.** A crate costs build time and supply-chain
   risk rather than download size, and `std` is small on purpose: regexes,
-  serialisation, argument parsing and error types live in crates (`regex`,
+  serialization, argument parsing and error types live in crates (`regex`,
   `serde`, `clap`, `thiserror`). Prefer the ecosystem's standard crate to
   hand-rolled code. Judge a crate by its maintenance (recent releases, more
   than one maintainer), its dependency tree and build time (`cargo tree`,
   `default-features = false`), and its build scripts and `unsafe`.
-  cargo-deny checks advisories, licences, sources and duplicates.
+  cargo-deny checks advisories, licenses, sources and duplicates.
 - **Small, sharp libraries are worth it** when they buy a type-safe
   abstraction or remove a class of bugs at low cost (a schema validator, a
   state primitive, an error-reporting crate). Judge by what it removes from
@@ -73,10 +73,10 @@ code) or removes a choice nobody should be making by hand.
 - **Make invalid states unrepresentable.** Discriminated unions and enums
   over booleans plus optionals; parse at the boundary (schema in TypeScript,
   newtypes and `FromStr` in Rust), trust the types inside.
-- **Refactor before behaviour changes.** When a change is awkward, first land
-  a pure refactor that keeps every test green, then the behaviour change on
+- **Refactor before behavior changes.** When a change is awkward, first land
+  a pure refactor that keeps every test green, then the behavior change on
   top. Two commits at least, ideally two PRs. Reviewers can then read the
-  behaviour change on its own. The refactor keeps the existing tests and
+  behavior change on its own. The refactor keeps the existing tests and
   their assertions (only imports may move): their passing unchanged is what
   shows nothing broke. Rewriting or deleting tests, even the fragile ones
   that prompted the refactor, belongs to the follow-up, which says why they
@@ -85,7 +85,7 @@ code) or removes a choice nobody should be making by hand.
   depend on each other. Aim for a diff a reviewer reads in one sitting
   (a few hundred lines of non-generated change). Split by layer or by
   refactor/behaviour rather than shipping a big one.
-- **Tests check behaviour, not structure.** Assert what a user or caller can
+- **Tests check behavior, not structure.** Assert what a user or caller can
   observe (output, rendered text, a returned value, an error code) through
   the public interface. Don't assert which internal function ran, and don't
   re-test what the type checker already guarantees.
@@ -94,14 +94,14 @@ code) or removes a choice nobody should be making by hand.
   suit parsers and pure transforms. Write no production or test code for
   states the types rule out; if a state seems possible, make it
   unrepresentable instead.
-- **A UI has visual regression tests.** Behaviour tests stay green while a
+- **A UI has visual regression tests.** Behavior tests stay green while a
   layout breaks; screenshots compared with `main`'s catch it. The
   [web baseline](../web/README.md) and
   [explorations/visual-regression.md](../explorations/visual-regression.md)
   say how.
 - **Tests are production code.** Same naming, typing and review bar. Shared
   setup lives in fixtures, builders and page objects, not copy-paste. A test
-  states one behaviour and fails with a message that says which.
+  states one behavior and fails with a message that says which.
 - **Decisions are written down.** A choice that shapes the codebase (a
   framework, a storage format, a public contract) gets an ADR in
   `docs/adr/NNNN-<slug>.md`: context, decision, alternatives, consequences,
@@ -133,7 +133,7 @@ file pointing at it.
 - **A check the agent can run**: Claude Code's
   [best practices](https://code.claude.com/docs/en/best-practices). Without
   one, "looks done" is the agent's only signal that it has finished.
-- **Rule of three**: popularised by Martin Fowler's *Refactoring*, which
+- **Rule of three**: popularized by Martin Fowler's *Refactoring*, which
   credits Don Roberts
   ([summary](https://en.wikipedia.org/wiki/Rule_of_three_(computer_programming))).
 - **Make invalid states unrepresentable**: Yaron Minsky,
