@@ -110,7 +110,7 @@ export const STACKS = {
     shape: 'a Rust workspace for a developer tool: a thin binary over a core library',
     kickoffSection: 'Rust tools',
     marker: 'Cargo.toml',
-    install: 'mise install && cargo generate-lockfile',
+    install: 'mise install && cargo generate-lockfile && just bootstrap',
     verify: 'just verify',
     manifests: ['rust-toolchain.toml', 'Cargo.toml'],
     steps: [
@@ -118,6 +118,7 @@ export const STACKS = {
       { run: ['mise', 'install'] },
       { bump: 'rust-toolchain', isMajor: true },
       { run: ['mise', 'exec', '--', 'cargo', 'generate-lockfile'] },
+      { run: ['mise', 'exec', '--', 'just', 'bootstrap'] },
       // cargo-edit is a one-off here, so mise fetches it without pinning it.
       { run: ['mise', 'exec', 'cargo:cargo-edit@latest', '--', 'cargo', 'upgrade', '--incompatible'], isMajor: true },
       { run: ['mise', 'exec', '--', 'cargo', 'fmt', '--all'] },
@@ -128,7 +129,7 @@ export const STACKS = {
     shape: 'a Python package for a tool, script or pipeline: a thin CLI over typed modules',
     kickoffSection: 'Python tools',
     marker: 'pyproject.toml',
-    install: 'mise install && uv lock',
+    install: 'mise install && uv lock && just bootstrap',
     verify: 'just verify',
     manifests: ['mise.toml', '.python-version', 'pyproject.toml'],
     steps: [
@@ -137,6 +138,7 @@ export const STACKS = {
       { bump: 'mise-tools', isMajor: true },
       { bump: 'python', isMajor: true },
       { run: ['mise', 'exec', '--', 'uv', 'lock'] },
+      { run: ['mise', 'exec', '--', 'just', 'bootstrap'] },
       { run: ['mise', 'exec', '--', 'uv', 'run', 'ruff', 'format'] },
       { run: ['mise', 'exec', '--', 'just', 'verify'] },
     ],

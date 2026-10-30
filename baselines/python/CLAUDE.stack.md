@@ -22,6 +22,10 @@ Python comes from `.python-version`, uv and just from `mise.toml`
 Spelling: `typos` enforces American English, including hooks and CI config.
 It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
 
+Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
+After `mise install`, run `just bootstrap` in every clone. Keep the full
+verify gate before handoff; the pre-commit is a fast file check.
+
 ## Conventions
 
 - **Layout**: logic lives in private modules (`_width.py`, `_errors.py`),

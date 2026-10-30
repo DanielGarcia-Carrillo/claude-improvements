@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "mise exec -- lefthook install",
     "dev": "vite",
     "build": "vite build",
     "build:kill-switch": "SW_KILL_SWITCH=1 vite build",

@@ -19,7 +19,8 @@ Versions and statuses were checked on 2026-10-27.
    CLI test's helper, and `Repository` in `pyproject.toml`.
    `git grep --untracked -niE 'replace[-_ ]?me([^a-z]|$)'` lists what's left, and CI
    fails while any remain.
-3. `mise install && uv lock`. The dependency groups give floors only and the
+   Run `git init -b main` if this is not already a Git repository.
+3. `mise install && uv lock && just bootstrap`. The dependency groups give floors only and the
    template has no lockfile, so this resolves the newest releases.
 4. Take a new Python too: set `.python-version` and `requires-python` to the
    newest release uv offers (`uv python list --only-downloads`), then
@@ -27,6 +28,20 @@ Versions and statuses were checked on 2026-10-27.
    back and note it in the stack ADR. Commit `uv.lock`.
 5. Build `CLAUDE.md` from [`CLAUDE.template.md`](../general/CLAUDE.template.md)
    plus [`CLAUDE.stack.md`](CLAUDE.stack.md); `ln -s CLAUDE.md AGENTS.md`.
+
+Pre-commit uses Lefthook (pinned in `mise.toml`) on staged files only, with
+independent jobs in parallel and formatter fixes re-staged. Spelling runs
+after fixes on the same files. typos checks
+American English spelling. Run
+`just bootstrap` in every clone to install hooks. Ruff applies safe lint fixes
+and then formats staged Python files; type checks and tests stay in `just verify` and CI.
+
+The target is under five seconds after installing dependencies. A commit with
+no matching files skips the corresponding jobs. `git commit --no-verify`
+bypasses hooks; full verify and CI remain required. If installation reports a
+configured `core.hooksPath`, follow the deliberate recovery steps in
+[Git hook setup](../general/infra.md#git-hook-setup); setup never forces or
+resets an existing hook path automatically.
 
 ## The defaults
 

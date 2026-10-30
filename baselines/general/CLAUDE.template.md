@@ -33,7 +33,8 @@ every handoff and never hand off red.
   Graphite (`gt create`, `gt restack`).
 - **Commits**: imperative subject ending in the issue key, for example
   `Add offline banner (ABC-12)`. A refactor and a behavior change are
-  separate commits.
+  separate commits. Install the template's Lefthook hooks in every clone;
+  staged-file checks supplement the full verify gate.
 - **PRs**: one branch each, title carries the key, body has the `Linear:`
   (or `Closes #n`) line, how it was verified and, for a visible change, a
   representative screenshot ([template](.github/pull_request_template.md)).

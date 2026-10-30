@@ -6,6 +6,11 @@
 # being quietly re-resolved. `uv lock` updates the lockfile.
 export UV_LOCKED := "1"
 
+# Install Git hooks in every clone after `mise install`.
+bootstrap:
+    lefthook install
+
+[default]
 verify: spellcheck fmt-check lint types deps test
 
 spellcheck:

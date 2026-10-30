@@ -25,6 +25,10 @@ by itself.
 Spelling: `typos` enforces American English, including hooks and CI config.
 It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
 
+Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
+`pnpm install` installs it via `prepare`. Keep the full verify gate before
+handoff; the pre-commit is a fast file check.
+
 ## Conventions
 
 - **Styling is StyleX.** Styles live beside their component in
