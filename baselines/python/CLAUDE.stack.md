@@ -56,6 +56,21 @@ Python comes from `.python-version`, uv and just from `mise.toml`
 
 ## Traps
 
+- **`re.Match` groups are typed `str | Any`.** `match.group(1)`,
+  `match.group("name")` and `match[1]` fail ty's unsound-return and
+  unsound-assignment rules when returned as or assigned to `str`, since a
+  group that didn't take part is `None`. Narrow with
+  `isinstance(value, str)`. The whole match, `match.group()`, is fine.
+- **Tests can't import each other or `conftest`.** Under
+  `--import-mode=importlib`, test folders aren't on `sys.path`. Share
+  helpers as `conftest.py` fixtures, which pytest injects, and put code that
+  several modules need in the package itself.
+- **Colors stay off where output is checked.** CI sets `FORCE_COLOR`. The
+  parser passes `color=False`, because argparse in 3.14 and later colors
+  usage and errors by it, which would put escape codes into stderr and the
+  `--json` hint. `default-flags-tui = ["report"]` stops inline-snapshot from
+  prompting for input, which it would otherwise do under `FORCE_COLOR`,
+  since that makes any run look interactive.
 - **`uv run` syncs the environment first.** Under `just` and in CI,
   `UV_LOCKED=1` makes a `pyproject.toml` that no longer matches `uv.lock`
   fail instead of re-resolving: run `uv lock` after editing dependencies by

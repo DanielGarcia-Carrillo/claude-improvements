@@ -10,8 +10,19 @@ file=$(jq -r '.tool_input.file_path // empty' <<<"$payload")
 # on the main checkout. Format against the checkout Claude is working in.
 cwd=$(jq -r --arg dir "$CLAUDE_PROJECT_DIR" '.cwd // $dir' <<<"$payload")
 root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$cwd")
-# On Windows the path arrives with backslashes, even under Git Bash. A file
-# that doesn't parse exits 2, which hands ruff's message on stderr to Claude.
-case "${file//\\//}" in
-  "${root//\\//}"/*.py | "${root//\\//}"/*.pyi) uv run --project "$root" --frozen ruff format "$file" >/dev/null ;;
+# On Windows the path arrives with backslashes, even under Git Bash.
+file=${file//\\//}
+root=${root//\\//}
+case "$file" in
+  "$root"/*.py | "$root"/*.pyi) ;;
+  *) exit 0 ;;
 esac
+# The project is the nearest folder above the file that holds pyproject.toml,
+# so one in a subfolder of the repository works like one at its root.
+project=$(dirname "$file")
+while [ ! -f "$project/pyproject.toml" ]; do
+  [ "$project" = "$root" ] && exit 0
+  project=$(dirname "$project")
+done
+# A file that doesn't parse exits 2, which hands ruff's message to Claude.
+uv run --project "$project" --frozen ruff format "$file" >/dev/null

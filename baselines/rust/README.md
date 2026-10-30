@@ -47,7 +47,7 @@ Versions and statuses were checked on 2026-10-20.
 | Warnings | `CARGO_BUILD_WARNINGS=deny` in `just` and CI | Fails on warnings without the cache misses of `RUSTFLAGS=-D warnings` |
 | Errors (lib) | `thiserror` enum with stable `code()` and `hint()`, cause as `#[source]` | Machine-matchable, actionable, no duplicated messages |
 | Errors (bin) | `main() -> ExitCode`, one output module | `main() -> Result` prints Debug output and always exits 1 |
-| CLI | clap 4 derive; `--json` prints exactly one envelope; exit 0 / 1 findings / 2 error | Agents and scripts parse stdout and branch on codes |
+| CLI | clap 4 derive; `--json` prints exactly one envelope; exit 0 / 1 findings / 2 error. Exit 1 is whatever the kickoff names, such as warnings for a converter | Agents and scripts parse stdout and branch on codes |
 | Logging | `tracing` to stderr, `RUST_LOG` filter | stdout stays the result |
 | Tests | nextest (+ `cargo test --doc`), insta-cmd CLI snapshots, proptest | Fast, isolated, contract-shaped; flaky tests fail even when a retry passes |
 | Supply chain | cargo-deny (licences, bans, sources; advisories on main and weekly, or `just deny-all`), cargo-shear | Unused and duplicate dependencies fail; a new advisory doesn't block an unrelated PR |

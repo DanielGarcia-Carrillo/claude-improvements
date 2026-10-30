@@ -53,6 +53,7 @@ new repo's `docs/adr/0001-stack.md`.
 |---|---|
 | CLI, library, or both? | Single crate vs workspace with a `-cli` crate; lint strictness for public API |
 | Who runs it: humans, agents, CI? | Output contract: human text, `--json`, exit codes |
+| Besides errors, what result must a caller notice: findings (a checker), warnings ("converted with warnings"), or none? | What exit 1 means, or that there is none; the `--json` data that explains it |
 | Target platforms? | CI matrix, release targets, whether to avoid system deps |
 | How is it distributed: `cargo install`, prebuilt binaries, Homebrew, an npm wrapper? | Release tooling (cargo-dist, release-plz) |
 | Published to crates.io? | `publish`, semver checks, docs requirements, MSRV policy |
@@ -65,6 +66,7 @@ new repo's `docs/adr/0001-stack.md`.
 |---|---|
 | CLI, library, or a pipeline of scripts? | The template's CLI as is, or a package without `[project.scripts]` |
 | Who runs it: humans, agents, CI? | Output contract: human text, `--json`, exit codes |
+| Besides errors, what result must a caller notice: findings (a checker), warnings ("converted with warnings"), or none? | What exit 1 means, or that there is none; the `--json` data that explains it |
 | Published to PyPI, or used in place? | The `Private` classifier, `requires-python` range, a CI leg per Python, trusted publishing |
 | Which Python versions must it run on? | `.python-version` and `requires-python` |
 | Native dependencies (GDAL, Cairo, CUDA)? | System packages in CI and the README; whether uv's wheels cover every platform |

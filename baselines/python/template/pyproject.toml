@@ -122,6 +122,9 @@ filterwarnings = ["error"]
 # leaves nothing for the format check.
 [tool.inline-snapshot]
 format-command = "ruff format --stdin-filename {filename}"
+# Never prompt: FORCE_COLOR makes any run look like an interactive terminal, and a
+# prompt hangs an agent or a hook. `just snapshots` rewrites them instead.
+default-flags-tui = ["report"]
 
 [tool.deptry]
 known_first_party = ["replace_me"]

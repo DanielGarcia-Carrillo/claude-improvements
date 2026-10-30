@@ -25,6 +25,10 @@ env:
 # Every job runs on GitHub-hosted Ubuntu unless the CI_RUNNER repository
 # variable names another runner label (e.g. blacksmith-2vcpu-ubuntu-2404 on a
 # private repo). Deleting the variable moves CI back, with no commit.
+#
+# A project in a subfolder of a bigger repository: give verify and advisories
+# `defaults: run: working-directory: <folder>`. Never set it for the whole
+# workflow, since `ci` checks nothing out and its steps would fail to start.
 jobs:
   verify:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}

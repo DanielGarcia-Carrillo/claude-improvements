@@ -249,3 +249,11 @@ def test_a_bad_argument_reaches_stderr_escaped() -> None:
     assert result["exit"] == 2
     assert r"\x1b[31mred" in result["stderr"]
     assert "\x1b" not in result["stderr"]
+
+
+def test_errors_stay_plain_text_under_force_color() -> None:
+    # CI sets FORCE_COLOR, and Python 3.14+ argparse colors its output by it.
+    for args in (("check", "--bogus"), ("--json", "check", "--bogus")):
+        result = replace_me(*args, env={"FORCE_COLOR": "1"})
+        assert result["exit"] == 2
+        assert "\x1b" not in result["stdout"] + result["stderr"]
