@@ -53,7 +53,7 @@ resets an existing hook path automatically.
 | Lint and format | ruff with every rule (`ALL`) minus a short list, each with its reason; `ruff format` | Each rule names the problem and usually the fix. A suppression must name its rule (`PGH004`), and an unused one fails (`RUF100`) |
 | Types | ty, with the rules its guide lists as `mypy --strict`'s counterparts turned on, plus ruff's `ANN` for annotations; any warning fails | Checks the whole project in well under a second, so the Stop hook runs it every time; diagnostics in rustc's style |
 | Errors | Subclasses of the package's `Error`, each with a stable `code` and a `hint`; the cause kept with `raise … from` | Machine-matchable, actionable, no duplicated messages |
-| CLI | argparse from the standard library; `--json` prints exactly one envelope, even for bad arguments; exit 0 clean / 1 findings / 2 error / 70 bug | Agents and scripts parse stdout and branch on codes; no dependency and the fastest start |
+| CLI | argparse from the standard library; `--json` prints exactly one envelope, even for bad arguments; exit 0 clean / 1 findings / 2 error / 70 bug. Exit 1 is whatever the kickoff names, such as warnings for a converter | Agents and scripts parse stdout and branch on codes; no dependency and the fastest start |
 | Logging | `logging` to stderr, `LOG_LEVEL` filter; `print` and `sys.stdout` banned outside `_output.py` | stdout stays the result |
 | Tests | pytest (strict, warnings fail), doctests, inline-snapshot for the CLI contract, Hypothesis for properties | Snapshots live in the test and are rewritten by a command, so the diff is the review |
 | Supply chain | deptry for undeclared and unused dependencies; `uv audit` (OSV advisories) on main and weekly, or `just audit` | A new advisory doesn't block an unrelated PR |
@@ -82,6 +82,7 @@ stalls before its own 1.0.
 
 | Need | Add |
 |---|---|
+| The project in a subfolder of a bigger repository | Copy `template/` into the folder, then move its `.claude/`, `.github/`, `mise.toml`, `lefthook.yml` and `_typos.toml` to the repository root, next to `general/files/`. GitHub, mise-action, Lefthook and the spelling check read their files only from there, so spelling covers the whole repository; exclude older folders in `_typos.toml` (`extend-exclude`) if they aren't ready. Start Claude Code from the root too, since it loads `.claude/settings.json` and its hooks from where it starts; the hooks then find each project by the nearest folder holding `pyproject.toml` and `uv.lock`. In `lefthook.yml`, give the python job `root: "<folder>/"` so `uv` runs in the project. Then edit `ci.yml` as its comment above `jobs:` says: a job-level `working-directory`, the `<folder>/` prefix on the junit paths, and a placeholder check and spellcheck that cover the whole repository. In `dependabot.yml`, point the uv entry at `/<folder>` |
 | Published library | Drop the `Private` classifier; `requires-python` two or three releases back with a CI leg on the oldest; `uv build` and `uv publish` with PyPI trusted publishing from Actions |
 | Validating outside data | Pydantic 2 (ty understands it without a plugin) or msgspec, which is faster and smaller |
 | Faster JSON | orjson |
