@@ -1,10 +1,10 @@
 // Headings drawn as SVG text, the one way a plugin sets a type size on the
 // desktop: its Text and Markdown take the app's body size and its small
-// heading styles. The SVG is drawn as an image, so it carries its own colours
+// heading styles. The SVG is drawn as an image, so it carries its own colors
 // for light and dark and wraps its own lines.
 
-// Six hues, none shared: one per list, whose colour means the same everywhere,
-// and the lens's own for its frames. `mid` reads on either theme and colours
+// Six hues, none shared: one per list, whose color means the same everywhere,
+// and the lens's own for its frames. `mid` reads on either theme and colors
 // borders and text; `light` and `dark` are the headings' shades.
 export const PALETTE = {
   text: { mid: '#8a8780', light: '#1f1e1d', dark: '#f0eee6' },

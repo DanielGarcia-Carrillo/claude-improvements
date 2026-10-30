@@ -320,7 +320,7 @@ function scaffold(options: { answers: string; target: string; baselines: string 
     insideRepo.status === 0
       ? `already inside the git repository at ${insideRepo.stdout.trim()}`
       : run(['git', 'init', '-q', '-b', 'main'], target).status === 0
-        ? 'git initialised on main'
+        ? 'git initialized on main'
         : 'git init failed; run it by hand'
 
   process.stdout.write(

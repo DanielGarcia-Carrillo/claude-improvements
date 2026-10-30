@@ -38,6 +38,7 @@ describe('after-edit', () => {
         `${repo.root}|exec oxlint --fix ${file}`,
         `${repo.root}|exec oxfmt --no-error-on-unmatched-pattern ${file}`,
         `${repo.root}|exec oxlint ${file}`,
+        `${repo.root}|mise exec -- typos --force-exclude -- ${file}`,
       ],
     })
   })
@@ -46,13 +47,24 @@ describe('after-edit', () => {
     'formats %s without linting it',
     (path) => {
       const file = repo.write(path)
-      expect(edit(file).calls).toEqual([`${repo.root}|exec oxfmt --no-error-on-unmatched-pattern ${file}`])
+      expect(edit(file).calls).toEqual([
+        `${repo.root}|exec oxfmt --no-error-on-unmatched-pattern ${file}`,
+        `${repo.root}|mise exec -- typos --force-exclude -- ${file}`,
+      ])
     },
   )
 
-  it.each(['public/icon.png', 'public/logo.svg', 'notes.txt', '.gitignore'])('leaves %s alone', (path) => {
-    expect(edit(repo.write(path))).toEqual({ status: 0, stderr: '', calls: [] })
-  })
+  it.each(['public/icon.png', 'public/logo.svg', 'notes.txt', '.gitignore'])(
+    'spellchecks %s without formatting or linting',
+    (path) => {
+      const file = repo.write(path)
+      expect(edit(file)).toEqual({
+        status: 0,
+        stderr: '',
+        calls: [`${repo.root}|mise exec -- typos --force-exclude -- ${file}`],
+      })
+    },
+  )
 
   it('leaves a file outside the checkout alone', () => {
     const file = join(repo.base, 'elsewhere.ts')
@@ -105,6 +117,13 @@ describe('after-edit', () => {
     symlinkSync(repo.root, link)
     const { calls } = edit(join(link, 'src/app.ts'), {}, link)
     expect(calls[0]).toBe(`${repo.root}|exec oxlint --fix ${file}`)
+  })
+
+  it('hands spelling failures back to Claude', () => {
+    const file = repo.write('notes.txt')
+    const result = edit(file, { STUB_FAIL: 'typos', STUB_OUTPUT: 'Use American English' })
+    expect(result.status).toBe(2)
+    expect(result.stderr).toBe('typos: problems in notes.txt:\nUse American English\n')
   })
 
   it('ignores a payload without a file', () => {

@@ -2,7 +2,7 @@
  * The scaffold over the real baselines, which the plugin test kit cannot
  * read (it offers no file system). Run it with Node, not `claude plugin test`:
  *
- *   node --test mods/new-project/tests/baselines.node.mts
+ *   mise exec -- node --test mods/new-project/tests/baselines.node.mts
  *
  * Each stack is scaffolded into a temporary folder, then checked with the
  * template CI's own placeholder step, so a placeholder the baselines gain
@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { after, test } from 'node:test'
 
 import type { Stack } from '../scripts/compose.ts'
@@ -51,10 +51,11 @@ function answersFor(stack: Stack) {
   }
 }
 
-function scaffold(stack: Stack): string {
-  const answers = join(scratch, `${stack}.json`)
+/** Generates a named scratch project from the real baseline without installing dependencies. */
+function scaffold(stack: Stack, name: string = stack): string {
+  const answers = join(scratch, `${name}.json`)
   writeFileSync(answers, JSON.stringify(answersFor(stack)))
-  const target = join(scratch, stack)
+  const target = join(scratch, name)
   const result = run(
     'node',
     [SCRIPT, 'scaffold', '--answers', answers, '--target', target, '--baselines', BASELINES],
@@ -282,3 +283,69 @@ test('setup needs --stack for a folder holding both manifests, and runs the stac
   rmSync(join(repo, 'pyproject.toml'))
   assert.match(setup().stderr, /holds no package\.json, Cargo\.toml or pyproject\.toml/)
 })
+
+for (const stack of ['web', 'rust', 'python'] as const) {
+  test(`${stack} scaffolds enforce American English, including hidden agent files`, () => {
+    const repo = scaffold(stack, `${stack}-spelling`)
+    assert.match(read(repo, 'mise.toml'), /typos = "1\.51\.1"/)
+    const clean = run('typos', [], repo)
+    assert.equal(clean.status, 0, clean.stdout + clean.stderr)
+    for (const path of ['README.md', '.claude/spelling.md']) {
+      writeFileSync(join(repo, path), ['col', 'our'].join('') + '\n')
+      const checked = run('typos', [], repo)
+      assert.equal(checked.status, 2, checked.stdout + checked.stderr)
+      assert.match(checked.stdout, /color/)
+      writeFileSync(join(repo, path), 'color\n')
+    }
+    assert.equal(run('typos', [], repo).status, 0)
+  })
+}
+
+for (const stack of ['rust', 'python'] as const) {
+  test(`${stack} hooks return spelling errors from the payload checkout`, () => {
+    const repo = scaffold(stack, `${stack}-hooks`)
+    const bin = join(scratch, `${stack}-hook-tools`)
+    mkdirSync(bin)
+    for (const tool of ['rustfmt', 'cargo', 'uv'])
+      writeFileSync(join(bin, tool), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    // Reject direct calls without removing shared PATH directories (for example jq's).
+    const located = run('mise', ['which', 'typos'], resolve(BASELINES, '..'))
+    assert.equal(located.status, 0, located.stderr)
+    writeFileSync(join(bin, 'typos'), '#!/bin/sh\necho "Use mise exec for typos" >&2\nexit 98\n', { mode: 0o755 })
+    writeFileSync(
+      join(bin, 'mise'),
+      `#!/bin/sh
+[ "$1" = exec ] && [ "$2" = -- ] && [ "$3" = typos ] || exit 99
+shift 3
+exec "$PINNED_TYPOS" "$@"
+`,
+      { mode: 0o755 },
+    )
+    const nested = join(repo, 'nested')
+    mkdirSync(nested)
+    const file = join(repo, 'README.md')
+    writeFileSync(file, ['col', 'our'].join('') + '\n')
+    const hook = (name: string, retry = false) =>
+      spawnSync('bash', [join(repo, `.claude/hooks/${name}.sh`)], {
+        cwd: nested,
+        input: JSON.stringify({ cwd: nested, tool_input: { file_path: file }, stop_hook_active: retry }),
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}${delimiter}${process.env['PATH'] ?? ''}`,
+          PINNED_TYPOS: located.stdout.trim(),
+          CLAUDE_PROJECT_DIR: scratch,
+        },
+      })
+    const edited = hook('after-edit')
+    assert.equal(edited.status, 2, edited.stderr)
+    assert.match(edited.stderr, /color/)
+    const stopped = hook('before-stop')
+    assert.equal(stopped.status, 2, stopped.stderr)
+    assert.match(stopped.stderr, /color/)
+    assert.equal(hook('before-stop', true).status, 1)
+    writeFileSync(file, 'color\n')
+    assert.equal(hook('after-edit').status, 0)
+    assert.equal(hook('before-stop').status, 0)
+  })
+}

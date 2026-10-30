@@ -35,7 +35,7 @@ on 2026-10-21 with each library's documented imports:
 | Radix (`radix-ui`) | 1.8.1, maintained again since 2026 | +22 KB | +28 KB | +33 KB | Smallest; plain `data-state` attributes for styling | Thinner i18n; its maintenance lapsed once before |
 | Ariakit | 0.4.42 | +28 KB | +41 KB | +44 KB | Composable, good a11y | Still 0.x |
 | Base UI | 1.9.0 | +34 KB | +44 KB | +53 KB | Modern API from the Radix and MUI authors | Newer, smaller community |
-| React Aria Components | 1.22.1 | +29 KB | +48 KB (+45 KB) | +58 KB (+53 KB) | Strongest a11y and i18n: localised strings, RTL, date and number fields | Heaviest; bracketed figures use its locale optimiser |
+| React Aria Components | 1.22.1 | +29 KB | +48 KB (+45 KB) | +58 KB (+53 KB) | Strongest a11y and i18n: localized strings, RTL, date and number fields | Heaviest; bracketed figures use its locale optimizer |
 
 All four tree-shake fully. Umbrella packages, root imports, `import * as`
 and per-component subpaths land within 1 KB of each other, so use the style
@@ -53,7 +53,7 @@ target (`'[data-state="open"]': …`).
   from Base UI or Ariakit.
 - **Date picker, number or currency field, anything locale-heavy:** React
   Aria, the one case where its weight buys something the others lack. A
-  DatePicker alone is +60 KB with the locale optimiser. Once React Aria is
+  DatePicker alone is +60 KB with the locale optimizer. Once React Aria is
   in, take the other widgets from it too: its Menu and Select then add
   +24 KB, against +33 KB for Radix alongside it.
 - **Dialog, disclosure, accordion, popover without positioning:** native, no
@@ -76,7 +76,7 @@ fit the per-widget slot:
   to three weeks.
 - Its accessibility testing is serious (axe on every PR, an APG conformance
   programme), but its checked-in baseline still tolerates 149 serious axe
-  violations, most of them colour contrast.
+  violations, most of them color contrast.
 - It shares StyleX's `x` class prefix; clean layering needs its own Vite
   plugin, which wraps `@stylexjs/unplugin`.
 

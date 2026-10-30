@@ -72,3 +72,12 @@ if (LINTED.has(ext)) {
     process.exit(2)
   }
 }
+
+const spelling = spawnSync('mise', ['exec', '--', 'typos', '--force-exclude', '--', file], {
+  cwd: root,
+  encoding: 'utf8',
+})
+if (spelling.status !== 0) {
+  process.stderr.write(`typos: problems in ${relative(root, file)}:\n${printed(spelling)}`)
+  process.exit(2)
+}

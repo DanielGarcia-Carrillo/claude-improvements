@@ -8,7 +8,7 @@ project does not use (an API, Storybook) and these comments.
 
 ```bash
 pnpm dev               # Vite dev server; the service worker is off in dev
-pnpm verify            # typecheck, lint, format check, every test suite: the gate
+pnpm verify            # spelling, typecheck, lint, format check, every test suite: the gate
 pnpm verify:changed    # while iterating: typecheck, then lint, format and Vitest for changed files only; no e2e
 pnpm test              # Vitest: unit tests (node) and every story in a real browser
 pnpm e2e               # Playwright against a production build and preview server
@@ -22,10 +22,13 @@ Node comes from `mise.toml`, pnpm from `packageManager`. If pnpm says
 dependencies are out of date, run `pnpm install` once; it will not install
 by itself.
 
+Spelling: `typos` enforces American English, including hooks and CI config.
+It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
+
 ## Conventions
 
 - **Styling is StyleX.** Styles live beside their component in
-  `stylex.create`; colours, spacing, radii and motion come only from the
+  `stylex.create`; colors, spacing, radii and motion come only from the
   tokens in `src/theme/*.stylex.ts`, never literals. A component that accepts
   styling takes a typed `xstyle` prop (`StyleXStyles<{ …allowed properties }>`),
   never a class name. Interaction states are pseudo-classes on native
@@ -34,9 +37,9 @@ by itself.
 - **Dark mode, reduced motion and contrast are token concerns.** Tokens change
   under `prefers-color-scheme`, `prefers-reduced-motion` and
   `prefers-contrast`; components never test those media queries themselves.
-  Borders stay `transparent` rather than absent so forced-colours mode paints
+  Borders stay `transparent` rather than absent so forced-colors mode paints
   them.
-- **Colour values live in `src/theme/palette.ts`**, the one source the
+- **Color values live in `src/theme/palette.ts`**, the one source the
   StyleX tokens and the APCA test both read. Every foreground/background pair
   the app draws is listed in `src/theme/contrast.test.ts` and must reach APCA
   Lc 75 for body text, 60 for UI text, 45 for non-text, in both themes. Add
@@ -81,7 +84,7 @@ by itself.
 
 - **The service worker is generated from `src/sw.ts`.** `dist/sw.js` is
   rebuilt on every build, and dev runs without a worker. Test offline
-  behaviour against `pnpm e2e`, or `pnpm build` then `pnpm preview`.
+  behavior against `pnpm e2e`, or `pnpm build` then `pnpm preview`.
 - **`public/update-policy.json` stays `{ "forceUpdateBefore": null }`**
   except in an emergency fix's PR. A date there makes every open tab of an
   older build reload without asking. The kill switch is deployed only from

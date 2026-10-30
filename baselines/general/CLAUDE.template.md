@@ -48,7 +48,7 @@ every handoff and never hand off red.
   replies, issue comments, chat messages) ends with a line naming the agent,
   such as `🤖 Generated with [Claude Code](https://claude.com/claude-code)`,
   and its commits carry its `Co-Authored-By:` trailer.
-- **Done** means: verify green; tests cover the new behaviour; an ADR is
+- **Done** means: verify green; tests cover the new behavior; an ADR is
   added or superseded if a decision changed; this file is updated if a
   command, convention or trap changed.
 
@@ -70,6 +70,8 @@ every handoff and never hand off red.
 
 ## Conventions
 
+- Write American English in prose, comments and test names; `typos` checks it.
+
 - **Rule of three**: tolerate a second copy, extract on the third (constant,
   helper, component, fixture, page object). Not before.
 - **Errors name the fix**: what failed, where, and what to do about it. No
@@ -80,9 +82,9 @@ every handoff and never hand off red.
   library; in Rust, the ecosystem's standard crate before hand-rolled code.
   A new dependency is justified in its commit message; a structural one gets
   an ADR.
-- **Tests check behaviour** a caller can observe, not internals or what the
+- **Tests check behavior** a caller can observe, not internals or what the
   types already guarantee, and only inputs that can happen. Shared setup in
-  fixtures and builders, one behaviour per test, failure messages that say
+  fixtures and builders, one behavior per test, failure messages that say
   which.
 
 <!-- stack fragment: Conventions -->

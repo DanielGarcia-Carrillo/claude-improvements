@@ -560,11 +560,12 @@ export function kickoffFor(sections: readonly KickoffSection[], stack: Stack): K
   })
 }
 
-const normalise = (question: string) => question.toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim()
+/** Compares kickoff questions independent of case, Markdown emphasis and whitespace. */
+const normalize = (question: string) => question.toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim()
 
 function findAnswer(answers: readonly KickoffAnswer[], question: string): KickoffAnswer | undefined {
-  const key = normalise(question)
-  return answers.find((a) => normalise(a.question) === key)
+  const key = normalize(question)
+  return answers.find((a) => normalize(a.question) === key)
 }
 
 /** The kickoff questions the answers leave out, as problems. */
@@ -807,7 +808,7 @@ export function renderAdr(
   const stack = STACKS[answers.stack]
 
   const asked = input.kickoff.flatMap((section) => section.questions)
-  const extra = answers.kickoff.filter((a) => !asked.some((q) => normalise(q) === normalise(a.question)))
+  const extra = answers.kickoff.filter((a) => !asked.some((q) => normalize(q) === normalize(a.question)))
   const rows = [
     ...asked.map((question) => ({ question, found: findAnswer(answers.kickoff, question) })),
     ...extra.map((found) => ({ question: found.question, found })),

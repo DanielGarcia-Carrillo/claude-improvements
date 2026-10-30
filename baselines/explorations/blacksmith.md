@@ -2,7 +2,7 @@
 
 Status: **recommended for private repos that pay for Actions minutes;
 public repos stay on GitHub's free runners.** It needs the repos in a GitHub
-organisation, which in practice means the Team plan (see below). Not yet
+organization, which in practice means the Team plan (see below). Not yet
 piloted. Checked on 2026-10-21 from Blacksmith's and GitHub's docs and
 pricing pages; speed figures are the vendor's and unverified.
 
@@ -61,21 +61,21 @@ Team. Rust compiles and cache restores gain the most from faster machines;
 jobs that mostly wait on the network or on fixed setup gain little, so
 measure rather than assume 2×.
 
-## Moving private repos into an organisation
+## Moving private repos into an organization
 
-Creating an organisation and transferring repos takes minutes, but four
+Creating an organization and transferring repos takes minutes, but four
 things change:
 
 1. **Choose Team, not Free** ($4 per user per month). On a Free
-   organisation, private repos lose protected branches and rulesets,
+   organization, private repos lose protected branches and rulesets,
    required reviewers, code owners and GitHub Pages, and can't read
-   organisation-level variables or secrets. The templates rely on a
+   organization-level variables or secrets. The templates rely on a
    required `ci` status check, which needs branch protection or a ruleset.
-2. **Reinstall GitHub apps on the organisation.** An app installed on the
-   personal account doesn't cover the organisation's repos: Graphite,
+2. **Reinstall GitHub apps on the organization.** An app installed on the
+   personal account doesn't cover the organization's repos: Graphite,
    Linear, Cloudflare, Claude and the like each need installing there.
    Fine-grained tokens are scoped to one owner, so make new ones for the
-   organisation.
+   organization.
 3. **Update remotes.** Web links and `git` URLs redirect, but run
    `git remote set-url origin <new URL>` in each clone (worktrees share one
    config, so once per repo). Never create a repo with the old name under
@@ -86,7 +86,7 @@ things change:
 
 ## Pilot
 
-1. Create the organisation on Team and transfer the private repo with the
+1. Create the organization on Team and transfer the private repo with the
    most CI minutes.
 2. Install Blacksmith's app on **selected repositories** only, starting with
    that one.
@@ -94,9 +94,9 @@ things change:
 4. After a week, compare minutes, wall-clock time and cost with the week
    before.
 5. If it holds up, move the other private repos, add each to Blacksmith's
-   app, and set `CI_RUNNER` once as an organisation variable for those same
+   app, and set `CI_RUNNER` once as an organization variable for those same
    selected repositories. A repo with the variable but not the app has no
-   runner for its jobs. Public repos in the organisation stay on GitHub's
+   runner for its jobs. Public repos in the organization stay on GitHub's
    free runners.
 
 ## Risks
@@ -105,7 +105,7 @@ things change:
   each job in its own VM, and doesn't request access to secrets. Its app
   does ask for read/write on contents, workflows, pull requests, checks and
   actions (for its migration wizard and agent features), so install it on
-  selected repos only. It also gets organisation-wide read/write on
+  selected repos only. It also gets organization-wide read/write on
   self-hosted runners, which is how jobs reach its runners; repo selection
   doesn't limit that.
 - **Ubuntu 24.04 only**, while the templates default to 26.04. Toolchains
@@ -122,13 +122,13 @@ things change:
 | Ubicloud | about $0.0012/min, 1,250 free minutes | Open source |
 | Depot | $20/month for 2,000 min, then $0.006/min | Strongest on Docker builds |
 | WarpBuild | $0.004/min ($0.002 in your own cloud) | Similar to Blacksmith |
-| RunsOn | About $0.0009/min on AWS spot, plus a licence | Runs in your own AWS account |
+| RunsOn | About $0.0009/min on AWS spot, plus a license | Runs in your own AWS account |
 
 `CI_RUNNER` works the same way for any of these.
 
 ## Replacing GitHub Actions entirely
 
-Checked on 2026-10-21; prices normalised to 2-vCPU Linux minutes.
+Checked on 2026-10-21; prices normalized to 2-vCPU Linux minutes.
 
 | Platform | Cost for one person | Gap for these projects |
 |---|---|---|

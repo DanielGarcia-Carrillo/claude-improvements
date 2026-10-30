@@ -50,7 +50,7 @@ Versions and statuses were checked on 2026-10-20.
 | CLI | clap 4 derive; `--json` prints exactly one envelope; exit 0 / 1 findings / 2 error | Agents and scripts parse stdout and branch on codes |
 | Logging | `tracing` to stderr, `RUST_LOG` filter | stdout stays the result |
 | Tests | nextest (+ `cargo test --doc`), insta-cmd CLI snapshots, proptest | Fast, isolated, contract-shaped; flaky tests fail even when a retry passes |
-| Supply chain | cargo-deny (licences, bans, sources; advisories on main and weekly, or `just deny-all`), cargo-shear | Unused and duplicate dependencies fail; a new advisory doesn't block an unrelated PR |
+| Supply chain | cargo-deny (licenses, bans, sources; advisories on main and weekly, or `just deny-all`), cargo-shear | Unused and duplicate dependencies fail; a new advisory doesn't block an unrelated PR |
 | Tasks | `just` | One `just verify` that runs the checks PR CI runs |
 | Tools | mise pins just, nextest, cargo-deny, cargo-shear, cargo-insta as prebuilt binaries; CI installs them from the same `mise.toml` | Same versions locally and in CI, and no tool compiles from source |
 | CI | GitHub Actions, SHA-pinned; `rustup toolchain install` reads the toolchain file; Swatinem/rust-cache; sccache in the test job (Actions cache backend; `main` writes, PRs read); jdx/mise-action for the tools. Draft PRs skip lint and test; marking a PR ready runs them | Linux only by default; a draft push runs only the short `ci` job until someone marks the PR ready. rust-cache restores dependencies but not the workspace's own crates, which sccache serves, so a PR that changed one crate recompiles little else. Lint gets no sccache: clippy and rustdoc emit metadata only, which it can't cache; add macOS and Windows test legs only for tools shipped there |
@@ -61,7 +61,7 @@ Versions and statuses were checked on 2026-10-20.
 |---|---|
 | Published library | `cargo-semver-checks` in CI, `avoid-breaking-exported-api = true` in clippy.toml, `missing_docs` stays, an MSRV job, `expect_used` lint |
 | Releases with prebuilt binaries | `dist` (cargo-dist) for installers and GitHub releases; `release-plz` for versions, changelog and crates.io |
-| Source-span diagnostics (parsers, config files) | `miette` or `annotate-snippets` for labelled spans; keep codes and hints |
+| Source-span diagnostics (parsers, config files) | `miette` or `annotate-snippets` for labeled spans; keep codes and hints |
 | An error type of the binary's own, with context chains | `anyhow` with `.with_context(…)` at I/O boundaries; the reporter downcasts to the core error for its code |
 | Feature flags | `cargo hack --feature-powerset check` in CI |
 | `unsafe` (FFI only) | `unsafe_code = "deny"` with `#[expect(unsafe_code, reason)]` at each site, `undocumented_unsafe_blocks`, Miri in CI |

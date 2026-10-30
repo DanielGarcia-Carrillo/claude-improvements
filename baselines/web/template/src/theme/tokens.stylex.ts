@@ -1,12 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
 
 /**
- * Design tokens. Components take colour, spacing, radii, type and motion
+ * Design tokens. Components take color, spacing, radii, type and motion
  * from here and never spell a literal. Tokens, not components, answer to
  * `prefers-color-scheme`, `prefers-reduced-motion` and `prefers-contrast`.
  */
 
-/** Colour roles from palette.ts, each a `light-dark()` pair. */
+/** Color roles from palette.ts, each a `light-dark()` pair. */
 export const color = stylex.defineVars(stylex.env.colorTokens)
 
 export const space = stylex.defineVars({

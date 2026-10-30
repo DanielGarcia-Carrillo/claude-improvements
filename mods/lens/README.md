@@ -5,7 +5,7 @@ you**, **waiting on others**, **blocked** and **done**, under a one-line
 headline. You see where the work stands
 without reading the whole reply. The idea comes from Amelia Wattenberger's
 [fish-eye essay](https://wattenberger.com/thoughts/fish-eye/): show the part
-you're looking at in detail, with the context around it summarised.
+you're looking at in detail, with the context around it summarized.
 
 ## What it does
 
@@ -28,7 +28,7 @@ One call covers all five lists, so switching between them never calls the
 model again. Digests are cached per turn for the session.
 
 Every view is stamped with when Claude finished the original reply (with the
-date once it isn't today), not when it was summarised.
+date once it isn't today), not when it was summarized.
 
 ### In the transcript
 
@@ -91,15 +91,15 @@ design. Some may change in later releases.
 
 - **No type size for text.** `Text` and `Markdown` draw at the app's body
   size. Markdown `##`/`###` headings use the app's own small heading styles,
-  and `Text` offers only bold, italic, underline, colour and background. The
+  and `Text` offers only bold, italic, underline, color and background. The
   only way to draw a larger heading is an `Svg` element, so on the desktop
   every heading here is an SVG image. That costs three things:
   - SVG headings can't be selected or copied.
   - They wrap lines by estimating character width, so a line can break a
     little early or late.
-  - They pick light or dark colours from the system setting, which can differ
+  - They pick light or dark colors from the system setting, which can differ
     from the app's theme.
-- **Colours have no light/dark pair outside SVG.** `Text` and `Box` colours
+- **Colors have no light/dark pair outside SVG.** `Text` and `Box` colors
   take a theme name or a fixed hex. The lens uses mid-tone hex values that
   read on both themes, rather than separate shades for each.
 - **Rewriting a reply means redrawing it.** To add the callout or replace the
@@ -120,7 +120,7 @@ design. Some may change in later releases.
   it or call the model, so replies note which digests they're missing and a
   timer fetches them, three at a time.
 - **Hotkeys only show on plain buttons.** Buttons drawn as real buttons hide
-  their hotkey, so the pane's shortcuts work but aren't labelled.
+  their hotkey, so the pane's shortcuts work but aren't labeled.
 
 ## Develop
 

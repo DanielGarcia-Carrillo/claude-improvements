@@ -1,4 +1,5 @@
 [tools]
+typos = "1.51.1"
 # Even-numbered majors become LTS in October. pnpm comes from package.json's
 # `packageManager`, which pnpm itself enforces.
 node = "26"

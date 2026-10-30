@@ -7,7 +7,7 @@
  * page that isn't there around the component.
  *
  * `color-contrast` is off. It scores WCAG 2 contrast ratios, while this
- * project holds colour to APCA in src/theme/contrast.test.ts: running both
+ * project holds color to APCA in src/theme/contrast.test.ts: running both
  * lets a palette that passes one fail the other. The rule also reads whatever
  * is painted at that instant (a transition, an overlapping layer), which makes
  * it axe's usual source of flaky results.

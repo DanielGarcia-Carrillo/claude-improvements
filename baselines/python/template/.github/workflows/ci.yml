@@ -39,6 +39,7 @@ jobs:
       # uv and just at mise.toml's versions. uv then installs the Python in
       # .python-version and the tools in uv.lock on its first `uv run`.
       - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - run: just spellcheck
       # The steps of `just verify`, one each so the summary times them.
       - run: just fmt-check
       - run: just lint

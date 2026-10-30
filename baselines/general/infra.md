@@ -76,7 +76,7 @@ Source: [Workers pricing](https://developers.cloudflare.com/workers/platform/pri
 | Vercel | The project must be Next.js with every feature | Hobby tier is non-commercial; Pro is $20/seat |
 | Netlify | An existing Netlify site | Credit-based plan charges per production deploy |
 | AWS (Lambda, Amplify) | Needs AWS-only services or an existing account | Heaviest setup: IAM, regions, many bills |
-| Azure Static Web Apps | Organisational requirement | Free tier stops serving at quota |
+| Azure Static Web Apps | Organizational requirement | Free tier stops serving at quota |
 
 ## Data
 
@@ -134,7 +134,7 @@ rules:
   its slowest tests and a `cargo --timings` report as an artifact, the
   Python template its slowest tests from pytest's JUnit report, and
   Playwright's HTML report ranks tests by duration. For trends, use GitHub's
-  Actions performance metrics (organisation Insights) or Blacksmith's
+  Actions performance metrics (organization Insights) or Blacksmith's
   dashboard.
 - On public repos, turn on secret-scanning push protection and CodeQL
   default setup in the repo settings (both free, both off per repo by default).

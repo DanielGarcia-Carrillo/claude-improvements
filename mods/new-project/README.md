@@ -139,7 +139,7 @@ placeholder check on the result, and run doctor through a linked skill
 folder:
 
 ```bash
-node --test mods/new-project/tests/baselines.node.mts
+mise exec -- node --test mods/new-project/tests/baselines.node.mts
 ```
 
 After changing a baseline or the script, scaffold each stack into a scratch
