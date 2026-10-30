@@ -67,7 +67,7 @@ stalls before its own 1.0.
 
 | Need | Add |
 |---|---|
-| The project in a subfolder of a bigger repository | Copy `template/` into the folder and `general/files/` at the repository root, with `.claude/` at the root too: the hooks find each project by its nearest `pyproject.toml`. In `ci.yml`, set `defaults: run: working-directory: <folder>` on the verify and advisories jobs, never the whole workflow (`ci` checks nothing out). In `dependabot.yml`, point the uv entry at `/<folder>`. `mise.toml` can stay at the root, where mise-action reads it |
+| The project in a subfolder of a bigger repository | Copy `template/` into the folder, then move its `.claude/`, `.github/` and `mise.toml` to the repository root, next to `general/files/`. GitHub reads workflows and mise-action reads `mise.toml` only there, and the hooks find each project by the nearest folder holding `pyproject.toml` and `uv.lock`. Then edit `ci.yml` as its comment above `jobs:` says: a job-level `working-directory`, the `<folder>/` prefix on the junit paths, and a placeholder check that searches the whole repository. In `dependabot.yml`, point the uv entry at `/<folder>` |
 | Published library | Drop the `Private` classifier; `requires-python` two or three releases back with a CI leg on the oldest; `uv build` and `uv publish` with PyPI trusted publishing from Actions |
 | Validating outside data | Pydantic 2 (ty understands it without a plugin) or msgspec, which is faster and smaller |
 | Faster JSON | orjson |

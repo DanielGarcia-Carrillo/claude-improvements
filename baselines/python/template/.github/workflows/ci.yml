@@ -29,6 +29,9 @@ env:
 # A project in a subfolder of a bigger repository: give verify and advisories
 # `defaults: run: working-directory: <folder>`. Never set it for the whole
 # workflow, since `ci` checks nothing out and its steps would fail to start.
+# It covers only `run` steps, so also prefix `<folder>/` to the junit path in
+# `hashFiles` and the artifact upload, and give the placeholder check
+# `working-directory: .` so it searches the whole repository.
 jobs:
   verify:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04' }}

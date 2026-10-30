@@ -17,10 +17,12 @@ case "$file" in
   "$root"/*.py | "$root"/*.pyi) ;;
   *) exit 0 ;;
 esac
-# The project is the nearest folder above the file that holds pyproject.toml,
-# so one in a subfolder of the repository works like one at its root.
+# The project is the nearest folder above the file that holds pyproject.toml
+# and uv.lock, so one in a subfolder of the repository works like one at its
+# root. A pyproject.toml without a lock (a test fixture, a workspace member)
+# belongs to the project above it.
 project=$(dirname "$file")
-while [ ! -f "$project/pyproject.toml" ]; do
+while [ ! -f "$project/pyproject.toml" ] || [ ! -f "$project/uv.lock" ]; do
   [ "$project" = "$root" ] && exit 0
   project=$(dirname "$project")
 done

@@ -13,17 +13,21 @@ payload=$(cat)
 cd "$(jq -r --arg dir "$CLAUDE_PROJECT_DIR" '.cwd // $dir' <<<"$payload")" || exit 0
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 0
 
-# Each folder holding a pyproject.toml is a project: the repository root, or a
-# subfolder when the project lives in a bigger repository. Both checks run in
-# each, so one stop reports every problem.
+# Each folder holding pyproject.toml and uv.lock is a project: the repository
+# root, or a subfolder when the project lives in a bigger repository. A
+# pyproject.toml without a lock (a test fixture, a workspace member) belongs
+# to the project above it. Both checks run in each, so one stop reports every
+# problem.
 output=""
-while IFS= read -r manifest; do
-  dir=$(dirname "$manifest")
+while IFS= read -r -d '' lock; do
+  dir=$(dirname "$lock")
+  # Listed but deleted, or moved, and not yet committed.
+  [ -f "$lock" ] && [ -f "$dir/pyproject.toml" ] || continue
   [ -z "$(git status --porcelain -- "$dir")" ] && continue
   label=$([ "$dir" = . ] || printf '%s: ' "$dir")
   lint=$(cd "$dir" && uv run --frozen ruff check --output-format concise 2>&1) || output+="$label$lint"$'\n'
   types=$(cd "$dir" && uv run --frozen ty check --output-format concise 2>&1) || output+="$label$types"$'\n'
-done < <(git ls-files --cached --others --exclude-standard | grep -E '(^|/)pyproject\.toml$')
+done < <(git ls-files -z --cached --others --exclude-standard -- ':(glob)**/uv.lock')
 [ -z "$output" ] && exit 0
 
 if [ "$(jq -r '.stop_hook_active // false' <<<"$payload")" = true ]; then
