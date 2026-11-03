@@ -16,8 +16,10 @@ them.
   `claude plugin validate mods/<name>` and `claude plugin test mods/<name>`.
 - `baselines/` holds contribution guidance for existing repositories and
   starting points for new projects; start at
-  [baselines/README.md](baselines/README.md). Existing repositories' requirements
-  and conventions take precedence over every baseline. After changing a template,
+  [baselines/README.md](baselines/README.md). For repositories Daniel owns,
+  evaluate and judiciously adopt new recommendations even when they conflict
+  with the current setup. For other people's repositories, their requirements
+  and conventions take precedence. After changing a template,
   copy it to a scratch directory and run its verify command there.
 - Write American English in prose, comments and test names. Run `mise install`
   once, then `mise exec -- typos` to check the repository.

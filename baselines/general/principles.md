@@ -1,9 +1,10 @@
 # Engineering principles
 
-These are shared recommendations, whatever the stack. In an existing
-repository, its requirements and guidelines take precedence; use the
-[adoption guidance](../README.md#existing-repositories) to identify relevant
-gaps. These principles do not authorize replacing its conventions.
+These are shared recommendations, whatever the stack. Follow the
+[ownership and adoption guidance](../README.md#existing-repositories):
+Daniel's projects should evaluate and judiciously adopt useful new
+recommendations, including changes to existing conventions. In other
+people's projects, their requirements and guidelines take precedence.
 
 For a new project, its agent file (`CLAUDE.md`, with `AGENTS.md` symlinked to
 it) restates the parts that apply in that repo's own terms; this file is the

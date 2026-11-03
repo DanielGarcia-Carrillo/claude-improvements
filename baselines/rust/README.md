@@ -8,9 +8,11 @@ working workspace that passes `just verify`;
 file.
 
 For an existing repository, follow the
-[adoption guidance](../README.md#existing-repositories): its requirements
-and conventions take precedence over these defaults. Adopt relevant gaps
-incrementally; the template-copying steps below are for new projects.
+[ownership and adoption guidance](../README.md#existing-repositories).
+Daniel's projects should evaluate and judiciously adopt useful new
+recommendations, including those that conflict with the current setup.
+Other people's requirements and conventions take precedence. Integrate
+improvements incrementally; the template-copying steps below are for new projects.
 
 Versions and statuses were checked on 2026-10-20.
 

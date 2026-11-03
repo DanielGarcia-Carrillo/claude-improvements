@@ -7,30 +7,42 @@ for agent-driven work: useful checks whose failures say how to fix them.
 
 ## Existing repositories
 
-**The target repository's requirements and guidelines take precedence over
-every baseline in this folder**, including the general principles, stack
-guides, templates, and explorations. Baselines are secondary references;
-reading or adopting one does not authorize changing established requirements.
+Apply the ownership policy to every baseline in this folder, including the
+general principles, stack guides, configurations, templates, and explorations.
+
+| Project ownership | How to use new baseline recommendations |
+|---|---|
+| Daniel owns the project | Actively evaluate new recommendations as they become available, including those that conflict with the current setup. Adopt worthwhile improvements judiciously, weighing correctness, maintenance, compatibility, migration cost, and disruption. Existing setup alone is not a reason to dismiss an improvement. |
+| Someone else owns the project | Its requirements and guidelines take precedence. Use baselines as secondary references to fill relevant gaps within its conventions. Preserve conflicting requirements unless the owner directs a change. |
+
+Establish ownership from the project context. A personal fork used to
+contribute upstream follows the upstream project's requirements. Clarify
+ownership when it is uncertain and would change the adoption decision.
+Explicit instructions, product constraints, and review, validation, and
+release gates remain in force until deliberately revised through the
+project's normal process.
 
 1. Read the repository's applicable `AGENTS.md`, `CLAUDE.md`, contributor
    guidance, accepted decisions, build configuration, and CI. Identify its
    architecture, supported platforms, tools, and required verification.
 2. Compare the relevant baseline with that evidence. Separate practices
    already covered, useful gaps, conflicts, and things that do not apply.
-3. Fill relevant gaps within the repository's conventions and the assigned
-   scope. Keep its formatter, dependencies, architecture, agent files, and
-   verification commands unless their change is explicitly part of the work.
-   Report a conflict and its tradeoffs; preserve the existing requirement
-   unless the owner directs a change.
+3. Apply the ownership policy within the assigned scope. In Daniel's projects,
+   assess conflicts on their merits and make proportionate improvements;
+   record why a recommendation is adopted, deferred, or rejected. Plan larger
+   migrations as focused work. In other people's projects, fill gaps within
+   their conventions and preserve conflicting requirements.
 4. Validate the contribution using the repository's required checks and
-   relevant behavior tests. Record any missing checks, existing failures,
-   and limitations separately from results for the change.
+   relevant behavior tests. When adopting a change to tools or conventions,
+   update configuration and instructions together and supersede accepted
+   decisions through the normal process. Record missing checks, existing
+   failures, and limitations separately from results for the change.
 
 The template-copying and toolchain-upgrade steps below and in stack guides
-are for new projects. For an existing project, adopt individual improvements
-incrementally; do not copy a template over its files or treat these guides
-as a migration requirement. The [Kotlin/Android guide](android/README.md)
-is written specifically for contributions to existing projects.
+are for new projects. For an existing project, integrate improvements
+incrementally under the ownership policy instead of copying a template over
+its files. The [Kotlin/Android guide](android/README.md) includes explicit
+lint configurations and contribution guidance for existing projects.
 
 | Path | What |
 |---|---|
@@ -44,7 +56,7 @@ is written specifically for contributions to existing projects.
 | [web/](web/README.md) | React PWA on Cloudflare: stack decisions, agent fragment, runnable template |
 | [rust/](rust/README.md) | Rust CLI/library workspace: defaults, agent fragment, runnable template |
 | [python/](python/README.md) | Python tool, script or pipeline on uv, ruff and ty: defaults, agent fragment, runnable template |
-| [android/](android/README.md) | Kotlin/Android contribution quality for existing projects: review checklist, incremental tool adoption, and validation evidence; documentation only |
+| [android/](android/README.md) | Kotlin/Android contribution quality: explicit lint configurations, agent fragment, review checklist, and incremental adoption; no app scaffold |
 
 ## Starting a project
 

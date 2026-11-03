@@ -1,0 +1,61 @@
+# Standalone defect profile for Detekt 1.23.8, without build-upon-default-config.
+# For an existing Detekt setup, merge selected rule entries instead of loading
+# this profile over its config: the inactive groups below would disable checks.
+# Follow baselines/README.md's ownership policy and preserve stronger settings.
+# Typed rules need a compilation classpath and a type-resolving task.
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+  warningsAsErrors: true
+
+# Leave conventions, formatting, and numeric complexity policy to the project.
+comments:
+  active: false
+complexity:
+  active: false
+naming:
+  active: false
+performance:
+  active: false
+style:
+  active: false
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+  SleepInsteadOfDelay:
+    active: true
+  SuspendFunSwallowedCancellation:
+    active: true
+
+empty-blocks:
+  active: true
+  EmptyCatchBlock:
+    active: true
+    # Intentional ignores need a reviewed, narrowly scoped suppression.
+    allowedExceptionNameRegex: '^$'
+
+exceptions:
+  active: true
+  NotImplementedDeclaration:
+    active: true
+  ReturnFromFinally:
+    active: true
+  ThrowingExceptionFromFinally:
+    active: true
+
+potential-bugs:
+  active: true
+  CastNullableToNonNullableType:
+    active: true
+  EqualsWithHashCodeExist:
+    active: true
+  IgnoredReturnValue:
+    active: true
+  UnreachableCode:
+    active: true
+  UnsafeCallOnNullableType:
+    active: true

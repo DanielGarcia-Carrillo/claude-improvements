@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Adoption candidate, not a replacement for an existing lint configuration.
+  Merge relevant entries under baselines/README.md's ownership policy.
+  Preserve stronger project settings. Do not use checkOnly to restrict lint
+  to these IDs: all other enabled Android Lint checks should continue to run.
+-->
+<lint>
+    <!-- API and permission mistakes can crash on supported devices. -->
+    <issue id="NewApi" severity="error" />
+    <issue id="MissingPermission" severity="error" />
+    <!-- Ignoring a required result or leaking a resource is a defect. -->
+    <issue id="CheckResult" severity="error" />
+    <issue id="Recycle" severity="error" />
+    <!-- Advisory until reviewed in the project's context. -->
+    <issue id="StaticFieldLeak" severity="warning" />
+    <issue id="WrongThread" severity="warning" />
+    <issue id="ContentDescription" severity="warning" />
+    <issue id="HardcodedText" severity="warning" />
+</lint>
