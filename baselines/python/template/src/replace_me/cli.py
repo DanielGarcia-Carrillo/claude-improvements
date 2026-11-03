@@ -64,9 +64,14 @@ def _width_limit(text: str) -> int:
 
 def _parser() -> _Parser:
     # Abbreviations off: `--max` working today would break the day another
-    # option starts with it.
+    # option starts with it. Color off: Python 3.14+ colors help and errors
+    # under FORCE_COLOR (CI sets it), and escape codes would land in stderr
+    # and the `--json` hint. Subcommand parsers inherit it.
     parser = _Parser(
-        prog="replace-me", description="Reports lines wider than a limit.", allow_abbrev=False
+        prog="replace-me",
+        description="Reports lines wider than a limit.",
+        allow_abbrev=False,
+        color=False,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {version('replace-me')}")
     parser.add_argument(
