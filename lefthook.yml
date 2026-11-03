@@ -1,0 +1,17 @@
+# Format and lint the staged shell files before checking their spelling.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: shell
+      glob: '*.{sh,bash,ksh,bats}'
+      group:
+        piped: true
+        jobs:
+          - name: format-and-lint
+            run: mise exec -- bash baselines/general/files/scripts/check-shell.sh --fix {staged_files}
+            stage_fixed: true
+          - name: spelling
+            run: mise exec -- typos --force-exclude {staged_files}
+    - name: spelling-other
+      exclude: '*.{sh,bash,ksh,bats}'
+      run: mise exec -- typos --force-exclude {staged_files}

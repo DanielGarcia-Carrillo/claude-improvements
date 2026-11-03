@@ -77,6 +77,7 @@ function leftovers(repo: string): string {
 }
 
 const read = (repo: string, path: string) => readFileSync(join(repo, path), 'utf8')
+const realGit = run('sh', ['-c', 'command -v git'], scratch).stdout.trim()
 
 /** A copy of the baselines to alter, without build output. */
 function baselinesCopy(name: string): string {
@@ -285,6 +286,34 @@ test('setup needs --stack for a folder holding both manifests, and runs the stac
 })
 
 for (const stack of ['web', 'rust', 'python'] as const) {
+  test(`${stack} shell checks cover hidden and extensionless files before the first commit`, () => {
+    const repo = scaffold(stack, `${stack}-shell`)
+    const check = (...args: string[]) => run('bash', ['scripts/check-shell.sh', ...args], repo)
+    const clean = check()
+    assert.equal(clean.status, 0, clean.stdout + clean.stderr)
+
+    const hidden = '.claude/quality check'
+    // Default ShellCheck would permit [, so this also checks the optional policy.
+    writeFileSync(join(repo, hidden), '#!/usr/bin/env bash\n[ -e README.md ]\n')
+    const bad = check()
+    assert.equal(bad.status, 1, bad.stdout + bad.stderr)
+    assert.match(bad.stdout, /SC2292/)
+    writeFileSync(join(repo, hidden), '#!/usr/bin/env bash\n[[ -e README.md ]]\n')
+    assert.equal(check().status, 0)
+
+    writeFileSync(join(repo, 'scripts/-a b.sh'), '#!/usr/bin/env bash\nif true; then\necho ok\nfi\n')
+    assert.equal(check('scripts/-a b.sh').status, 1)
+    assert.equal(check('--fix', 'scripts/-a b.sh').status, 0)
+    assert.equal(check().status, 0)
+    assert.equal(check('README.md').status, 0, 'an explicit set with no shell inputs must not hang')
+
+    const ignored = join(repo, 'ignored-shell')
+    mkdirSync(ignored)
+    writeFileSync(join(ignored, 'invalid.sh'), 'this is not shell syntax (\n')
+    writeFileSync(join(repo, '.git/info/exclude'), 'ignored-shell/\n')
+    assert.equal(check().status, 0, 'Git ignores must exclude unrelated files')
+  })
+
   test(`${stack} scaffolds enforce American English, including hidden agent files`, () => {
     const repo = scaffold(stack, `${stack}-spelling`)
     assert.match(read(repo, 'mise.toml'), /typos = "1\.51\.1"/)
@@ -334,6 +363,7 @@ exec "$PINNED_TYPOS" "$@"
           ...process.env,
           PATH: `${bin}${delimiter}${process.env['PATH'] ?? ''}`,
           PINNED_TYPOS: located.stdout.trim(),
+          REAL_GIT: realGit,
           CLAUDE_PROJECT_DIR: scratch,
         },
       })
@@ -347,8 +377,56 @@ exec "$PINNED_TYPOS" "$@"
     writeFileSync(file, 'color\n')
     assert.equal(hook('after-edit').status, 0)
     assert.equal(hook('before-stop').status, 0)
+
+    writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = status ]; then exit 128; fi\nexec "$REAL_GIT" "$@"\n', {
+      mode: 0o755,
+    })
+    const failedStatus = hook('before-stop')
+    assert.equal(failedStatus.status, 2, failedStatus.stderr)
+    assert.match(failedStatus.stderr, /git status failed/)
+    assert.equal(hook('before-stop', true).status, 1, 'an inspection failure must not block retries forever')
+    if (stack === 'python') {
+      writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = ls-files ]; then exit 128; fi\nexec "$REAL_GIT" "$@"\n', {
+        mode: 0o755,
+      })
+      const failedListing = hook('before-stop')
+      assert.equal(failedListing.status, 2, failedListing.stderr)
+      assert.match(failedListing.stderr, /Cannot list Python projects/)
+      assert.equal(hook('before-stop', true).status, 1)
+    }
   })
 }
+
+test('shell discovery reports a failed Git listing instead of checking an empty set', () => {
+  const repo = scaffold('python', 'shell-discovery-failure')
+  const bin = join(scratch, 'shell-discovery-bin')
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = ls-files ]; then exit 128; fi\nexec "$REAL_GIT" "$@"\n', {
+    mode: 0o755,
+  })
+  const result = spawnSync('bash', ['scripts/check-shell.sh'], {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${bin}${delimiter}${process.env['PATH'] ?? ''}`, REAL_GIT: realGit },
+  })
+  assert.equal(result.status, 128)
+  assert.doesNotMatch(result.stdout, /Shell quality passed/)
+})
+
+test('workflow checks fail when ShellCheck is missing instead of silently omitting inline shell', () => {
+  const repo = scaffold('web', 'workflow-missing-shellcheck')
+  const bin = join(scratch, 'workflow-tools-bin')
+  mkdirSync(bin)
+  symlinkSync(realGit, join(bin, 'git'))
+  const result = spawnSync('/bin/bash', ['scripts/check-shell.sh', '.github/workflows/ci.yml'], {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: bin },
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Missing shellcheck/)
+  assert.doesNotMatch(result.stdout, /Shell quality passed/)
+})
 
 test('setup installs Git hooks in every stack before verify, including --keep-versions', () => {
   const bin = join(scratch, 'setup-hooks-bin')

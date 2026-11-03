@@ -1,0 +1,6 @@
+# actionlint 1.7.12 predates this GitHub-hosted runner label. Keep the exact
+# label allowed until a newer actionlint recognizes it; do not allow ubuntu-*.
+# https://github.com/actions/runner-images#available-images
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

@@ -12,7 +12,7 @@ strict, local, fast checks whose failures say how to fix them.
 | [general/infra.md](general/infra.md) | Hosting (Cloudflare), data, CI, toolchains, Claude Code mechanisms |
 | [general/ci-speed.md](general/ci-speed.md) | Keeping CI and local checks proportional to a change: defaults for new projects, steps for existing ones |
 | [general/CLAUDE.template.md](general/CLAUDE.template.md) | Skeleton for a new repo's `CLAUDE.md` |
-| [general/files/](general/files/) | `.editorconfig`, `.gitattributes`, PR template, ADR template |
+| [general/files/](general/files/) | Editor and Git settings, shell quality checks, PR template, ADR template |
 | [explorations/](explorations/README.md) | Options under evaluation, not yet defaults: Renovate, UI primitives, visual regression, Blacksmith, observability, tsrs and smaller ones |
 | [web/](web/README.md) | React PWA on Cloudflare: stack decisions, agent fragment, runnable template |
 | [rust/](rust/README.md) | Rust CLI/library workspace: defaults, agent fragment, runnable template |
@@ -49,6 +49,20 @@ Each stack README ends with its sources, and
 
 ## Conventions in this folder
 
+- Every stack's verify command checks shell scripts with ShellCheck and
+  shfmt, and workflows with actionlint. These tools are pinned in each
+  `mise.toml`; the shared `.shellcheckrc` and `scripts/check-shell.sh` come
+  from `general/files/`. The scanner includes hidden files and extensionless
+  shell scripts, honors Git ignores and also works before the first commit.
+  `just shell-fix` (Rust/Python) or `pnpm shell:fix` (web) formats shell files.
+  Lefthook formats and lints staged shell files before checking spelling;
+  extensionless scripts and workflows are covered by full verify.
+- ShellCheck enables checks for masked exit statuses, suppressed `set -e`,
+  unassigned uppercase variables, Bash `[[ ]]`, consistent quoting and
+  explicit string tests. Validate required environment variables with
+  `${NAME:?message}` and explain any local suppression. Keep the default
+  severity coverage. `justfile` recipes and package-script strings are not
+  shell files: move substantial shell logic into a checked script.
 - Agent files are named `*.template.md` and `*.stack.md`, never `CLAUDE.md`,
   so Claude Code does not load them as instructions while working in this
   repo. The templates' `.claude/settings.json` and workflows are inert here

@@ -20,3 +20,10 @@ them.
   copy it to a scratch directory and run its verify command there.
 - Write American English in prose, comments and test names. Run `mise install`
   once, then `mise exec -- typos` to check the repository.
+- Run `mise run bootstrap` in each checkout to install Git hooks, and
+  `mise run verify` before handing off: spelling, ShellCheck, shfmt and
+  actionlint, including the templates' hidden hooks and workflows, then the
+  scaffold regression tests.
+  `mise run shell:fix` formats shell files; `mise run shell:check` checks them.
+  ShellCheck's six extra checks are in `.shellcheckrc`. Keep suppressions
+  local and explained; do not lower the severity threshold to hide them.

@@ -53,6 +53,7 @@ jobs:
       # same ones.
       - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
       - run: just spellcheck
+      - run: just shell-check
       - run: cargo fmt --all --check
       # Bans, licenses and sources, as `just verify` checks them. It compiles
       # nothing, so it runs before clippy.
@@ -149,6 +150,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # jq owns $j below; the shell must not expand it.
+          # shellcheck disable=SC2016
           {
             echo '### Slowest steps'
             echo

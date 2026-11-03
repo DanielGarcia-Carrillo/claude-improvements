@@ -49,6 +49,7 @@ jobs:
       # .python-version and the tools in uv.lock on its first `uv run`.
       - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
       - run: just spellcheck
+      - run: just shell-check
       # The steps of `just verify`, one each so the summary times them.
       - run: just fmt-check
       - run: just lint
@@ -103,6 +104,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # jq owns $j below; the shell must not expand it.
+          # shellcheck disable=SC2016
           {
             echo '### Slowest steps'
             echo

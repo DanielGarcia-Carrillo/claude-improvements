@@ -17,6 +17,16 @@ pre-commit:
             run: mise exec -- pnpm exec oxlint --no-error-on-unmatched-pattern --type-aware --deny-warnings --report-unused-disable-directives-severity=error {staged_files}
           - name: spelling
             run: mise exec -- typos --force-exclude {staged_files}
+    - name: shell
+      glob: '*.{sh,bash,ksh,bats}'
+      group:
+        piped: true
+        jobs:
+          - name: format-and-lint
+            run: mise exec -- bash scripts/check-shell.sh --fix {staged_files}
+            stage_fixed: true
+          - name: spelling
+            run: mise exec -- typos --force-exclude {staged_files}
     - name: spelling-other
-      exclude: '*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,toml,css,scss,html,vue,yml,yaml,md,mdx}'
+      exclude: '*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,toml,css,scss,html,vue,yml,yaml,md,mdx,sh,bash,ksh,bats}'
       run: mise exec -- typos --force-exclude {staged_files}

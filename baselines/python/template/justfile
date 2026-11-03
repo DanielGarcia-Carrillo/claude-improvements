@@ -11,10 +11,16 @@ bootstrap:
     lefthook install
 
 [default]
-verify: spellcheck fmt-check lint types deps test
+verify: spellcheck shell-check fmt-check lint types deps test
 
 spellcheck:
     mise exec -- typos
+
+shell-check:
+    bash scripts/check-shell.sh
+
+shell-fix:
+    bash scripts/check-shell.sh --fix
 
 fmt-check:
     uv run ruff format --check
@@ -39,7 +45,7 @@ audit:
     uv audit --preview-features audit-command
 
 # Apply every machine fix: ruff's safe fixes, then formatting.
-fix:
+fix: shell-fix
     uv run ruff check --fix
     uv run ruff format
 

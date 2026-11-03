@@ -1,2 +1,21 @@
 [tools]
 typos = "1.51.1"
+shellcheck = "0.11.0"
+shfmt = "3.14.1"
+actionlint = "1.7.12"
+lefthook = "2.2.2"
+node = "26"
+
+[tasks.verify]
+description = "Run the repository quality checks"
+run = ["typos", "bash baselines/general/files/scripts/check-shell.sh", "node --test mods/new-project/tests/baselines.node.mts"]
+
+[tasks."shell:check"]
+run = "bash baselines/general/files/scripts/check-shell.sh"
+
+[tasks."shell:fix"]
+run = "bash baselines/general/files/scripts/check-shell.sh --fix"
+
+[tasks.bootstrap]
+description = "Install this checkout's Git hooks"
+run = "lefthook install"

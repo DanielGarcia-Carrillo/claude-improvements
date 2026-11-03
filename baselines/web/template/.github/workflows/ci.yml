@@ -180,6 +180,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # jq owns $j below; the shell must not expand it.
+          # shellcheck disable=SC2016
           {
             echo '### Slowest steps'
             echo
