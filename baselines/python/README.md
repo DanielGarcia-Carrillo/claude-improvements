@@ -90,7 +90,6 @@ stalls before its own 1.0.
 | A richer CLI (prompts, colors, completion) | Cyclopts, at a startup cost |
 | Startup time | `python -X importtime`, then 3.15's `lazy import` for the heavy modules it shows |
 | Slow tests | pytest-xdist (`-n auto`) once the suite takes more than about 30 seconds |
-| Coverage | coverage.py; on 3.12 and later `COVERAGE_CORE=sysmon` traces through `sys.monitoring` at a fraction of the cost |
 | Stubs for an untyped dependency | `.pyi` files in `typings/`, added to ty's `environment.extra-paths` |
 | License checks | `pip-licenses --allow-only` in CI |
 | Django, or anything that needs a mypy plugin | mypy `--strict` in place of ty |
@@ -103,3 +102,11 @@ stalls before its own 1.0.
   discipline, narrow tests first.
 - The [Rust baseline](../rust/README.md), whose CLI contract and error shape
   this template follows, so agents meet the same rules in both.
+
+## Coverage
+
+The full verify checks 80% overall line coverage and 90% of changed lines,
+including Bash hooks and maintenance scripts. Run `just coverage` and `just shell-coverage` directly to inspect
+gaps. Install kcov 43 in addition to the pinned tools. See the shared
+[coverage policy](../general/coverage.md) for collector scopes, reports,
+comparison bases, bootstrap behavior and CI setup.

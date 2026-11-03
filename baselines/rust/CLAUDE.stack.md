@@ -7,6 +7,8 @@ and delete these comments.
 ## Commands
 
 ```bash
+just coverage          # overall and changed-line coverage
+just shell-coverage    # Bash behavior tests and coverage
 just verify                              # spelling, shell, fmt, deny, clippy, tests, docs, shear: the gate
 cargo nextest run -p replace-me-core NAME  # narrowest test first, then widen
 just fix                                 # shell formatting, clippy --fix, then rustfmt

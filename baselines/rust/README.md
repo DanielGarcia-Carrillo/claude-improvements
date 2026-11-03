@@ -83,7 +83,7 @@ resets an existing hook path automatically.
 | Feature flags | `cargo hack --feature-powerset check` in CI |
 | `unsafe` (FFI only) | `unsafe_code = "deny"` with `#[expect(unsafe_code, reason)]` at each site, `undocumented_unsafe_blocks`, Miri in CI |
 | Async or network I/O | tokio with only the features used; a decision recorded in an ADR |
-| Coverage, mutation testing | cargo-llvm-cov, cargo-mutants |
+| Mutation testing | cargo-mutants |
 
 ## Sources
 
@@ -94,3 +94,11 @@ resets an existing hook path automatically.
 - The agent files of ruff, uv, oxc, biome and rust-analyzer: exact verify
   commands, no panics or lint suppression, snapshot discipline, narrow tests
   first.
+
+## Coverage
+
+The full verify checks 80% overall line coverage and 90% of changed lines,
+including Bash hooks and maintenance scripts. Run `just coverage` and `just shell-coverage` directly to inspect
+gaps. Install kcov 43 in addition to the pinned tools. See the shared
+[coverage policy](../general/coverage.md) for collector scopes, reports,
+comparison bases, bootstrap behavior and CI setup.

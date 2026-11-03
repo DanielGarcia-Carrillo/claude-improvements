@@ -7,6 +7,8 @@ project does not use (an API, Storybook) and these comments.
 ## Commands
 
 ```bash
+pnpm test:coverage     # overall and changed-line coverage, including browser tests
+pnpm shell:coverage    # Bash behavior tests and coverage
 pnpm dev               # Vite dev server; the service worker is off in dev
 pnpm verify            # spelling, typecheck, lint, format check, every test suite: the gate
 pnpm verify:changed    # while iterating: typecheck, then lint, format and Vitest for changed files only; no e2e

@@ -5,10 +5,11 @@ shfmt = "3.14.1"
 actionlint = "1.7.12"
 lefthook = "2.2.2"
 node = "26"
+uv = "0.13.6"
 
 [tasks.verify]
 description = "Run the repository quality checks"
-run = ["typos", "bash baselines/general/files/scripts/check-shell.sh", "node --test mods/new-project/tests/baselines.node.mts"]
+run = ["typos", "bash baselines/general/files/scripts/check-shell.sh", "node --test mods/new-project/tests/baselines.node.mts", "uv run --no-project --python 3.15 python -m unittest discover -s tests"]
 
 [tasks."shell:check"]
 run = "bash baselines/general/files/scripts/check-shell.sh"
