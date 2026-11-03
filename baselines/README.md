@@ -1,9 +1,36 @@
 # Project baselines
 
-Starting points for new projects: engineering principles, the questions to
-ask before choosing infrastructure, agent-file skeletons, and working
-templates with their configs. Everything is tuned for agent-driven work:
-strict, local, fast checks whose failures say how to fix them.
+Engineering guidance for contributions to existing repositories, plus
+starting points for new projects: principles, kickoff questions, agent-file
+skeletons, and working templates with their configs. Everything is tuned
+for agent-driven work: useful checks whose failures say how to fix them.
+
+## Existing repositories
+
+**The target repository's requirements and guidelines take precedence over
+every baseline in this folder**, including the general principles, stack
+guides, templates, and explorations. Baselines are secondary references;
+reading or adopting one does not authorize changing established requirements.
+
+1. Read the repository's applicable `AGENTS.md`, `CLAUDE.md`, contributor
+   guidance, accepted decisions, build configuration, and CI. Identify its
+   architecture, supported platforms, tools, and required verification.
+2. Compare the relevant baseline with that evidence. Separate practices
+   already covered, useful gaps, conflicts, and things that do not apply.
+3. Fill relevant gaps within the repository's conventions and the assigned
+   scope. Keep its formatter, dependencies, architecture, agent files, and
+   verification commands unless their change is explicitly part of the work.
+   Report a conflict and its tradeoffs; preserve the existing requirement
+   unless the owner directs a change.
+4. Validate the contribution using the repository's required checks and
+   relevant behavior tests. Record any missing checks, existing failures,
+   and limitations separately from results for the change.
+
+The template-copying and toolchain-upgrade steps below and in stack guides
+are for new projects. For an existing project, adopt individual improvements
+incrementally; do not copy a template over its files or treat these guides
+as a migration requirement. The [Kotlin/Android guide](android/README.md)
+is written specifically for contributions to existing projects.
 
 | Path | What |
 |---|---|
@@ -17,6 +44,7 @@ strict, local, fast checks whose failures say how to fix them.
 | [web/](web/README.md) | React PWA on Cloudflare: stack decisions, agent fragment, runnable template |
 | [rust/](rust/README.md) | Rust CLI/library workspace: defaults, agent fragment, runnable template |
 | [python/](python/README.md) | Python tool, script or pipeline on uv, ruff and ty: defaults, agent fragment, runnable template |
+| [android/](android/README.md) | Kotlin/Android contribution quality for existing projects: review checklist, incremental tool adoption, and validation evidence; documentation only |
 
 ## Starting a project
 

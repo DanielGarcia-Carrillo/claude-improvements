@@ -1,8 +1,13 @@
 # Engineering principles
 
-These hold for every project, whatever the stack. A project's agent file
-(`CLAUDE.md`, with `AGENTS.md` symlinked to it) restates the parts that apply
-in that repo's own terms; this file is the reasoning behind them.
+These are shared recommendations, whatever the stack. In an existing
+repository, its requirements and guidelines take precedence; use the
+[adoption guidance](../README.md#existing-repositories) to identify relevant
+gaps. These principles do not authorize replacing its conventions.
+
+For a new project, its agent file (`CLAUDE.md`, with `AGENTS.md` symlinked to
+it) restates the parts that apply in that repo's own terms; this file is the
+reasoning behind them.
 
 ## 1. Errors are the interface for agents
 

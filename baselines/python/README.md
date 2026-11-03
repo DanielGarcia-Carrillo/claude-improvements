@@ -7,6 +7,11 @@ package with a CLI that passes `just verify`;
 [`CLAUDE.stack.md`](CLAUDE.stack.md) is the Python part of the new repo's
 agent file.
 
+For an existing repository, follow the
+[adoption guidance](../README.md#existing-repositories): its requirements
+and conventions take precedence over these defaults. Adopt relevant gaps
+incrementally; the template-copying steps below are for new projects.
+
 Versions and statuses were checked on 2026-10-27.
 
 ## Using it

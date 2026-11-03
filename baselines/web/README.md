@@ -7,6 +7,11 @@ every check is local, fast, strict, and says how to fix what it finds.
 offline check). [`CLAUDE.stack.md`](CLAUDE.stack.md) is the web part of the
 new repo's agent file.
 
+For an existing repository, follow the
+[adoption guidance](../README.md#existing-repositories): its requirements
+and conventions take precedence over these defaults. Adopt relevant gaps
+incrementally; the template-copying steps below are for new projects.
+
 Versions and statuses were checked on 2026-10-20.
 
 ## Using it
