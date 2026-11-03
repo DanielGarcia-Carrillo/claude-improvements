@@ -10,7 +10,7 @@ bootstrap:
     lefthook install
 
 [default]
-verify: spellcheck shell-check fmt-check deny lint test doc shear
+verify: spellcheck shell-check fmt-check deny lint coverage shell-coverage doc shear
 
 spellcheck:
     mise exec -- typos
@@ -71,3 +71,14 @@ fix: shell-fix
 # Review changed snapshots. Never edit .snap files by hand.
 snapshots:
     cargo insta review
+
+# The full gate collects once; `just test` stays available for narrow iteration.
+shell-coverage:
+    bash scripts/shell-coverage.sh
+
+coverage *args:
+    mkdir -p coverage
+    cargo llvm-cov nextest --workspace --all-features --locked --cobertura --output-path coverage/rust.xml {{ args }}
+    cargo llvm-cov report --html --output-dir coverage/rust-html
+    uv run --script --locked scripts/check-coverage.py coverage/rust.xml
+    cargo test --workspace --all-features --locked --doc
