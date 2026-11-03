@@ -59,7 +59,10 @@ jobs:
       # they need aren't, so a cache hit still installs those.
       - name: Playwright version
         id: playwright
-        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          version=$(pnpm exec playwright --version | cut -d' ' -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: browsers
         with:

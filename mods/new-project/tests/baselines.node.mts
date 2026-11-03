@@ -23,6 +23,12 @@ const SCRIPT = resolve(import.meta.dirname, '../scripts/new-project.ts')
 const BASELINES = resolve(import.meta.dirname, '../../../baselines')
 const scratch = mkdtempSync(join(tmpdir(), 'new-project-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
+// Git and tools such as typos must see fixture inputs independently of the
+// developer's global excludes. This environment lives only in this test process.
+const gitConfig = join(scratch, 'gitconfig')
+writeFileSync(gitConfig, '')
+process.env['GIT_CONFIG_GLOBAL'] = gitConfig
+process.env['GIT_CONFIG_NOSYSTEM'] = '1'
 
 const run = (command: string, args: readonly string[], cwd: string) =>
   spawnSync(command, args, { cwd, encoding: 'utf8' })
@@ -62,6 +68,10 @@ function scaffold(stack: Stack, name: string = stack): string {
     scratch,
   )
   assert.equal(result.status, 0, result.stderr)
+  // Fixtures must not inherit global ignores such as .claude/.
+  const excludes = join(target, '.git/test-excludes')
+  writeFileSync(excludes, '')
+  assert.equal(run('git', ['config', 'core.excludesFile', excludes], target).status, 0)
   return target
 }
 
@@ -306,6 +316,16 @@ for (const stack of ['web', 'rust', 'python'] as const) {
     assert.equal(check('--fix', 'scripts/-a b.sh').status, 0)
     assert.equal(check().status, 0)
     assert.equal(check('README.md').status, 0, 'an explicit set with no shell inputs must not hang')
+    const workflowPath = '.github/workflows/shell-test.yml'
+    const workflow =
+      'name: fixture\non: push\njobs:\n  check:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: "[ -e README.md ]"\n'
+    writeFileSync(join(repo, workflowPath), workflow)
+    const workflowBad = check()
+    assert.equal(workflowBad.status, 1)
+    assert.match(workflowBad.stdout + workflowBad.stderr, /SC2292/)
+    writeFileSync(join(repo, workflowPath), workflow.replace('[ -e README.md ]', '[[ -e README.md ]]'))
+    assert.equal(check().status, 0)
+    rmSync(join(repo, workflowPath))
 
     const ignored = join(repo, 'ignored-shell')
     mkdirSync(ignored)
@@ -354,10 +374,10 @@ exec "$PINNED_TYPOS" "$@"
     mkdirSync(nested)
     const file = join(repo, 'README.md')
     writeFileSync(file, ['col', 'our'].join('') + '\n')
-    const hook = (name: string, retry = false) =>
+    const hook = (name: string, retry = false, payloadCwd = nested) =>
       spawnSync('bash', [join(repo, `.claude/hooks/${name}.sh`)], {
         cwd: nested,
-        input: JSON.stringify({ cwd: nested, tool_input: { file_path: file }, stop_hook_active: retry }),
+        input: JSON.stringify({ cwd: payloadCwd, tool_input: { file_path: file }, stop_hook_active: retry }),
         encoding: 'utf8',
         env: {
           ...process.env,
@@ -377,6 +397,11 @@ exec "$PINNED_TYPOS" "$@"
     writeFileSync(file, 'color\n')
     assert.equal(hook('after-edit').status, 0)
     assert.equal(hook('before-stop').status, 0)
+    const missing = hook('before-stop', false, join(repo, 'missing-checkout'))
+    assert.equal(missing.status, 2)
+    assert.match(missing.stderr, /Cannot enter the hook checkout/)
+    assert.doesNotMatch(missing.stderr, /No such file or directory/)
+    assert.equal(hook('before-stop', true, join(repo, 'missing-checkout')).status, 1)
 
     writeFileSync(join(bin, 'git'), '#!/bin/sh\nif [ "$1" = status ]; then exit 128; fi\nexec "$REAL_GIT" "$@"\n', {
       mode: 0o755,

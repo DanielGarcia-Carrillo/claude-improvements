@@ -23,9 +23,9 @@ fail() {
 # The payload's cwd follows Claude into a worktree; CLAUDE_PROJECT_DIR stays
 # on the main checkout.
 cwd=$(jq -r --arg dir "$CLAUDE_PROJECT_DIR" '.cwd // $dir' <<<"$payload") || fail 'Cannot read the hook checkout.'
-cd "$cwd" || fail 'Cannot enter the hook checkout.'
+cd "$cwd" 2>/dev/null || fail 'Cannot enter the hook checkout.'
 root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-cd "$root" || fail 'Cannot enter the repository root.'
+cd "$root" 2>/dev/null || fail 'Cannot enter the repository root.'
 status=$(git status --porcelain) || fail 'git status failed; the checkout has not been validated.'
 [[ -z "$status" ]] && exit 0
 

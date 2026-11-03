@@ -81,6 +81,10 @@ if [[ "$script_count" -gt 0 ]]; then
 fi
 if [[ "$workflow_count" -gt 0 ]]; then
   require_tool actionlint
-  actionlint -shellcheck=shellcheck "${workflows[@]}"
+  # actionlint invokes ShellCheck with --norc, so forward the configured
+  # optional checks explicitly. Its GitHub-specific exclusions still apply.
+  optional_checks=$(sed -n 's/^enable=//p' "$root/.shellcheckrc" | paste -sd, -)
+  SHELLCHECK_OPTS="${SHELLCHECK_OPTS:-} --enable=$optional_checks" \
+    actionlint -shellcheck=shellcheck "${workflows[@]}"
 fi
 printf 'Shell quality passed: %s shell files, %s workflows.\n' "$script_count" "$workflow_count"
