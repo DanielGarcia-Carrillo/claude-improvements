@@ -21,9 +21,11 @@
     "storybook": "storybook dev -p 6006 --ci",
     "build-storybook": "storybook build",
     "screenshots": "SCREENSHOT_DIR=screenshots vitest run --project storybook && SCREENSHOT_DIR=screenshots playwright test screens",
-    "verify": "pnpm spellcheck && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm e2e",
+    "verify": "pnpm spellcheck && pnpm shell:check && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm e2e",
     "verify:changed": "node scripts/verify-changed.ts",
-    "spellcheck": "mise exec -- typos"
+    "spellcheck": "mise exec -- typos",
+    "shell:check": "mise exec -- bash scripts/check-shell.sh",
+    "shell:fix": "mise exec -- bash scripts/check-shell.sh --fix"
   },
   "dependencies": {
     "@stylexjs/stylex": "0.19.1",

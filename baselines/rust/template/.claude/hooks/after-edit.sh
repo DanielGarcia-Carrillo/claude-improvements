@@ -4,6 +4,7 @@
 # Every edited file is also checked for American English.
 set -euo pipefail
 
+: "${CLAUDE_PROJECT_DIR:?CLAUDE_PROJECT_DIR must name the project checkout}"
 payload=$(cat)
 file=$(jq -r '.tool_input.file_path // empty' <<<"$payload")
 # The payload's cwd follows Claude into a worktree; CLAUDE_PROJECT_DIR stays
@@ -12,8 +13,11 @@ cwd=$(jq -r --arg dir "$CLAUDE_PROJECT_DIR" '.cwd // $dir' <<<"$payload")
 root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$cwd")
 # macOS may send /var paths while git reports /private/var. Compare the
 # physical file path with git's root so the edited file is not skipped.
-if [ -f "$file" ]; then
-  file="$(cd "$(dirname "$file")" && pwd -P)/$(basename "$file")"
+if [[ -f "$file" ]]; then
+  directory=$(dirname "$file")
+  directory=$(cd "$directory" && pwd -P)
+  name=$(basename "$file")
+  file="$directory/$name"
 fi
 # On Windows the path arrives with backslashes, even under Git Bash.
 case "${file//\\//}" in

@@ -10,10 +10,16 @@ bootstrap:
     lefthook install
 
 [default]
-verify: spellcheck fmt-check deny lint test doc shear
+verify: spellcheck shell-check fmt-check deny lint test doc shear
 
 spellcheck:
     mise exec -- typos
+
+shell-check:
+    bash scripts/check-shell.sh
+
+shell-fix:
+    bash scripts/check-shell.sh --fix
 
 fmt-check:
     cargo fmt --all --check
@@ -58,7 +64,7 @@ shear:
     cargo shear
 
 # Apply every machine fix: clippy suggestions, then formatting.
-fix:
+fix: shell-fix
     cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
     cargo fmt --all
 

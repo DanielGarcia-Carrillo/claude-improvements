@@ -5,6 +5,7 @@
 # Every edited file is also checked for American English.
 set -euo pipefail
 
+: "${CLAUDE_PROJECT_DIR:?CLAUDE_PROJECT_DIR must name the project checkout}"
 payload=$(cat)
 file=$(jq -r '.tool_input.file_path // empty' <<<"$payload")
 # The payload's cwd follows Claude into a worktree; CLAUDE_PROJECT_DIR stays
@@ -15,10 +16,13 @@ root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$cwd"
 file=${file//\\//}
 root=${root//\\//}
 # A symlink can point outside the checkout; leave it alone.
-[ -f "$file" ] && [ ! -L "$file" ] || exit 0
+[[ -f "$file" ]] && [[ ! -L "$file" ]] || exit 0
 # Compare physical paths: macOS may send /var where git reports /private/var,
 # and a symlinked or `..` folder must not lead outside the checkout.
-file="$(cd "$(dirname "$file")" && pwd -P)/$(basename "$file")"
+directory=$(dirname "$file")
+directory=$(cd "$directory" && pwd -P)
+name=$(basename "$file")
+file="$directory/$name"
 root=$(cd "$root" && pwd -P)
 case "$file" in
   "$root"/*) ;;
@@ -32,12 +36,12 @@ case "$file" in
     # works like one at its root. A pyproject.toml without a lock (a test
     # fixture, a workspace member) belongs to the project above it.
     project=$(dirname "$file")
-    while [ "$project" != "$root" ] && { [ ! -f "$project/pyproject.toml" ] || [ ! -f "$project/uv.lock" ]; }; do
+    while [[ "$project" != "$root" ]] && { [[ ! -f "$project/pyproject.toml" ]] || [[ ! -f "$project/uv.lock" ]]; }; do
       project=$(dirname "$project")
     done
     # A file that doesn't parse exits 2, which hands ruff's message on stderr
     # to Claude.
-    if [ -f "$project/pyproject.toml" ] && [ -f "$project/uv.lock" ]; then
+    if [[ -f "$project/pyproject.toml" ]] && [[ -f "$project/uv.lock" ]]; then
       uv run --project "$project" --frozen ruff format "$file" >/dev/null
     fi
     ;;

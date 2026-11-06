@@ -7,9 +7,9 @@ and delete these comments.
 ## Commands
 
 ```bash
-just verify                              # spelling, fmt, deny, clippy, tests, docs, shear: the gate
+just verify                              # spelling, shell, fmt, deny, clippy, tests, docs, shear: the gate
 cargo nextest run -p replace-me-core NAME  # narrowest test first, then widen
-just fix                                 # clippy --fix, then rustfmt
+just fix                                 # shell formatting, clippy --fix, then rustfmt
 just snapshots                           # review changed insta snapshots
 cargo run -p replace-me -- check FILE --json
 ```
@@ -20,6 +20,10 @@ with `--release` unless asked: it is slow and nothing here needs it.
 
 Spelling: `typos` enforces American English, including hooks and CI config.
 It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
+
+Shell quality: ShellCheck, shfmt and actionlint run in verify and CI.
+Use `just shell-fix` to format shell files. Keep `.shellcheckrc` checks enabled;
+validate environment variables and explain local suppressions.
 
 Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
 After `mise install`, run `just bootstrap` in every clone. Keep the full

@@ -15,6 +15,16 @@ pre-commit:
             stage_fixed: true
           - name: spelling
             run: mise exec -- typos --force-exclude {staged_files}
+    - name: shell
+      glob: '*.{sh,bash,ksh,bats}'
+      group:
+        piped: true
+        jobs:
+          - name: format-and-lint
+            run: mise exec -- bash scripts/check-shell.sh --fix {staged_files}
+            stage_fixed: true
+          - name: spelling
+            run: mise exec -- typos --force-exclude {staged_files}
     - name: spelling-other
-      exclude: "*.rs"
+      exclude: "*.{rs,sh,bash,ksh,bats}"
       run: mise exec -- typos --force-exclude {staged_files}

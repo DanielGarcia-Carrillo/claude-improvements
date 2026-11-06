@@ -25,6 +25,10 @@ by itself.
 Spelling: `typos` enforces American English, including hooks and CI config.
 It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
 
+Shell quality: ShellCheck, shfmt and actionlint run in verify and CI.
+Use `pnpm shell:fix` to format shell files. Keep `.shellcheckrc` checks enabled;
+validate environment variables and explain local suppressions.
+
 Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
 `pnpm install` installs it via `prepare`. Keep the full verify gate before
 handoff; the pre-commit is a fast file check.

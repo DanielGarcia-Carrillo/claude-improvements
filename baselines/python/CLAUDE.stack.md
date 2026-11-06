@@ -7,9 +7,9 @@ and `replace_me`, and delete these comments.
 ## Commands
 
 ```bash
-just verify                                # spelling, format, lint, types, deps, tests: the gate
+just verify                                # spelling, shell, format, lint, types, deps, tests: the gate
 uv run pytest tests/test_width.py -k NAME  # narrowest test first, then widen
-just fix                                   # ruff's safe fixes, then formatting
+just fix                                   # shell formatting, then ruff's safe fixes and formatting
 just snapshots                             # rewrite changed inline snapshots, then rerun
 uv run replace-me check FILE --json
 uv add NAME                                # or `uv add --dev NAME`; never pip install
@@ -21,6 +21,10 @@ Python comes from `.python-version`, uv and just from `mise.toml`
 
 Spelling: `typos` enforces American English, including hooks and CI config.
 It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
+
+Shell quality: ShellCheck, shfmt and actionlint run in verify and CI.
+Use `just shell-fix` to format shell files. Keep `.shellcheckrc` checks enabled;
+validate environment variables and explain local suppressions.
 
 Lefthook checks staged files, re-stages formatter fixes, and checks spelling.
 After `mise install`, run `just bootstrap` in every clone. Keep the full
