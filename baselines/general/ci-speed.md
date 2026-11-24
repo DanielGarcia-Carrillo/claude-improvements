@@ -48,8 +48,13 @@ and [Rust](../rust/template/) templates already do them.
   plus sccache for the workspace's own crates, which `rust-cache` drops
   ([details](../explorations/sccache.md));
   Playwright's browsers in `~/.cache/ms-playwright` keyed on the Playwright
-  version, with `playwright install-deps` on a hit. A browser download
-  normally takes 20–40 s but spiked to 8–10 minutes in one repo.
+  version, and the .debs of their system packages, which apt keeps in a
+  cached directory and reuses only when name, version and size match the
+  fresh index. Main saves both and PRs only restore. A browser download
+  normally takes 20–40 s but spiked to 8–10 minutes in one repo, and
+  `playwright install-deps` to 20 minutes in another, both on a slow Ubuntu
+  mirror. The web template's `.github/actions/playwright` does this and
+  bounds the install so a stuck mirror fails fast.
 - **Per-step timings in the run summary**, so a slow step shows up before
   it's expensive.
 - **A quick local check beside the full gate.** The web template's

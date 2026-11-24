@@ -1,0 +1,123 @@
+# Playwright's browsers and their system packages, with both kept in the
+# Actions cache.
+#
+# `playwright install --with-deps` resolves the system packages with
+# `apt-get update && apt-get install` as usual; only where the .deb bytes come
+# from changes. apt reads them from a directory that main saves to the cache
+# whenever the set of packages changes, so a slow Ubuntu mirror (20 minutes
+# for one install-deps step, against about 30 s normally) is off the critical
+# path. apt still picks every version from the freshly updated index: a cached
+# .deb is used only when its file name (name_version_arch, immutable in the
+# Ubuntu archive) and size match apt's choice, and anything else downloads as
+# before. The browsers are the builds the lockfile's Playwright pins, saved per
+# Playwright version.
+#
+# Only a push to main saves either cache. Pull requests restore main's entries
+# and never write their own, so there are no per-PR copies to prune: a
+# superseded entry stops being read and GitHub evicts it after a week unused.
+name: Install Playwright browsers
+description: Install the lockfile's Playwright browsers with their system packages, reusing main's cached .debs and browsers.
+inputs:
+  browsers:
+    description: The browsers to install, space-separated, as `playwright install` names them.
+    default: chromium webkit
+runs:
+  using: composite
+  steps:
+    - name: Point apt's package cache at a cacheable directory
+      id: debs
+      shell: bash
+      run: |
+        dir=/var/cache/playwright-debs
+        sudo install -d -o "$(id -u)" -g "$(id -g)" "$dir" "$dir/partial"
+        printf 'Dir::Cache::archives "%s/";\nAPT::Keep-Downloaded-Packages "true";\n' "$dir" \
+          | sudo tee /etc/apt/apt.conf.d/99-playwright-debs > /dev/null
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+        echo "prefix=playwright-debs-${ImageOS:-unknown}-${RUNNER_ARCH}-" >> "$GITHUB_OUTPUT"
+    # The newest entry main saved. Every one holds .debs that apt downloaded
+    # and checked against the signed index on main.
+    - name: Restore the cached system packages
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.debs.outputs.dir }}/*.deb
+        key: ${{ steps.debs.outputs.prefix }}
+        restore-keys: ${{ steps.debs.outputs.prefix }}
+    # Keyed by the lockfile's Playwright, which pins the browser builds, and by
+    # the browsers asked for. Exact key only: another version misses, and
+    # `playwright install` downloads as usual.
+    - name: Key the browsers
+      id: browsers
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        version=$(pnpm exec playwright --version | sed -n 's/^Version //p') || version=
+        if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]]; then
+          echo "::warning title=Playwright setup::Could not read the Playwright version; downloading the browsers."
+          exit 0
+        fi
+        echo "key=playwright-browsers-${ImageOS:-unknown}-${RUNNER_ARCH}-$version-${BROWSERS// /-}" >> "$GITHUB_OUTPUT"
+    - name: Restore the browsers
+      id: browsers-restore
+      if: steps.browsers.outputs.key != ''
+      continue-on-error: true
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.browsers.outputs.key }}
+    - name: Install the browsers and their system packages
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        DEBS: ${{ steps.debs.outputs.dir }}
+      run: |
+        echo "Cached system packages: $(find "$DEBS" -maxdepth 1 -name '*.deb' | wc -l)"
+        # A warm install takes seconds and a cold one under two minutes. A pull
+        # request fails fast and reruns; main waits longer, so a cold cache on a
+        # slow mirror doesn't turn main red and hold up its deploy.
+        bound=240
+        [ "$GITHUB_EVENT_NAME" = pull_request ] || bound=540
+        status=0
+        # BROWSERS is a list of names, split on purpose.
+        # shellcheck disable=SC2086
+        timeout --kill-after=15s "$bound" pnpm exec playwright install --with-deps $BROWSERS || status=$?
+        if [ "$status" = 124 ] || [ "$status" = 137 ]; then
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            saved="the packages this run finished downloading are saved for the rerun"
+          else
+            saved="only main saves the package cache, so the rerun downloads what main's cache lacks"
+          fi
+          echo "::error title=Playwright setup timed out::Installing the browsers and their system packages took over $((bound / 60)) minutes. That is almost always a slow Ubuntu mirror, not this change. Re-run the job: $saved."
+        fi
+        exit "$status"
+    - name: Save the browsers
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.browsers.outputs.key != '' && steps.browsers-restore.outcome == 'success' && steps.browsers-restore.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.browsers.outputs.key }}
+    # Runs on main even after a failed or timed-out install, so the rerun
+    # starts with whatever finished downloading. autoclean drops .debs the
+    # current index no longer offers, so the cache holds today's set rather
+    # than growing; it reads only the local index.
+    - name: Key the system packages
+      id: key
+      if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.debs.outcome == 'success'
+      shell: bash
+      env:
+        DEBS: ${{ steps.debs.outputs.dir }}
+        PREFIX: ${{ steps.debs.outputs.prefix }}
+      run: |
+        sudo apt-get autoclean -qq || true
+        names=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf '%f\n' | LC_ALL=C sort)
+        [ -n "$names" ] || exit 0
+        echo "key=$PREFIX$(printf '%s\n' "$names" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+    - name: Save the system packages
+      if: always() && steps.key.outputs.key != '' && steps.key.outputs.key != steps.restore.outputs.cache-matched-key
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.debs.outputs.dir }}/*.deb
+        key: ${{ steps.key.outputs.key }}
