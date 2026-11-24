@@ -29,7 +29,9 @@ runs:
       shell: bash
       run: |
         dir=/var/cache/playwright-debs
-        sudo install -d -o "$(id -u)" -g "$(id -g)" "$dir" "$dir/partial"
+        uid=$(id -u)
+        gid=$(id -g)
+        sudo install -d -o "$uid" -g "$gid" "$dir" "$dir/partial"
         printf 'Dir::Cache::archives "%s/";\nAPT::Keep-Downloaded-Packages "true";\n' "$dir" \
           | sudo tee /etc/apt/apt.conf.d/99-playwright-debs > /dev/null
         echo "dir=$dir" >> "$GITHUB_OUTPUT"
@@ -52,7 +54,8 @@ runs:
       env:
         BROWSERS: ${{ inputs.browsers }}
       run: |
-        version=$(pnpm exec playwright --version | sed -n 's/^Version //p') || version=
+        output=$(pnpm exec playwright --version) || output=
+        version=$(sed -n 's/^Version //p' <<<"$output")
         if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]]; then
           echo "::warning title=Playwright setup::Could not read the Playwright version; downloading the browsers."
           exit 0
@@ -74,7 +77,9 @@ runs:
         BROWSERS_HIT: ${{ steps.browsers-restore.outputs.cache-hit }}
         DEBS_KEY: ${{ steps.restore.outputs.cache-matched-key }}
       run: |
-        echo "Cached system packages: $(find "$DEBS" -maxdepth 1 -name '*.deb' | wc -l)"
+        # One dot per file, so the count needs no pipe.
+        cached=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf .)
+        echo "Cached system packages: ${#cached}"
         # With both caches restored the install takes seconds, so a pull
         # request gets 4 minutes and a stuck mirror fails fast. Anything
         # missing from main's cache downloads in full: a Playwright bump, the
@@ -82,12 +87,12 @@ runs:
         # never save, so a rerun misses again; that gets 9 minutes, as main
         # always does, so a slow download doesn't keep main red either.
         missing=
-        [ "$BROWSERS_HIT" = true ] || missing="the browsers"
-        if [ -z "$DEBS_KEY" ]; then
+        [[ "$BROWSERS_HIT" = true ]] || missing="the browsers"
+        if [[ -z "$DEBS_KEY" ]]; then
           missing="${missing:+$missing and }the system packages"
         fi
         bound=240
-        if [ "$GITHUB_EVENT_NAME" != pull_request ] || [ -n "$missing" ]; then
+        if [[ "$GITHUB_EVENT_NAME" != pull_request ]] || [[ -n "$missing" ]]; then
           bound=540
         fi
         status=0
@@ -97,19 +102,19 @@ runs:
         timeout --kill-after=15s "$bound" pnpm exec playwright install --with-deps $BROWSERS || status=$?
         # timeout exits 124, or 137 after --kill-after. A 137 before the bound
         # is a kill from elsewhere, such as the out-of-memory killer.
-        if [ "$status" = 124 ] || { [ "$status" = 137 ] && [ "$SECONDS" -ge "$bound" ]; }; then
-          if [ -n "$missing" ]; then
+        if [[ "$status" = 124 ]] || { [[ "$status" = 137 ]] && [[ "$SECONDS" -ge "$bound" ]]; }; then
+          if [[ -n "$missing" ]]; then
             what="Main's cache lacked $missing, so they downloaded in full, and the download was slow (browsers come from Playwright's CDN, system packages from the Ubuntu mirror)."
           else
             what="Both caches were restored, so apt was fetching only its package index, and the Ubuntu mirror was slow."
           fi
-          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+          if [[ "$GITHUB_EVENT_NAME" = push ]] && [[ "$GITHUB_REF" = refs/heads/main ]]; then
             rerun="The system packages that finished downloading are saved for the rerun."
           else
             rerun="Only main saves the caches, so the rerun downloads the same again; it usually passes once the slowdown ends."
           fi
           echo "::error title=Playwright setup timed out::The install took over $((bound / 60)) minutes. $what The code under test is not the cause. Re-run the job. $rerun"
-        elif [ "$status" = 137 ]; then
+        elif [[ "$status" = 137 ]]; then
           echo "::error title=Playwright setup was killed::The install was killed after ${SECONDS}s, before its ${bound}s limit, probably by the out-of-memory killer. Re-run the job, or use a larger runner."
         fi
         exit "$status"
@@ -133,9 +138,11 @@ runs:
         PREFIX: ${{ steps.debs.outputs.prefix }}
       run: |
         sudo apt-get autoclean -qq || true
-        names=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf '%f\n' | LC_ALL=C sort)
-        [ -n "$names" ] || exit 0
-        echo "key=$PREFIX$(printf '%s\n' "$names" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        listing=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf '%f\n')
+        [[ -n "$listing" ]] || exit 0
+        names=$(LC_ALL=C sort <<<"$listing")
+        hash=$(sha256sum <<<"$names")
+        echo "key=$PREFIX${hash:0:16}" >> "$GITHUB_OUTPUT"
     - name: Save the system packages
       if: always() && steps.key.outputs.key != '' && steps.key.outputs.key != steps.restore.outputs.cache-matched-key
       continue-on-error: true
