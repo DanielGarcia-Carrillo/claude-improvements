@@ -68,8 +68,8 @@ verify gate before handoff; the pre-commit is a fast file check.
 ## Traps
 
 - **`re.Match` groups are typed `str | Any`.** `match.group(1)`,
-  `match.group("name")` and `match[1]` fail ty's unsound-return and
-  unsound-assignment rules when returned as or assigned to `str`, since a
+  `match.group("name")` and `match[1]` fail ty's `unsound-return` and
+  `unsound-assignment` rules when returned as or assigned to `str`, since a
   group that didn't take part is `None`. Narrow with
   `isinstance(value, str)`. The whole match, `match.group()`, is fine.
 - **Tests can't import each other or `conftest`.** Under

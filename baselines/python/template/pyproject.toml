@@ -31,7 +31,7 @@ dev = [
   "inline-snapshot>=0.36.1",
   "pytest>=9.2.0",
   "ruff>=0.17.3",
-  "ty>=0.0.92",
+  "ty>=0.0.102",
 ]
 
 [tool.ruff]
@@ -97,7 +97,7 @@ dynamic-function-decorator-return = "error"
 missing-type-argument = "error"
 possibly-unresolved-reference = "error"
 unsound-assignment = "error"
-unsound-return-statement = "error"
+unsound-return = "error"
 unsound-yield = "error"
 unused-ignore-comment = "error"
 
