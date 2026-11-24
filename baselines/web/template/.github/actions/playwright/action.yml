@@ -81,15 +81,17 @@ runs:
         cached=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf .)
         echo "Cached system packages: ${#cached}"
         # With both caches restored the install takes seconds, so a pull
-        # request gets 4 minutes and a stuck mirror fails fast. Anything
-        # missing from main's cache downloads in full: a Playwright bump, the
-        # first run, or an entry evicted after a week unused. Pull requests
-        # never save, so a rerun misses again; that gets 9 minutes, as main
-        # always does, so a slow download doesn't keep main red either.
+        # request gets 4 minutes and a stuck mirror fails fast. Anything the
+        # caches didn't supply downloads in full: a Playwright bump, the first
+        # run, or an entry evicted after a week unused. Pull requests never
+        # save, so a rerun misses again; that gets 9 minutes, as main always
+        # does. The install fetches the system packages first, then the
+        # browsers, so the message names every source that was in play rather
+        # than guessing which one was slow.
         missing=
-        [[ "$BROWSERS_HIT" = true ]] || missing="the browsers"
+        [[ "$BROWSERS_HIT" = true ]] || missing="the browsers (from Playwright's CDN)"
         if [[ -z "$DEBS_KEY" ]]; then
-          missing="${missing:+$missing and }the system packages"
+          missing="${missing:+$missing and }the system packages (from the Ubuntu mirror)"
         fi
         bound=240
         if [[ "$GITHUB_EVENT_NAME" != pull_request ]] || [[ -n "$missing" ]]; then
@@ -104,14 +106,14 @@ runs:
         # is a kill from elsewhere, such as the out-of-memory killer.
         if [[ "$status" = 124 ]] || { [[ "$status" = 137 ]] && [[ "$SECONDS" -ge "$bound" ]]; }; then
           if [[ -n "$missing" ]]; then
-            what="Main's cache lacked $missing, so they downloaded in full, and the download was slow (browsers come from Playwright's CDN, system packages from the Ubuntu mirror)."
+            what="The caches didn't supply $missing, so those were downloading in full, along with apt's package index from the Ubuntu mirror; one of these was slow."
           else
-            what="Both caches were restored, so apt was fetching only its package index, and the Ubuntu mirror was slow."
+            what="Both caches were restored, so the install was downloading only apt's package index and any system packages updated since main's last save, from the Ubuntu mirror, which was slow."
           fi
           if [[ "$GITHUB_EVENT_NAME" = push ]] && [[ "$GITHUB_REF" = refs/heads/main ]]; then
-            rerun="The system packages that finished downloading are saved for the rerun."
+            rerun="System packages that finished downloading are saved for the rerun; the browsers are saved only after an install succeeds."
           else
-            rerun="Only main saves the caches, so the rerun downloads the same again; it usually passes once the slowdown ends."
+            rerun="Only pushes to main save the caches, so the rerun downloads the same again; it usually passes once the slowdown ends."
           fi
           echo "::error title=Playwright setup timed out::The install took over $((bound / 60)) minutes. $what The code under test is not the cause. Re-run the job. $rerun"
         elif [[ "$status" = 137 ]]; then

@@ -56,7 +56,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # The browsers and their system packages, both from main's cache, with
-      # the install bounded so a slow Ubuntu mirror fails fast.
+      # the install bounded: a PR whose caches are warm fails fast on a slow
+      # mirror, and anything downloading in full gets longer.
       - uses: ./.github/actions/playwright
 
       # The same gate as local: typecheck, lint, format, unit, browser and
