@@ -29,7 +29,9 @@ runs:
       shell: bash
       run: |
         dir=/var/cache/playwright-debs
-        sudo install -d -o "$(id -u)" -g "$(id -g)" "$dir" "$dir/partial"
+        uid=$(id -u)
+        gid=$(id -g)
+        sudo install -d -o "$uid" -g "$gid" "$dir" "$dir/partial"
         printf 'Dir::Cache::archives "%s/";\nAPT::Keep-Downloaded-Packages "true";\n' "$dir" \
           | sudo tee /etc/apt/apt.conf.d/99-playwright-debs > /dev/null
         echo "dir=$dir" >> "$GITHUB_OUTPUT"
@@ -52,7 +54,8 @@ runs:
       env:
         BROWSERS: ${{ inputs.browsers }}
       run: |
-        version=$(pnpm exec playwright --version | sed -n 's/^Version //p') || version=
+        output=$(pnpm exec playwright --version) || output=
+        version=$(sed -n 's/^Version //p' <<<"$output")
         if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]]; then
           echo "::warning title=Playwright setup::Could not read the Playwright version; downloading the browsers."
           exit 0
@@ -71,24 +74,50 @@ runs:
       env:
         BROWSERS: ${{ inputs.browsers }}
         DEBS: ${{ steps.debs.outputs.dir }}
+        BROWSERS_HIT: ${{ steps.browsers-restore.outputs.cache-hit }}
+        DEBS_KEY: ${{ steps.restore.outputs.cache-matched-key }}
       run: |
-        echo "Cached system packages: $(find "$DEBS" -maxdepth 1 -name '*.deb' | wc -l)"
-        # A warm install takes seconds and a cold one under two minutes. A pull
-        # request fails fast and reruns; main waits longer, so a cold cache on a
-        # slow mirror doesn't turn main red and hold up its deploy.
+        # One dot per file, so the count needs no pipe.
+        cached=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf .)
+        echo "Cached system packages: ${#cached}"
+        # With both caches restored the install takes seconds, so a pull
+        # request gets 4 minutes and a stuck mirror fails fast. Anything the
+        # caches didn't supply downloads in full: a Playwright bump, the first
+        # run, or an entry evicted after a week unused. Pull requests never
+        # save, so a rerun misses again; that gets 9 minutes, as main always
+        # does. The install fetches the system packages first, then the
+        # browsers, so the message names every source that was in play rather
+        # than guessing which one was slow.
+        missing=
+        [[ "$BROWSERS_HIT" = true ]] || missing="the browsers (from Playwright's CDN)"
+        if [[ -z "$DEBS_KEY" ]]; then
+          missing="${missing:+$missing and }the system packages (from the Ubuntu mirror)"
+        fi
         bound=240
-        [ "$GITHUB_EVENT_NAME" = pull_request ] || bound=540
+        if [[ "$GITHUB_EVENT_NAME" != pull_request ]] || [[ -n "$missing" ]]; then
+          bound=540
+        fi
         status=0
+        SECONDS=0
         # BROWSERS is a list of names, split on purpose.
         # shellcheck disable=SC2086
         timeout --kill-after=15s "$bound" pnpm exec playwright install --with-deps $BROWSERS || status=$?
-        if [ "$status" = 124 ] || [ "$status" = 137 ]; then
-          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
-            saved="the packages this run finished downloading are saved for the rerun"
+        # timeout exits 124, or 137 after --kill-after. A 137 before the bound
+        # is a kill from elsewhere, such as the out-of-memory killer.
+        if [[ "$status" = 124 ]] || { [[ "$status" = 137 ]] && [[ "$SECONDS" -ge "$bound" ]]; }; then
+          if [[ -n "$missing" ]]; then
+            what="The caches didn't supply $missing, so those were downloading in full, along with apt's package index from the Ubuntu mirror; one of these was slow."
           else
-            saved="only main saves the package cache, so the rerun downloads what main's cache lacks"
+            what="Both caches were restored, so the install was downloading only apt's package index and any system packages updated since main's last save, from the Ubuntu mirror, which was slow."
           fi
-          echo "::error title=Playwright setup timed out::Installing the browsers and their system packages took over $((bound / 60)) minutes. That is almost always a slow Ubuntu mirror, not this change. Re-run the job: $saved."
+          if [[ "$GITHUB_EVENT_NAME" = push ]] && [[ "$GITHUB_REF" = refs/heads/main ]]; then
+            rerun="System packages that finished downloading are saved for the rerun; the browsers are saved only after an install succeeds."
+          else
+            rerun="Only pushes to main save the caches, so the rerun downloads the same again; it usually passes once the slowdown ends."
+          fi
+          echo "::error title=Playwright setup timed out::The install took over $((bound / 60)) minutes. $what The code under test is not the cause. Re-run the job. $rerun"
+        elif [[ "$status" = 137 ]]; then
+          echo "::error title=Playwright setup was killed::The install was killed after ${SECONDS}s, before its ${bound}s limit, probably by the out-of-memory killer. Re-run the job, or use a larger runner."
         fi
         exit "$status"
     - name: Save the browsers
@@ -111,9 +140,11 @@ runs:
         PREFIX: ${{ steps.debs.outputs.prefix }}
       run: |
         sudo apt-get autoclean -qq || true
-        names=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf '%f\n' | LC_ALL=C sort)
-        [ -n "$names" ] || exit 0
-        echo "key=$PREFIX$(printf '%s\n' "$names" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        listing=$(find "$DEBS" -maxdepth 1 -name '*.deb' -printf '%f\n')
+        [[ -n "$listing" ]] || exit 0
+        names=$(LC_ALL=C sort <<<"$listing")
+        hash=$(sha256sum <<<"$names")
+        echo "key=$PREFIX${hash:0:16}" >> "$GITHUB_OUTPUT"
     - name: Save the system packages
       if: always() && steps.key.outputs.key != '' && steps.key.outputs.key != steps.restore.outputs.cache-matched-key
       continue-on-error: true

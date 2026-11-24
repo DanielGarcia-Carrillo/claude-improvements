@@ -54,7 +54,8 @@ and [Rust](../rust/template/) templates already do them.
   normally takes 20–40 s but spiked to 8–10 minutes in one repo, and
   `playwright install-deps` to 20 minutes in another, both on a slow Ubuntu
   mirror. The web template's `.github/actions/playwright` does this and
-  bounds the install so a stuck mirror fails fast.
+  bounds the install: tightly when both caches are restored, so a stuck
+  mirror fails fast, and loosely when anything downloads in full.
 - **Per-step timings in the run summary**, so a slow step shows up before
   it's expensive.
 - **A quick local check beside the full gate.** The web template's
