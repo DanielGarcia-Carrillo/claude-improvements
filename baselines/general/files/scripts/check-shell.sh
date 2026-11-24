@@ -86,8 +86,15 @@ if [[ "$workflow_count" -gt 0 || "$action_count" -gt 0 ]]; then
   require_tool actionlint
 fi
 if [[ "$action_count" -gt 0 ]]; then
-  # Composite actions are read with yq.
+  # Composite actions are read with mikefarah/yq, not the Python wrapper of
+  # the same name, whose language differs.
   require_tool yq
+  yq_identity=$(yq --version 2>&1) || yq_identity=
+  if [[ "$yq_identity" != *mikefarah/yq* ]]; then
+    yq_path=$(command -v yq)
+    printf '%s is not mikefarah/yq. Run mise install and use mise exec -- for the shell checks.\n' "$yq_path" >&2
+    exit 1
+  fi
 fi
 if [[ "$workflow_count" -gt 0 || "$action_count" -gt 0 ]]; then
   # actionlint invokes ShellCheck with --norc, so forward the configured
@@ -122,12 +129,20 @@ fail_action() {
   exit 2
 }
 
-# The indentation of a line of the action, to place ShellCheck columns.
-line_indent() {
-  local text lead
+# Reads YAML merge keys (<<: *anchor) as the spec defines them.
+yq_spec=--yaml-fix-merge-anchor-to-spec
+
+# The content indentation of the literal block script whose run key is on
+# line $1, for a step whose keys start at column $2. An indentation indicator
+# (run: |2) sets it; otherwise the first line with text does.
+block_indent() {
+  local text
   text=$(sed -n "$1p" "$action")
-  lead=${text%%[! ]*}
-  printf '%s' "${#lead}"
+  if [[ "$text" =~ $block_indicator ]]; then
+    printf '%s' "$(($2 - 1 + BASH_REMATCH[1]))"
+  else
+    awk -v from="$1" 'NR > from && /[^ \t\r]/ { match($0, /^ */); print RLENGTH; exit }' "$action"
+  fi
 }
 
 checked_actions=0
@@ -137,35 +152,36 @@ if [[ "$action_count" -gt 0 ]]; then
   make_work
 fi
 sc_position='SC[0-9]+:[a-z]+:([0-9]+):([0-9]+):'
+block_indicator=':[[:space:]]*[|][-+]?([1-9])'
 # Bash 3.2 treats an empty array as unset under set -u.
 for action in ${actions[@]+"${actions[@]}"}; do
   # One read per value: in yq, reading a missing key can add it, and binding
   # a missing value to a variable yields nothing.
-  if ! runs_kind=$(yq '.runs | type' "$action" 2>"$work/yq-errors"); then
+  if ! runs_kind=$(yq "$yq_spec" '.runs | type' "$action" 2>"$work/yq-errors"); then
     printf '%s: yq cannot read this YAML:\n' "$action" >&2
     cat "$work/yq-errors" >&2
     exit 2
   fi
   [[ "$runs_kind" = '!!map' ]] || fail_action 'cannot find runs in this action'
-  using=$(yq '.runs.using // "" | tostring | downcase' "$action")
+  using=$(yq "$yq_spec" '.runs.using // "" | tostring | downcase' "$action")
   case "$using" in
     composite) ;;
     node* | docker) continue ;;
     '') fail_action 'cannot find runs.using in this action' ;;
     *) fail_action "runs.using is '$using', not composite, docker or a node runtime" ;;
   esac
-  steps_kind=$(yq '.runs.steps | type' "$action")
-  inputs_kind=$(yq '.inputs | type' "$action")
+  steps_kind=$(yq "$yq_spec" '.runs.steps | type' "$action")
+  inputs_kind=$(yq "$yq_spec" '.inputs | type' "$action")
   [[ "$steps_kind" = '!!seq' ]] || fail_action 'cannot find the list of runs.steps in this composite action'
   [[ "$inputs_kind" = '!!map' || "$inputs_kind" = '!!null' ]] ||
     fail_action 'inputs must be a mapping of input names'
-  ((checked_actions += 1))
+  checked_actions=$((checked_actions + 1))
 
   # One line per step: its line and column, its run script's line, column and
   # style, its shell, whether it runs a script, and its name. As above, has()
   # comes before the reads.
   # shellcheck disable=SC2016 # A yq program, not a shell expansion.
-  yq '.runs.steps | .[] | . as $s | ($s | has("run")) as $runs |
+  yq "$yq_spec" 'explode(.) | .runs.steps | .[] | . as $s | ($s | has("run")) as $runs |
     [($s | line), ($s | column), ($s.run | line), ($s.run | column),
       ($s.run | style | sub("^$"; "plain")), $s.shell // "-", $runs,
       ($s.name // "" | tostring | sub("[\t\r\n]+"; " "))] | map(tostring) | join("\t")' \
@@ -180,7 +196,7 @@ for action in ${actions[@]+"${actions[@]}"}; do
     step_run_column[step_count]=$run_column
     step_style[step_count]=$style
     step_label[step_count]="step $((step_count + 1))${name:+ \"$name\"}"
-    ((step_count += 1))
+    step_count=$((step_count + 1))
     [[ "$runs" = true ]] || continue
     case "${shell%% *}" in
       -)
@@ -189,23 +205,23 @@ for action in ${actions[@]+"${actions[@]}"}; do
         action_failed=1
         ;;
       bash | sh) ;;
-      *) ((skipped_steps += 1)) ;;
+      *) skipped_steps=$((skipped_steps + 1)) ;;
     esac
   done <"$work/steps"
   [[ "$step_count" -gt 0 ]] || fail_action 'runs.steps has no steps'
 
   # shellcheck disable=SC2016 # Expressions for actionlint, not shell expansions.
-  MATRIX='${{ fromJSON(vars.MATRIX) }}' yq '{"on": {"workflow_call": {"inputs":
+  MATRIX='${{ fromJSON(vars.MATRIX) }}' yq "$yq_spec" 'explode(.) | {"on": {"workflow_call": {"inputs":
       ((.inputs // {}) | with_entries(.value = {"type": "string"}))}},
     "jobs": {"composite": {"runs-on": "self-hosted", "strategy": {"matrix": strenv(MATRIX)},
       "steps": .runs.steps}}}' "$action" >"$work/workflow.yml"
-  yq '.jobs.composite.steps[] | (line | tostring) + "\t" + (column | tostring)' \
+  yq "$yq_spec" '.jobs.composite.steps[] | (line | tostring) + "\t" + (column | tostring)' \
     "$work/workflow.yml" >"$work/generated"
   generated=0
   while IFS=$'\t' read -r line column; do
     generated_line[generated]=$line
     generated_column[generated]=$column
-    ((generated += 1))
+    generated=$((generated + 1))
   done <"$work/generated"
 
   status=0
@@ -223,7 +239,9 @@ for action in ${actions[@]+"${actions[@]}"}; do
       continue
     fi
     step=$((generated - 1))
-    while [[ "$step" -gt 0 && "${generated_line[step]}" -gt "$line" ]]; do ((step -= 1)); done
+    # Under set -e, Bash 4.1 and later exit when (( )) evaluates to 0, so
+    # counters here use assignments.
+    while [[ "$step" -gt 0 && "${generated_line[step]}" -gt "$line" ]]; do step=$((step - 1)); done
     if [[ "$kind" = shellcheck && "$message" =~ $sc_position ]]; then
       # ShellCheck counts from the start of the script.
       script_line=${BASH_REMATCH[1]}
@@ -232,8 +250,9 @@ for action in ${actions[@]+"${actions[@]}"}; do
       column=${step_run_column[step]}
       case "${step_style[step]}" in
         literal)
+          base=$(block_indent "$line" "${step_column[step]}")
           line=$((line + script_line))
-          column=$(($(line_indent "$line") + script_column))
+          column=$((base + script_column))
           ;;
         plain)
           line=$((line + script_line - 1))

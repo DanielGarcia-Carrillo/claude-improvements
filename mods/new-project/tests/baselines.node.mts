@@ -375,6 +375,8 @@ runs:
       const result = check(actionPath)
       assert.equal(result.status, 1, result.stdout + result.stderr)
       assert.doesNotMatch(result.stdout, /Shell quality passed/)
+      // A failure must say where, not just exit.
+      assert.match(result.stdout, /^\.\/\.github\/actions\/shell-test\/action\.yml:\d+:\d+: step \d/m)
       return result.stdout + result.stderr
     }
     assert.match(
@@ -434,7 +436,7 @@ runs:
     assert.match(quotedBad.output, /action\.yml:18:9: step 1 "Look for the target": .*SC2292/)
     const unreadable = checkAction(`${action}[not, a, key]\n`)
     assert.equal(unreadable.status, 2, unreadable.output)
-    assert.match(unreadable.stderr, /action\.yml: yq cannot read this YAML:\n.*L22/)
+    assert.match(unreadable.stderr, /action\.yml: yq cannot read this YAML:\nError: .*action\.yml/)
     const noRuns = checkAction(action.replace(/\nruns:[^]*/, '\n'))
     assert.equal(noRuns.status, 2, noRuns.output)
     assert.match(noRuns.stderr, /cannot find runs in this action/)
@@ -498,6 +500,33 @@ runs:
     const docker = checkAction(action.replace('using: composite', 'using: docker\n  image: Dockerfile'))
     assert.equal(docker.status, 0, docker.output)
     assert.match(docker.stdout, /, 0 composite actions\./)
+    // ShellCheck columns count from the block's own indentation, so an
+    // indented script line keeps its place, with or without an indentation
+    // indicator.
+    const indented = '        if true; then\n          [ -e $TARGET ]\n        fi'
+    assert.match(
+      broken('        [[ -e $TARGET ]]', indented),
+      /action\.yml:19:11: step 1 "Look for the target": .*SC2292:style:3:3:/,
+    )
+    writeFileSync(
+      join(repo, actionPath),
+      action.replace(
+        '      run: |\n        echo "Looking in ${{ github.action_path }}"\n        [[ -e $TARGET ]]',
+        '      run: |2\n          [ -e $TARGET ]',
+      ),
+    )
+    const indicator = check(actionPath)
+    assert.equal(indicator.status, 1, indicator.stdout + indicator.stderr)
+    assert.match(indicator.stdout, /action\.yml:17:11: step 1 "Look for the target": .*SC2292:style:1:3:/)
+    // An anchor outside runs.steps is resolved before the steps are read.
+    const anchored = (script: string) =>
+      action.replace('\nruns:', '\nx-common: &common\n  shell: bash\nruns:') +
+      `    - <<: *common\n      name: Anchored\n      run: ${script}\n`
+    const anchoredClean = checkAction(anchored('"[[ -e README.md ]]"'))
+    assert.equal(anchoredClean.status, 0, anchoredClean.output)
+    const anchoredBad = checkAction(anchored('"[ -e README.md ]"'))
+    assert.equal(anchoredBad.status, 1, anchoredBad.output)
+    assert.match(anchoredBad.output, /action\.yml:26:12: step 3 "Anchored": .*SC2292/)
     // GitHub rejects a composite run step without a shell.
     const noShell = checkAction(action.replace('      shell: bash\n', ''))
     assert.equal(noShell.status, 1, noShell.output)
@@ -669,6 +698,16 @@ test('composite action checks fail when yq is missing', () => {
   assert.equal(result.status, 1)
   assert.match(result.stderr, /Missing yq/)
   assert.doesNotMatch(result.stdout, /Shell quality passed/)
+  // The Python yq wrapper has the same name and another language.
+  writeFileSync(join(bin, 'yq'), '#!/bin/sh\necho "yq 3.4.3"\n', { mode: 0o755 })
+  const wrapper = spawnSync('/bin/bash', ['scripts/check-shell.sh', '.github/actions/playwright/action.yml'], {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: bin },
+  })
+  assert.equal(wrapper.status, 1)
+  assert.match(wrapper.stderr, /yq is not mikefarah\/yq/)
+  assert.doesNotMatch(wrapper.stdout, /Shell quality passed/)
 })
 
 test('setup installs Git hooks in every stack before verify, including --keep-versions', () => {
