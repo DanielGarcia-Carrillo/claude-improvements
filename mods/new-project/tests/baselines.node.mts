@@ -327,6 +327,71 @@ for (const stack of ['web', 'rust', 'python'] as const) {
     assert.equal(check().status, 0)
     rmSync(join(repo, workflowPath))
 
+    // actionlint reads only workflows, so composite actions go through a
+    // generated one. Its expressions must not trip ShellCheck, and each step
+    // keeps its own shell.
+    const composites = stack === 'web' ? 1 : 0
+    const actionPath = '.github/actions/shell-test/action.yml'
+    const action = `name: fixture
+description: A composite action fixture.
+inputs:
+  target:
+    description: The file to look for.
+    default: README.md
+runs:
+  using: composite
+  steps:
+    # A comment between the steps.
+    - id: look
+      name: Look for the target
+      shell: bash
+      env:
+        TARGET: \${{ inputs.target }}
+      run: |
+        echo "Looking in \${{ github.action_path }}"
+        [[ -e $TARGET ]]
+    - shell: sh
+      name: 'Look again in sh'
+      run: test -e "\${{ inputs.target }}" && echo \${{ steps.look.outcome }}
+`
+    mkdirSync(join(repo, '.github/actions/shell-test'), { recursive: true })
+    mkdirSync(join(repo, '.github/actions/javascript'), { recursive: true })
+    writeFileSync(
+      join(repo, '.github/actions/javascript/action.yml'),
+      "name: fixture\ndescription: Not composite.\nruns:\n  using: 'node24'\n  main: index.js\n",
+    )
+    writeFileSync(join(repo, actionPath), action)
+    const actionClean = check()
+    assert.equal(actionClean.status, 0, actionClean.stdout + actionClean.stderr)
+    assert.match(actionClean.stdout, new RegExp(`, ${composites + 1} composite actions\\.`))
+    assert.match(check(actionPath).stdout, /, 1 composite actions\./)
+
+    const broken = (from: string, to: string) => {
+      writeFileSync(join(repo, actionPath), action.replace(from, to))
+      const result = check(actionPath)
+      assert.equal(result.status, 1, result.stdout + result.stderr)
+      assert.doesNotMatch(result.stdout, /Shell quality passed/)
+      return result.stdout + result.stderr
+    }
+    assert.match(
+      broken('[[ -e $TARGET ]]', '[ -e $TARGET ]'),
+      /^\.\/\.github\/actions\/shell-test\/action\.yml:18:9: step 1 "Look for the target": .*SC2292/m,
+    )
+    assert.match(
+      broken('run: test -e', 'run: test -e x && [[ -e x ]] && test -e'),
+      /action\.yml:21:7: step 2 "Look again in sh": .*SC3010/,
+      "a step's shell must decide the ShellCheck dialect",
+    )
+    assert.match(
+      broken('inputs.target }}"', 'inputs.destination }}"'),
+      /step 2 .*property "destination" is not defined/,
+    )
+    writeFileSync(join(repo, actionPath), action.replace(/ {2}steps:\n[^]*/, '  steps: []\n'))
+    const flow = check(actionPath)
+    assert.equal(flow.status, 2)
+    assert.match(flow.stderr, /action\.yml: write runs\.steps as a block list/)
+    rmSync(join(repo, '.github/actions'), { recursive: true })
+
     const ignored = join(repo, 'ignored-shell')
     mkdirSync(ignored)
     writeFileSync(join(ignored, 'invalid.sh'), 'this is not shell syntax (\n')
@@ -450,6 +515,24 @@ test('workflow checks fail when ShellCheck is missing instead of silently omitti
   })
   assert.equal(result.status, 1)
   assert.match(result.stderr, /Missing shellcheck/)
+  assert.doesNotMatch(result.stdout, /Shell quality passed/)
+})
+
+test('composite action checks fail when actionlint is missing', () => {
+  const repo = scaffold('web', 'action-missing-actionlint')
+  const bin = join(scratch, 'action-tools-bin')
+  mkdirSync(bin)
+  symlinkSync(realGit, join(bin, 'git'))
+  const shellcheck = run('mise', ['which', 'shellcheck'], resolve(BASELINES, '..'))
+  assert.equal(shellcheck.status, 0, shellcheck.stderr)
+  symlinkSync(shellcheck.stdout.trim(), join(bin, 'shellcheck'))
+  const result = spawnSync('/bin/bash', ['scripts/check-shell.sh', '.github/actions/playwright/action.yml'], {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: bin },
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Missing actionlint/)
   assert.doesNotMatch(result.stdout, /Shell quality passed/)
 })
 
