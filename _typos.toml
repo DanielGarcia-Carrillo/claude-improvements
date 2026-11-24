@@ -1,7 +1,7 @@
 [files]
 # Include agent hooks and CI files; keep build output and VCS data excluded.
 ignore-hidden = false
-extend-exclude = [".git", "node_modules", "target", "dist", ".venv", "uv.lock", "pnpm-lock.yaml"]
+extend-exclude = [".git", "node_modules", "target", "dist", ".venv", "uv.lock", "pnpm-lock.yaml", "Cargo.lock"]
 
 [default]
 locale = "en-us"

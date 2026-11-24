@@ -1,0 +1,44 @@
+# Dependabot keeps the scaffold check's pinned lockfiles current
+# (baselines/scaffold-check/; baselines/README.md, "Scaffold check"). The
+# manifests beside them are copies of what the templates scaffold, so
+# lockfile-only takes new versions inside the templates' own ranges, and each
+# update is a pull request that the scaffold workflow checks.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /baselines/scaffold-check/web
+    versioning-strategy: lockfile-only
+    schedule:
+      interval: weekly
+      day: monday
+    # A new release waits three days before Dependabot proposes it, as in
+    # the templates.
+    cooldown:
+      default-days: 3
+    groups:
+      lockfile:
+        patterns: ['*']
+
+  - package-ecosystem: cargo
+    directory: /baselines/scaffold-check/rust
+    versioning-strategy: lockfile-only
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      lockfile:
+        patterns: ['*']
+
+  - package-ecosystem: uv
+    directory: /baselines/scaffold-check/python
+    versioning-strategy: lockfile-only
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      lockfile:
+        patterns: ['*']

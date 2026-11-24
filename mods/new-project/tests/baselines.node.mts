@@ -17,7 +17,8 @@ import { delimiter, join, resolve } from 'node:path'
 import { after, test } from 'node:test'
 
 import type { Stack } from '../scripts/compose.ts'
-import { kickoffFor, PLACEHOLDER, PLACEHOLDER_EXEMPT, parseKickoff } from '../scripts/compose.ts'
+import { PLACEHOLDER, PLACEHOLDER_EXEMPT } from '../scripts/compose.ts'
+import { answersFor as answersForStack } from './answers.ts'
 
 const SCRIPT = resolve(import.meta.dirname, '../scripts/new-project.ts')
 const BASELINES = resolve(import.meta.dirname, '../../../baselines')
@@ -37,29 +38,7 @@ const run = (command: string, args: readonly string[], cwd: string) =>
 const badTest = (text: string) => text.replace('[[ -e $TARGET ]]', '[ -e $TARGET ]')
 const crlf = (text: string) => text.replaceAll('\n', '\r\n')
 
-/** Answers that take every default, with names that test the escaping. */
-function answersFor(stack: Stack) {
-  const sections = kickoffFor(parseKickoff(readFileSync(join(BASELINES, 'general/kickoff.md'), 'utf8')), stack)
-  const isWeb = stack === 'web'
-  return {
-    stack,
-    name: isWeb ? "Dan's Trips & Tours" : "Dan's Line Width",
-    slug: isWeb ? 'dans-trips' : 'line-width',
-    ...(isWeb ? { shortName: 'Trips' } : { repository: 'https://github.com/someone/line-width' }),
-    description: 'Checks the "real" thing for people in a hurry.',
-    summary: 'A scaffold check.',
-    issues: 'GitHub Issues',
-    merging: 'The owner merges',
-    kickoff: sections.flatMap((s) =>
-      s.questions.map((question) => ({ question, answer: 'Default', source: 'default' })),
-    ),
-    changed: [],
-    architecture: [{ choice: 'Shape', line: 'The baseline as is' }],
-    alternatives: [{ option: 'Nothing else', why: 'This is a test' }],
-    consequences: 'None.',
-    followUps: [],
-  }
-}
+const answersFor = (stack: Stack) => answersForStack(stack, BASELINES)
 
 /** Generates a named scratch project from the real baseline without installing dependencies. */
 function scaffold(stack: Stack, name: string = stack): string {
