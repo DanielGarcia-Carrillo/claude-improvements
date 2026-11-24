@@ -11,7 +11,7 @@ bootstrap:
     lefthook install
 
 [default]
-verify: spellcheck shell-check fmt-check lint types deps test
+verify: spellcheck shell-check fmt-check lint types deps coverage shell-coverage
 
 spellcheck:
     mise exec -- typos
@@ -54,3 +54,16 @@ fix: shell-fix
 snapshots:
     -uv run pytest --inline-snapshot=fix,create
     uv run pytest
+
+# The full gate collects once; `just test` stays available for narrow iteration.
+shell-coverage:
+    bash scripts/shell-coverage.sh
+
+coverage *args:
+    uv run coverage erase
+    uv run coverage run -m pytest {{ args }}
+    uv run coverage combine
+    uv run coverage report --show-missing
+    uv run coverage html -d coverage/python-html
+    uv run coverage xml -o coverage/python.xml
+    uv run --script --locked scripts/check-coverage.py coverage/python.xml

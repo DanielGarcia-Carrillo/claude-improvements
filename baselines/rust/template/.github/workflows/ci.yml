@@ -77,6 +77,7 @@ jobs:
     # writes; pull requests only read, as with rust-cache's save-if. It can't
     # cache incremental builds; rust-cache already sets CARGO_INCREMENTAL=0.
     env:
+      COVERAGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       SCCACHE_GHA_ENABLED: 'true'
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}
@@ -84,6 +85,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - run: rustup toolchain install
       # Before anything runs cargo, since RUSTC_WRAPPER names it. Its post step
       # reports the hit rate. Dependabot bumps the action, not `version`.
@@ -94,10 +96,12 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
-      # --timings writes target/cargo-timings/cargo-timing.html: compile time
+      - name: Install Bash coverage collector
+        run: sudo apt-get update && sudo apt-get install -y kcov
+      # Coverage's --timings writes under target/llvm-cov-target/: compile time
       # per crate, for the crates this run rebuilt.
-      - run: cargo nextest run --workspace --all-features --locked --profile ci --timings
-      - run: cargo test --workspace --all-features --locked --doc
+      - run: just coverage --profile ci --timings
+      - run: just shell-coverage
       - name: Slowest tests
         if: ${{ !cancelled() && hashFiles('target/nextest/ci/junit.xml') != '' }}
         shell: python3 {0}
@@ -114,7 +118,8 @@ jobs:
         with:
           name: rust-timings
           path: |
-            target/cargo-timings/cargo-timing.html
+            coverage/
+            target/llvm-cov-target/cargo-timings/cargo-timing.html
             target/nextest/ci/junit.xml
           if-no-files-found: ignore
           retention-days: 14

@@ -12,16 +12,54 @@ interface Fixtures {
   cspViolations: string[]
   /** Automatic: fails any test whose pages throw an uncaught error or log one to the console. */
   pageErrors: string[]
+  /** Automatic, enabled only by test:coverage's isolated instrumented build. */
+  coverage: void
 }
 
 declare global {
   interface Window {
     reportCspViolation?: (violation: string) => Promise<void>
+    reportCoverage?: (data: unknown) => Promise<void>
   }
 }
 
 /** Every spec imports `test` and `expect` from here, never from @playwright/test. */
 export const test = base.extend<Fixtures>({
+  coverage: [
+    async ({ page, context }, use) => {
+      if (process.env['COVERAGE_BUILD'] !== '1') {
+        await use()
+        return
+      }
+      const directory = 'coverage/istanbul'
+      await mkdir(directory, { recursive: true })
+      const save = async (data: unknown): Promise<void> => {
+        if (data !== null && typeof data === 'object' && Object.keys(data).length > 0) {
+          await writeFile(`${directory}/${randomUUID()}.json`, JSON.stringify(data))
+        }
+      }
+      await page.exposeFunction('reportCoverage', save)
+      await page.addInitScript(() => {
+        window.addEventListener('beforeunload', () => {
+          void window.reportCoverage?.((globalThis as { __coverage__?: unknown })['__coverage__'])
+        })
+      })
+      await use()
+      for (const current of context.pages()) {
+        if (!current.isClosed()) {
+          await save(await current.evaluate(() => (globalThis as { __coverage__?: unknown })['__coverage__']))
+        }
+      }
+      for (const worker of context.serviceWorkers()) {
+        // An update can retire a worker between listing and evaluating it.
+        const data = await worker
+          .evaluate(() => (globalThis as { __coverage__?: unknown })['__coverage__'])
+          .catch(() => undefined)
+        await save(data)
+      }
+    },
+    { auto: true },
+  ],
   home: async ({ page }, use) => {
     await use(new HomePage(page))
   },
@@ -66,3 +104,5 @@ export const test = base.extend<Fixtures>({
 })
 
 export { expect }
+import { randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'

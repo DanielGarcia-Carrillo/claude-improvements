@@ -10,6 +10,7 @@ strict, local, fast checks whose failures say how to fix them.
 | [general/principles.md](general/principles.md) | Errors as the interface for agents, dependencies, implementation ethos, ways of working |
 | [general/kickoff.md](general/kickoff.md) | Requirement questions to ask before choosing infrastructure |
 | [general/infra.md](general/infra.md) | Hosting (Cloudflare), data, CI, toolchains, Claude Code mechanisms |
+| [general/coverage.md](general/coverage.md) | Local and PR coverage floors for every stack, with no coverage service |
 | [general/ci-speed.md](general/ci-speed.md) | Keeping CI and local checks proportional to a change: defaults for new projects, steps for existing ones |
 | [general/CLAUDE.template.md](general/CLAUDE.template.md) | Skeleton for a new repo's `CLAUDE.md` |
 | [general/files/](general/files/) | Editor and Git settings, shell quality checks, PR template, ADR template |
@@ -48,6 +49,9 @@ Each stack README ends with its sources, and
 [principles.md](general/principles.md#sources) credits the ideas it borrows.
 
 ## Conventions in this folder
+
+- Every full verify checks overall and changed-line coverage. Shared policy,
+  setup, scopes and commands are in [coverage.md](general/coverage.md).
 
 - Every stack's verify command checks shell scripts with ShellCheck and
   shfmt, and workflows with actionlint. These tools are pinned in each

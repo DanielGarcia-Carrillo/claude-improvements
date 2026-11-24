@@ -7,6 +7,8 @@ and `replace_me`, and delete these comments.
 ## Commands
 
 ```bash
+just coverage          # overall and changed-line coverage
+just shell-coverage    # Bash behavior tests and coverage
 just verify                                # spelling, shell, format, lint, types, deps, tests: the gate
 uv run pytest tests/test_width.py -k NAME  # narrowest test first, then widen
 just fix                                   # shell formatting, then ruff's safe fixes and formatting

@@ -26,6 +26,7 @@ build-backend = "uv_build"
 # agree.
 [dependency-groups]
 dev = [
+  "coverage>=7.17.1",
   "deptry>=0.25.1",
   "hypothesis>=6.170.12",
   "inline-snapshot>=0.36.1",
@@ -128,3 +129,20 @@ default-flags-tui = ["report"]
 
 [tool.deptry]
 known_first_party = ["replace_me"]
+
+# Include unimported modules and Python processes launched by the CLI tests.
+[tool.coverage.run]
+branch = true
+source = ["src"]
+relative_files = true
+patch = ["subprocess"]
+parallel = true
+
+[tool.coverage.report]
+show_missing = true
+include_namespace_packages = true
+
+# This independent developer CLI prints diagnostics and invokes fixed tools;
+# its XML input is produced by the local test collectors, not user data.
+[tool.ruff.lint.extend-per-file-ignores]
+"scripts/check-coverage.py" = ["T201", "S603", "S607", "PLR2004", "S314", "TID251"]

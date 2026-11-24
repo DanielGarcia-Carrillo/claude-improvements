@@ -313,3 +313,12 @@ covers all three cases against real builds.
   and web.dev's [PWA update](https://web.dev/learn/pwa/update) guide.
 - **The `.claude/` hooks**: Claude Code's
   [hooks guide](https://code.claude.com/docs/en/hooks-guide).
+
+## Coverage
+
+The full verify checks 80% overall line coverage and 90% of changed lines,
+including Bash hooks and maintenance scripts. Run `pnpm test:coverage` and
+`pnpm shell:coverage` directly to inspect
+gaps. Install kcov 43 in addition to the pinned tools. See the shared
+[coverage policy](../general/coverage.md) for collector scopes, reports,
+comparison bases, bootstrap behavior and CI setup.

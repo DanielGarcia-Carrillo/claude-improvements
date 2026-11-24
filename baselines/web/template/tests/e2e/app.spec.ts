@@ -31,7 +31,9 @@ test('main navigation reaches every screen', async ({ home, page }) => {
 
 test('opens offline once the service worker is installed', async ({ home, page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'Playwright drives service workers in Chromium only')
+  const initialPolicy = page.waitForResponse((response) => new URL(response.url()).pathname === UPDATE_POLICY_URL)
   await home.goto()
+  await (await initialPolicy).finished()
   await home.waitForServiceWorker()
   await context.setOffline(true)
   await home.navigateTo('About')

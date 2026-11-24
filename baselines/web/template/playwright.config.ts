@@ -27,7 +27,12 @@ const KEEP_FINISHED_RUNS = 5
  * a job is one run in its own checkout, and ci.yml uploads dist/ and the
  * report from there.
  */
-const RUN_DIR = CI ? undefined : (process.env['E2E_RUN_DIR'] ??= newRun())
+const RUN_DIR =
+  process.env['COVERAGE_BUILD'] === '1'
+    ? process.env['E2E_RUN_DIR']
+    : CI
+      ? undefined
+      : (process.env['E2E_RUN_DIR'] ??= newRun())
 
 const dirs =
   RUN_DIR === undefined

@@ -1,0 +1,6 @@
+# Line coverage floors, checked separately for each language's report.
+# Raise these as the project gains tests. Changes to exclusions or these
+# floors deserve the same review as changes to tests.
+[coverage]
+overall = 80
+changed = 90

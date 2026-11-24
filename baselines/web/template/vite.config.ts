@@ -11,6 +11,7 @@ import { playwright } from '@vitest/browser-playwright'
 import browserslist from 'browserslist'
 import browserslistToEsbuild from 'browserslist-to-esbuild'
 import { browserslistToTargets } from 'lightningcss'
+import istanbul from 'vite-plugin-istanbul'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
@@ -54,10 +55,19 @@ function headersForEveryPath(file: string): Record<string, string> {
  * service worker, and a page that no longer registers one (see the web
  * README's "Recover from a broken service worker").
  */
+const coverageBuild = process.env['COVERAGE_BUILD'] === '1'
+const coveragePlugin = () =>
+  istanbul({
+    include: ['src/**/*.{ts,tsx}'],
+    exclude: ['**/*.test.ts', '**/*.stories.tsx', '**/*.d.ts', 'src/routeTree.gen.ts'],
+    forceBuildInstrument: true,
+  })
+
 const isKillSwitch = process.env['SW_KILL_SWITCH'] === '1'
 
 export default defineConfig(({ mode }) => ({
   plugins: [
+    ...(coverageBuild ? [coveragePlugin()] : []),
     // Generates src/routeTree.gen.ts from src/routes/. Must precede react().
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     // The package's types expose only the default export, so `vite` can't be imported by name.
@@ -102,6 +112,7 @@ export default defineConfig(({ mode }) => ({
         // strict mode its module source had. This puts the directive back.
         buildPlugins: {
           vite: [
+            ...(coverageBuild ? [coveragePlugin()] : []),
             {
               name: 'service-worker-use-strict',
               generateBundle(_options, bundle) {
@@ -145,11 +156,18 @@ export default defineConfig(({ mode }) => ({
     'import.meta.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
     'import.meta.env.SW_KILL_SWITCH': JSON.stringify(isKillSwitch),
   },
-  build: { target: browserslistToEsbuild(browsers) },
+  build: { target: browserslistToEsbuild(browsers), sourcemap: coverageBuild },
   preview: { headers: headersForEveryPath(headersFile) },
   css: { transformer: 'lightningcss', lightningcss: { targets: browserslistToTargets(browsers) } },
 
   test: {
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.ts', '**/*.stories.tsx', '**/*.d.ts', 'src/routeTree.gen.ts'],
+      reportsDirectory: 'coverage/app',
+      reporter: ['text', 'html', 'cobertura', 'json'],
+    },
     // StyleX's plugin holds Vite's server open after a run until
     // facebook/stylex#1846 is released; without this Vitest hangs on exit.
     teardownTimeout: 1000,

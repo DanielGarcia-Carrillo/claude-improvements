@@ -3,3 +3,6 @@
 *.snap.new
 /.claude/worktrees/
 .DS_Store
+
+/coverage/
+/.coverage*

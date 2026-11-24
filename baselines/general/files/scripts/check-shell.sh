@@ -5,6 +5,10 @@
 set -euo pipefail
 
 mode=check
+if [[ "${1:-}" = --list ]]; then
+  mode=list
+  shift
+fi
 if [[ "${1:-}" = --fix ]]; then
   mode=fix
   shift
@@ -57,6 +61,11 @@ else
   trap 'rm -f "$paths"' EXIT
   git ls-files -z --cached --others --exclude-standard >"$paths"
   while IFS= read -r -d '' file; do classify "$file"; done <"$paths"
+fi
+
+if [[ "$mode" = list ]]; then
+  if [[ "$script_count" -gt 0 ]]; then printf '%s\0' "${scripts[@]}"; fi
+  exit 0
 fi
 
 require_tool() {
