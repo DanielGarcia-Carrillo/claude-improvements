@@ -51,9 +51,10 @@ Each stack README ends with its sources, and
 
 - Every stack's verify command checks shell scripts with ShellCheck and
   shfmt, and workflows with actionlint. Composite actions (`action.yml`) are
-  checked the same way: actionlint does not read them, so each one's
-  `runs.steps` goes through a generated workflow, and errors name the
-  action's own line and step. These tools are pinned in each
+  checked the same way: actionlint does not read them, so yq copies each
+  one's `runs.steps` into a generated workflow, and errors name the action's
+  own line and step. Steps in shells other than `bash` and `sh` are counted
+  as skipped. These tools, and yq, are pinned in each
   `mise.toml`; the shared `.shellcheckrc` and `scripts/check-shell.sh` come
   from `general/files/`. The scanner includes hidden files and extensionless
   shell scripts, honors Git ignores and also works before the first commit.

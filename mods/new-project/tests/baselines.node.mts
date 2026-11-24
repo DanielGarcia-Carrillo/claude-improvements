@@ -383,7 +383,7 @@ runs:
     )
     assert.match(
       broken('run: test -e', 'run: test -e x && [[ -e x ]] && test -e'),
-      /action\.yml:21:7: step 2 "Look again in sh": .*SC3010/,
+      /action\.yml:21:25: step 2 "Look again in sh": .*SC3010/,
       "a step's shell must decide the ShellCheck dialect",
     )
     assert.match(
@@ -391,9 +391,9 @@ runs:
       /step 2 .*property "destination" is not defined/,
     )
     writeFileSync(join(repo, actionPath), action.replace(/ {2}steps:\n[^]*/, '  steps: []\n'))
-    const flow = check(actionPath)
-    assert.equal(flow.status, 2)
-    assert.match(flow.stderr, /action\.yml: write runs\.steps as a block list/)
+    const empty = check(actionPath)
+    assert.equal(empty.status, 2)
+    assert.match(empty.stderr, /action\.yml: runs\.steps has no steps/)
 
     const checkAction = (text: string) => {
       writeFileSync(join(repo, actionPath), text)
@@ -409,6 +409,7 @@ runs:
     )
     const windowsClean = checkAction(windows)
     assert.equal(windowsClean.status, 0, windowsClean.output)
+    assert.match(windowsClean.stdout, /, 1 composite actions \(2 steps in other shells skipped by ShellCheck\)\./)
     const windowsBad = checkAction(badTest(windows))
     assert.equal(windowsBad.status, 1, windowsBad.output)
     assert.match(windowsBad.output, /action\.yml:18:9: step 1 .*SC2292/)
@@ -433,7 +434,7 @@ runs:
     assert.match(quotedBad.output, /action\.yml:18:9: step 1 "Look for the target": .*SC2292/)
     const unreadable = checkAction(`${action}[not, a, key]\n`)
     assert.equal(unreadable.status, 2, unreadable.output)
-    assert.match(unreadable.stderr, /action\.yml: line 22: cannot read this top-level entry as a key/)
+    assert.match(unreadable.stderr, /action\.yml: yq cannot read this YAML:\n.*L22/)
     const noRuns = checkAction(action.replace(/\nruns:[^]*/, '\n'))
     assert.equal(noRuns.status, 2, noRuns.output)
     assert.match(noRuns.stderr, /cannot find runs in this action/)
@@ -450,6 +451,59 @@ runs:
     assert.match(
       flowInputsBad.output,
       /property "destination" is not defined in object type \{other: string; target: string\}/,
+    )
+    // A # inside a quoted value and a comment on a continuation line.
+    const commentedInputs = checkAction(
+      action.replace(
+        /\ninputs:\n[^]*?\nruns:/,
+        "\ninputs: {target: {description: 'The # file', default: README.md}, # note\n  other: {}}\nruns:",
+      ),
+    )
+    assert.equal(commentedInputs.status, 0, commentedInputs.output)
+    // A flow mapping on the line after inputs: is the inputs, not a key.
+    const nextLineInputs = checkAction(
+      action.replace(/\ninputs:\n[^]*?\nruns:/, '\ninputs:\n  {target: {default: README.md}}\nruns:'),
+    )
+    assert.equal(nextLineInputs.status, 0, nextLineInputs.output)
+    // A value that is only a comment opens a block, at every level.
+    const comments = checkAction(
+      action
+        .replace('\ninputs:\n', '\ninputs: # what to check\n')
+        .replace('\nruns:\n', '\nruns: # how\n')
+        .replace('  steps:\n', '  steps: # in order\n'),
+    )
+    assert.equal(comments.status, 0, comments.output)
+    // A quoted scalar may continue at column 0.
+    const continued = checkAction(
+      action.replace('description: A composite action fixture.', 'description: "A composite\naction fixture."'),
+    )
+    assert.equal(continued.status, 0, continued.output)
+    // The caller's matrix, the runner and env are not known here, so any of
+    // their properties is accepted. Inputs stay strict, as tested above.
+    const contexts = checkAction(
+      action.replace(
+        '    - shell: sh\n',
+        "    - if: matrix.os == 'windows-latest' && runner.os == 'Windows' && env.CI == 'true'\n" +
+          '      shell: bash\n      run: echo "${{ matrix.node }} ${{ env.CI }} ${{ runner.temp }}"\n    - shell: sh\n',
+      ),
+    )
+    assert.equal(contexts.status, 0, contexts.output)
+    // GitHub compares the runtime without case; an unknown one fails.
+    const capitalized = checkAction(badTest(action).replace('using: composite', 'using: Composite'))
+    assert.equal(capitalized.status, 1, capitalized.output)
+    assert.match(capitalized.output, /action\.yml:18:9: step 1 "Look for the target": .*SC2292/)
+    const typo = checkAction(action.replace('using: composite', 'using: compose'))
+    assert.equal(typo.status, 2, typo.output)
+    assert.match(typo.stderr, /action\.yml: runs\.using is 'compose', not composite, docker or a node runtime/)
+    const docker = checkAction(action.replace('using: composite', 'using: docker\n  image: Dockerfile'))
+    assert.equal(docker.status, 0, docker.output)
+    assert.match(docker.stdout, /, 0 composite actions\./)
+    // GitHub rejects a composite run step without a shell.
+    const noShell = checkAction(action.replace('      shell: bash\n', ''))
+    assert.equal(noShell.status, 1, noShell.output)
+    assert.match(
+      noShell.output,
+      /^\.\/\.github\/actions\/shell-test\/action\.yml:11:7: step 1 "Look for the target": a composite run step needs shell/m,
     )
     rmSync(join(repo, '.github/actions'), { recursive: true })
 
@@ -594,6 +648,26 @@ test('composite action checks fail when actionlint is missing', () => {
   })
   assert.equal(result.status, 1)
   assert.match(result.stderr, /Missing actionlint/)
+  assert.doesNotMatch(result.stdout, /Shell quality passed/)
+})
+
+test('composite action checks fail when yq is missing', () => {
+  const repo = scaffold('web', 'action-missing-yq')
+  const bin = join(scratch, 'action-yq-bin')
+  mkdirSync(bin)
+  symlinkSync(realGit, join(bin, 'git'))
+  for (const tool of ['shellcheck', 'actionlint']) {
+    const located = run('mise', ['which', tool], resolve(BASELINES, '..'))
+    assert.equal(located.status, 0, located.stderr)
+    symlinkSync(located.stdout.trim(), join(bin, tool))
+  }
+  const result = spawnSync('/bin/bash', ['scripts/check-shell.sh', '.github/actions/playwright/action.yml'], {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: bin },
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Missing yq/)
   assert.doesNotMatch(result.stdout, /Shell quality passed/)
 })
 

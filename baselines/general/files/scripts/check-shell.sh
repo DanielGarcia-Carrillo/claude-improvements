@@ -84,6 +84,12 @@ if [[ "$script_count" -gt 0 || "$workflow_count" -gt 0 || "$action_count" -gt 0 
 fi
 if [[ "$workflow_count" -gt 0 || "$action_count" -gt 0 ]]; then
   require_tool actionlint
+fi
+if [[ "$action_count" -gt 0 ]]; then
+  # Composite actions are read with yq.
+  require_tool yq
+fi
+if [[ "$workflow_count" -gt 0 || "$action_count" -gt 0 ]]; then
   # actionlint invokes ShellCheck with --norc, so forward the configured
   # optional checks explicitly. Its GitHub-specific exclusions still apply.
   optional_checks=$(sed -n 's/^enable=//p' "$root/.shellcheckrc" | paste -sd, -)
@@ -104,206 +110,156 @@ if [[ "$workflow_count" -gt 0 ]]; then
   actionlint -shellcheck=shellcheck "${workflows[@]}"
 fi
 
-# actionlint reads only workflows, so each composite action's runs.steps is
-# copied into a generated workflow, with the action's inputs declared as
+# actionlint reads only workflows, so yq copies each composite action's
+# runs.steps into a generated workflow, with the action's inputs declared as
 # workflow_call inputs. actionlint then checks it as it does any workflow:
 # ShellCheck with each step's shell and ${{ }} expressions replaced, plus the
-# expressions themselves. The job's runner names no platform, so a step's
-# shell (cmd on Windows, say) is checked for every runner the action may
-# meet. The copy keeps the steps' lines in order, so the report maps back to
-# the action's own lines and steps. Prints nothing for a JavaScript or Docker
-# action, and fails on metadata it cannot read rather than skipping it.
-# shellcheck disable=SC2016 # Awk programs, not shell expansions.
-read_yaml='
-function indent(s) { match(s, /^ */); return RLENGTH }
-function content(s) { return s !~ /^[ \t]*(#.*)?$/ }
-# Splits a mapping line, after any indentation or list dash, into its key K
-# (unquoted) and its value V (without a trailing comment). Returns 0 if the
-# line is not a key.
-function split_key(s,   t) {
-  K = ""; V = ""
-  sub(/^ *(- +)?/, "", s)
-  if (!match(s, /^"[^"]*"[ \t]*:([ \t]|$)/) && !match(s, /^\047[^\047]*\047[ \t]*:([ \t]|$)/) &&
-      !match(s, /^[^:#"\047 \t][^:#]*:([ \t]|$)/)) return 0
-  t = substr(s, 1, RLENGTH); sub(/[ \t]*:[ \t]*$/, "", t)
-  K = t ~ /^["\047]/ ? substr(t, 2, length(t) - 2) : t
-  V = substr(s, RLENGTH + 1)
-  sub(/^[ \t]+/, "", V); sub(/[ \t]+#.*$/, "", V); sub(/[ \t]+$/, "", V)
-  return 1
+# expressions themselves, with inputs kept strict. The job's runner names no
+# platform and its matrix is unknown, since the calling job decides both.
+# Errors are mapped back to the action's own lines with yq's positions.
+fail_action() {
+  printf '%s: %s\n' "$action" "$1" >&2
+  exit 2
 }
-# The unquoted value of a mapping line.
-function value(s) {
-  split_key(s)
-  return V ~ /^(".*"|\047.*\047)$/ ? substr(V, 2, length(V) - 2) : V
+
+# The indentation of a line of the action, to place ShellCheck columns.
+line_indent() {
+  local text lead
+  text=$(sed -n "$1p" "$action")
+  lead=${text%%[! ]*}
+  printf '%s' "${#lead}"
 }
-{ sub(/\r$/, ""); text[NR] = $0 }
-'
-# shellcheck disable=SC2016 # An awk program, not a shell expansion.
-wrap_action='
-function fail(message) { printf "%s: %s\n", file, message > "/dev/stderr"; exit 2 }
-# Prints the keys of a flow mapping such as {target: {default: x}, other: {}}.
-function flow_keys(s,   i, c, depth, quote, token, done) {
-  for (i = 1; i <= length(s); i++) {
-    c = substr(s, i, 1)
-    if (quote != "") {
-      if (c == quote) quote = ""
-      if (depth == 1 && !done) token = token c
-      continue
-    }
-    if (c == "\"" || c == "\047") {
-      quote = c
-      if (depth == 1 && !done) token = token c
-      continue
-    }
-    if (c == "{" || c == "[") { depth++; continue }
-    if (c == "}" || c == "]") { depth--; continue }
-    if (depth != 1) continue
-    if (c == ",") { token = ""; done = 0; continue }
-    if (done) continue
-    if (c == ":") { declare(token); done = 1; continue }
-    token = token c
-  }
-}
-function declare(name) {
-  sub(/^[ \t]+/, "", name); sub(/[ \t]+$/, "", name)
-  if (name ~ /^(".*"|\047.*\047)$/) name = substr(name, 2, length(name) - 2)
-  if (name == "") return
-  if (!declared++) { print "    inputs:"; header++ }
-  printf "      \"%s\":\n        type: string\n", name
-  header += 2
-}
-END {
-  for (n = 1; n <= NR + 1; n++) {
-    if (n <= NR && (!content(text[n]) || indent(text[n]) > 0 || text[n] ~ /^(---|\.\.\.)([ \t]|$)/)) continue
-    if (key == "runs") { runs = top; runs_end = n }
-    if (key == "inputs") { inputs = top; inputs_end = n }
-    if (n > NR) break
-    if (!split_key(text[n])) fail(sprintf("line %d: cannot read this top-level entry as a key", n))
-    key = K; top = n
-  }
-  if (!runs) fail("cannot find runs in this action")
-  if (value(text[runs]) != "") fail("write runs as a block mapping so its steps can be checked")
-  for (n = runs + 1; n < runs_end; n++) {
-    if (!content(text[n])) continue
-    if (!child) child = indent(text[n])
-    if (indent(text[n]) != child || !split_key(text[n])) continue
-    if (K == "using") using = value(text[n])
-    if (K == "steps") steps = n
-  }
-  if (using == "") fail("cannot find runs.using in this action")
-  if (using != "composite") exit 0
-  if (!steps) fail("cannot find runs.steps in this composite action")
-  if (value(text[steps]) != "") fail("write runs.steps as a block list so its run scripts can be checked")
-  for (n = steps + 1; n < runs_end && !content(text[n]); n++);
-  item = indent(text[n])
-  if (n >= runs_end || item < child || text[n] !~ /^ *-( |$)/) fail("cannot find the steps under runs.steps")
-  for (; n < runs_end; n++)
-    if (content(text[n]) && (indent(text[n]) < item || (indent(text[n]) == item && text[n] !~ /^ *-( |$)/))) break
-  last = n - 1
-  header = 2
-  print "on:"
-  print "  workflow_call:"
-  if (inputs && value(text[inputs]) ~ /^\{/) {
-    flow = value(text[inputs])
-    for (n = inputs + 1; n < inputs_end; n++) if (content(text[n])) flow = flow " " text[n]
-    flow_keys(flow)
-  } else if (inputs && value(text[inputs]) != "") {
-    fail("write inputs as a mapping so its names can be declared")
-  }
-  for (n = inputs + 1; inputs && n < inputs_end && flow == ""; n++) {
-    if (!content(text[n])) continue
-    if (!input) input = indent(text[n])
-    if (indent(text[n]) != input) continue
-    if (!split_key(text[n])) fail(sprintf("line %d: cannot read this input name", n))
-    declare(K)
-  }
-  print "jobs:"
-  print "  composite:"
-  print "    runs-on: self-hosted"
-  print "    steps:"
-  header += 4
-  shift = item < 6 ? 6 - item : 0
-  pad = sprintf("%" shift "s", "")
-  for (n = steps + 1; n <= last; n++) print (text[n] == "" ? "" : pad text[n])
-  print steps + 1, header, shift, item, last > meta
-}
-'
-# Reads the action, then actionlint's errors as line, column, kind and
-# message separated by tabs, and prints each with the action's own line and
-# step.
-# shellcheck disable=SC2016 # An awk program, not a shell expansion.
-report_action='
-!found && FNR != NR {
-  found = 1
-  for (n = first; n <= last; n++) {
-    if (indent(text[n]) != item || text[n] !~ /^ *-( |$)/) continue
-    start[++count] = n
-    rest = substr(text[n], item + 2)
-    keys[count] = item + 1 + indent(rest)
-    if (!content(rest)) keys[count] = -1
-    else if (split_key(rest) && K == "name") title[count] = value(rest)
-  }
-  start[count + 1] = last + 1
-  for (k = 1; k <= count; k++)
-    for (n = start[k] + 1; n < start[k + 1]; n++) {
-      if (!content(text[n])) continue
-      if (keys[k] < 0) keys[k] = indent(text[n])
-      if (indent(text[n]) == keys[k] && split_key(text[n]) && K == "name" && title[k] == "") title[k] = value(text[n])
-    }
-}
-FNR != NR {
-  fields = split($0, f, "\t")
-  message = f[4]
-  for (i = 5; i <= fields; i++) message = message "\t" f[i]
-  if (f[1] <= header) {
-    printf "%s: %s [%s] (in the workflow generated from its inputs)\n", file, message, f[3]
-    next
-  }
-  line = f[1] - header - 1 + first
-  column = f[2] - shift
-  if (column < 1) column = 1
-  # ShellCheck positions count from the start of a literal block script; point
-  # at the script line itself rather than at its run key. Folded scripts keep
-  # the run key, since folding moves their lines.
-  if (f[3] == "shellcheck" && split_key(text[line]) && K == "run" && V ~ /^[|][-+0-9]*$/ &&
-      match(message, /SC[0-9]+:[a-z]+:[0-9]+:[0-9]+:/)) {
-    split(substr(message, RSTART, RLENGTH), at, ":")
-    for (n = line + 1; n <= last && !content(text[n]); n++);
-    column = indent(text[n]) + at[4]
-    line += at[3]
-  }
-  for (k = count; k > 1 && start[k] > line; k--);
-  label = title[k] == "" ? "" : " \"" title[k] "\""
-  printf "%s:%d:%d: step %d%s: %s [%s]\n", file, line, column, k, label, message, f[3]
-}
-'
+
 checked_actions=0
+skipped_steps=0
+action_failed=0
 if [[ "$action_count" -gt 0 ]]; then
   make_work
 fi
-action_failed=0
+sc_position='SC[0-9]+:[a-z]+:([0-9]+):([0-9]+):'
 # Bash 3.2 treats an empty array as unset under set -u.
 for action in ${actions[@]+"${actions[@]}"}; do
-  awk -v file="$action" -v meta="$work/meta" "$read_yaml$wrap_action" "$action" >"$work/workflow.yml"
-  [[ -s "$work/workflow.yml" ]] || continue
+  # One read per value: in yq, reading a missing key can add it, and binding
+  # a missing value to a variable yields nothing.
+  if ! runs_kind=$(yq '.runs | type' "$action" 2>"$work/yq-errors"); then
+    printf '%s: yq cannot read this YAML:\n' "$action" >&2
+    cat "$work/yq-errors" >&2
+    exit 2
+  fi
+  [[ "$runs_kind" = '!!map' ]] || fail_action 'cannot find runs in this action'
+  using=$(yq '.runs.using // "" | tostring | downcase' "$action")
+  case "$using" in
+    composite) ;;
+    node* | docker) continue ;;
+    '') fail_action 'cannot find runs.using in this action' ;;
+    *) fail_action "runs.using is '$using', not composite, docker or a node runtime" ;;
+  esac
+  steps_kind=$(yq '.runs.steps | type' "$action")
+  inputs_kind=$(yq '.inputs | type' "$action")
+  [[ "$steps_kind" = '!!seq' ]] || fail_action 'cannot find the list of runs.steps in this composite action'
+  [[ "$inputs_kind" = '!!map' || "$inputs_kind" = '!!null' ]] ||
+    fail_action 'inputs must be a mapping of input names'
   ((checked_actions += 1))
-  read -r first header shift item last <"$work/meta"
+
+  # One line per step: its line and column, its run script's line, column and
+  # style, its shell, whether it runs a script, and its name. As above, has()
+  # comes before the reads.
+  # shellcheck disable=SC2016 # A yq program, not a shell expansion.
+  yq '.runs.steps | .[] | . as $s | ($s | has("run")) as $runs |
+    [($s | line), ($s | column), ($s.run | line), ($s.run | column),
+      ($s.run | style | sub("^$"; "plain")), $s.shell // "-", $runs,
+      ($s.name // "" | tostring | sub("[\t\r\n]+"; " "))] | map(tostring) | join("\t")' \
+    "$action" >"$work/steps"
+  step_count=0
+  while IFS=$'\t' read -r line column run_line run_column style shell runs name; do
+    # yq prints an empty line when there are no steps.
+    [[ -n "$line" ]] || continue
+    step_line[step_count]=$line
+    step_column[step_count]=$column
+    step_run_line[step_count]=$run_line
+    step_run_column[step_count]=$run_column
+    step_style[step_count]=$style
+    step_label[step_count]="step $((step_count + 1))${name:+ \"$name\"}"
+    ((step_count += 1))
+    [[ "$runs" = true ]] || continue
+    case "${shell%% *}" in
+      -)
+        printf '%s:%s:%s: %s: a composite run step needs shell, which GitHub requires\n' \
+          "$action" "$line" "$column" "${step_label[step_count - 1]}"
+        action_failed=1
+        ;;
+      bash | sh) ;;
+      *) ((skipped_steps += 1)) ;;
+    esac
+  done <"$work/steps"
+  [[ "$step_count" -gt 0 ]] || fail_action 'runs.steps has no steps'
+
+  # shellcheck disable=SC2016 # Expressions for actionlint, not shell expansions.
+  MATRIX='${{ fromJSON(vars.MATRIX) }}' yq '{"on": {"workflow_call": {"inputs":
+      ((.inputs // {}) | with_entries(.value = {"type": "string"}))}},
+    "jobs": {"composite": {"runs-on": "self-hosted", "strategy": {"matrix": strenv(MATRIX)},
+      "steps": .runs.steps}}}' "$action" >"$work/workflow.yml"
+  yq '.jobs.composite.steps[] | (line | tostring) + "\t" + (column | tostring)' \
+    "$work/workflow.yml" >"$work/generated"
+  generated=0
+  while IFS=$'\t' read -r line column; do
+    generated_line[generated]=$line
+    generated_column[generated]=$column
+    ((generated += 1))
+  done <"$work/generated"
+
   status=0
   actionlint -shellcheck=shellcheck -stdin-filename "$action" \
     -format $'{{range $e := .}}{{$e.Line}}\t{{$e.Column}}\t{{$e.Kind}}\t{{$e.Message}}\n{{end}}' \
     - <"$work/workflow.yml" >"$work/errors" || status=$?
-  if [[ "$status" -eq 1 && -s "$work/errors" ]]; then
-    awk -v file="$action" -v first="$first" -v header="$header" -v shift="$shift" \
-      -v item="$item" -v last="$last" "$read_yaml$report_action" "$action" - <"$work/errors"
-    action_failed=1
-  elif [[ "$status" -ne 0 ]]; then
+  if [[ "$status" -ne 0 && ("$status" -ne 1 || ! -s "$work/errors") ]]; then
     cat "$work/errors" >&2
-    printf '%s: actionlint could not check this composite action (exit %s).\n' "$action" "$status" >&2
-    exit "$status"
+    fail_action "actionlint could not check this composite action (exit $status)"
   fi
+  while IFS=$'\t' read -r line column kind message; do
+    action_failed=1
+    if [[ "$line" -lt "${generated_line[0]}" ]]; then
+      printf '%s: %s [%s] (in the workflow generated from its inputs)\n' "$action" "$message" "$kind"
+      continue
+    fi
+    step=$((generated - 1))
+    while [[ "$step" -gt 0 && "${generated_line[step]}" -gt "$line" ]]; do ((step -= 1)); done
+    if [[ "$kind" = shellcheck && "$message" =~ $sc_position ]]; then
+      # ShellCheck counts from the start of the script.
+      script_line=${BASH_REMATCH[1]}
+      script_column=${BASH_REMATCH[2]}
+      line=${step_run_line[step]}
+      column=${step_run_column[step]}
+      case "${step_style[step]}" in
+        literal)
+          line=$((line + script_line))
+          column=$(($(line_indent "$line") + script_column))
+          ;;
+        plain)
+          line=$((line + script_line - 1))
+          if [[ "$script_line" -eq 1 ]]; then
+            column=$((column + script_column - 1))
+          fi
+          ;;
+        *) ;;
+      esac
+    else
+      line=$((step_line[step] + line - generated_line[step]))
+      column=$((step_column[step] + column - generated_column[step]))
+      if [[ "$step" -lt "$((step_count - 1))" && "$line" -ge "${step_line[step + 1]}" ]]; then
+        line=${step_line[step]}
+      fi
+      [[ "$column" -ge 1 ]] || column=1
+    fi
+    printf '%s:%s:%s: %s: %s [%s]\n' "$action" "$line" "$column" "${step_label[step]}" "$message" "$kind"
+  done <"$work/errors"
 done
 if [[ "$action_failed" -ne 0 ]]; then
   exit 1
 fi
-printf 'Shell quality passed: %s shell files, %s workflows, %s composite actions.\n' \
-  "$script_count" "$workflow_count" "$checked_actions"
+skipped=
+if [[ "$skipped_steps" -gt 0 ]]; then
+  skipped=" ($skipped_steps steps in other shells skipped by ShellCheck)"
+fi
+printf 'Shell quality passed: %s shell files, %s workflows, %s composite actions%s.\n' \
+  "$script_count" "$workflow_count" "$checked_actions" "$skipped"
