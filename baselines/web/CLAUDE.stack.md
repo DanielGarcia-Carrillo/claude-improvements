@@ -25,7 +25,8 @@ by itself.
 Spelling: `typos` enforces American English, including hooks and CI config.
 It runs in verify, CI and edit/stop hooks; `mise install` installs its pinned version.
 
-Shell quality: ShellCheck, shfmt and actionlint run in verify and CI.
+Shell quality: ShellCheck, shfmt and actionlint run in verify and CI, on
+workflows and on composite actions, which yq reads.
 Use `pnpm shell:fix` to format shell files. Keep `.shellcheckrc` checks enabled;
 validate environment variables and explain local suppressions.
 

@@ -50,13 +50,18 @@ Each stack README ends with its sources, and
 ## Conventions in this folder
 
 - Every stack's verify command checks shell scripts with ShellCheck and
-  shfmt, and workflows with actionlint. These tools are pinned in each
+  shfmt, and workflows with actionlint. Composite actions (`action.yml`) are
+  checked the same way: actionlint does not read them, so yq copies each
+  one's `runs.steps` into a generated workflow, and errors name the action's
+  own line and step. Steps in shells other than `bash` and `sh` are counted
+  as skipped. These tools, and yq, are pinned in each
   `mise.toml`; the shared `.shellcheckrc` and `scripts/check-shell.sh` come
   from `general/files/`. The scanner includes hidden files and extensionless
   shell scripts, honors Git ignores and also works before the first commit.
   `just shell-fix` (Rust/Python) or `pnpm shell:fix` (web) formats shell files.
   Lefthook formats and lints staged shell files before checking spelling;
-  extensionless scripts and workflows are covered by full verify.
+  extensionless scripts, workflows and composite actions are covered by full
+  verify.
 - ShellCheck enables checks for masked exit statuses, suppressed `set -e`,
   unassigned uppercase variables, Bash `[[ ]]`, consistent quoting and
   explicit string tests. Validate required environment variables with
