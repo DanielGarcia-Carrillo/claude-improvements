@@ -108,35 +108,89 @@ fi
 # copied into a generated workflow, with the action's inputs declared as
 # workflow_call inputs. actionlint then checks it as it does any workflow:
 # ShellCheck with each step's shell and ${{ }} expressions replaced, plus the
-# expressions themselves. The copy keeps the steps' lines in order, so the
-# report maps back to the action's own lines and steps. Prints nothing for a
-# JavaScript or Docker action, and fails if the steps cannot be found.
+# expressions themselves. The job's runner names no platform, so a step's
+# shell (cmd on Windows, say) is checked for every runner the action may
+# meet. The copy keeps the steps' lines in order, so the report maps back to
+# the action's own lines and steps. Prints nothing for a JavaScript or Docker
+# action, and fails on metadata it cannot read rather than skipping it.
 # shellcheck disable=SC2016 # Awk programs, not shell expansions.
-wrap_action='
+read_yaml='
 function indent(s) { match(s, /^ */); return RLENGTH }
 function content(s) { return s !~ /^[ \t]*(#.*)?$/ }
-function value(s) {
-  sub(/^[^:]*:[ \t]*/, "", s); sub(/[ \t]+#.*$/, "", s); sub(/[ \t]+$/, "", s)
-  gsub(/^["\047]|["\047]$/, "", s)
-  return s
+# Splits a mapping line, after any indentation or list dash, into its key K
+# (unquoted) and its value V (without a trailing comment). Returns 0 if the
+# line is not a key.
+function split_key(s,   t) {
+  K = ""; V = ""
+  sub(/^ *(- +)?/, "", s)
+  if (!match(s, /^"[^"]*"[ \t]*:([ \t]|$)/) && !match(s, /^\047[^\047]*\047[ \t]*:([ \t]|$)/) &&
+      !match(s, /^[^:#"\047 \t][^:#]*:([ \t]|$)/)) return 0
+  t = substr(s, 1, RLENGTH); sub(/[ \t]*:[ \t]*$/, "", t)
+  K = t ~ /^["\047]/ ? substr(t, 2, length(t) - 2) : t
+  V = substr(s, RLENGTH + 1)
+  sub(/^[ \t]+/, "", V); sub(/[ \t]+#.*$/, "", V); sub(/[ \t]+$/, "", V)
+  return 1
 }
+# The unquoted value of a mapping line.
+function value(s) {
+  split_key(s)
+  return V ~ /^(".*"|\047.*\047)$/ ? substr(V, 2, length(V) - 2) : V
+}
+{ sub(/\r$/, ""); text[NR] = $0 }
+'
+# shellcheck disable=SC2016 # An awk program, not a shell expansion.
+wrap_action='
 function fail(message) { printf "%s: %s\n", file, message > "/dev/stderr"; exit 2 }
-{ text[NR] = $0 }
+# Prints the keys of a flow mapping such as {target: {default: x}, other: {}}.
+function flow_keys(s,   i, c, depth, quote, token, done) {
+  for (i = 1; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (quote != "") {
+      if (c == quote) quote = ""
+      if (depth == 1 && !done) token = token c
+      continue
+    }
+    if (c == "\"" || c == "\047") {
+      quote = c
+      if (depth == 1 && !done) token = token c
+      continue
+    }
+    if (c == "{" || c == "[") { depth++; continue }
+    if (c == "}" || c == "]") { depth--; continue }
+    if (depth != 1) continue
+    if (c == ",") { token = ""; done = 0; continue }
+    if (done) continue
+    if (c == ":") { declare(token); done = 1; continue }
+    token = token c
+  }
+}
+function declare(name) {
+  sub(/^[ \t]+/, "", name); sub(/[ \t]+$/, "", name)
+  if (name ~ /^(".*"|\047.*\047)$/) name = substr(name, 2, length(name) - 2)
+  if (name == "") return
+  if (!declared++) { print "    inputs:"; header++ }
+  printf "      \"%s\":\n        type: string\n", name
+  header += 2
+}
 END {
   for (n = 1; n <= NR + 1; n++) {
-    if (n <= NR && (!content(text[n]) || indent(text[n]) > 0)) continue
+    if (n <= NR && (!content(text[n]) || indent(text[n]) > 0 || text[n] ~ /^(---|\.\.\.)([ \t]|$)/)) continue
     if (key == "runs") { runs = top; runs_end = n }
     if (key == "inputs") { inputs = top; inputs_end = n }
-    key = text[n]; sub(/:.*/, "", key); top = n
+    if (n > NR) break
+    if (!split_key(text[n])) fail(sprintf("line %d: cannot read this top-level entry as a key", n))
+    key = K; top = n
   }
-  if (!runs) exit 0
+  if (!runs) fail("cannot find runs in this action")
+  if (value(text[runs]) != "") fail("write runs as a block mapping so its steps can be checked")
   for (n = runs + 1; n < runs_end; n++) {
     if (!content(text[n])) continue
     if (!child) child = indent(text[n])
-    if (indent(text[n]) != child) continue
-    if (text[n] ~ /^ *using:/) using = value(text[n])
-    if (text[n] ~ /^ *steps:/) steps = n
+    if (indent(text[n]) != child || !split_key(text[n])) continue
+    if (K == "using") using = value(text[n])
+    if (K == "steps") steps = n
   }
+  if (using == "") fail("cannot find runs.using in this action")
   if (using != "composite") exit 0
   if (!steps) fail("cannot find runs.steps in this composite action")
   if (value(text[steps]) != "") fail("write runs.steps as a block list so its run scripts can be checked")
@@ -149,24 +203,23 @@ END {
   header = 2
   print "on:"
   print "  workflow_call:"
-  for (n = inputs + 1; inputs && n < inputs_end; n++) {
+  if (inputs && value(text[inputs]) ~ /^\{/) {
+    flow = value(text[inputs])
+    for (n = inputs + 1; n < inputs_end; n++) if (content(text[n])) flow = flow " " text[n]
+    flow_keys(flow)
+  } else if (inputs && value(text[inputs]) != "") {
+    fail("write inputs as a mapping so its names can be declared")
+  }
+  for (n = inputs + 1; inputs && n < inputs_end && flow == ""; n++) {
     if (!content(text[n])) continue
-    if (!input) {
-      input = indent(text[n])
-      print "    inputs:"
-      header++
-    }
+    if (!input) input = indent(text[n])
     if (indent(text[n]) != input) continue
-    name = substr(text[n], input + 1)
-    if (name ~ /^"/) match(name, /^"[^"]*"/)
-    else if (name ~ /^\047/) match(name, /^\047[^\047]*\047/)
-    else match(name, /^[^:]*/)
-    printf "      %s:\n        type: string\n", substr(name, 1, RLENGTH)
-    header += 2
+    if (!split_key(text[n])) fail(sprintf("line %d: cannot read this input name", n))
+    declare(K)
   }
   print "jobs:"
   print "  composite:"
-  print "    runs-on: ubuntu-latest"
+  print "    runs-on: self-hosted"
   print "    steps:"
   header += 4
   shift = item < 6 ? 6 - item : 0
@@ -180,33 +233,25 @@ END {
 # step.
 # shellcheck disable=SC2016 # An awk program, not a shell expansion.
 report_action='
-function indent(s) { match(s, /^ */); return RLENGTH }
-function content(s) { return s !~ /^[ \t]*(#.*)?$/ }
-function value(s) {
-  sub(/^[^:]*:[ \t]*/, "", s); sub(/[ \t]+#.*$/, "", s); sub(/[ \t]+$/, "", s)
-  gsub(/^["\047]|["\047]$/, "", s)
-  return s
-}
-FNR == NR { text[FNR] = $0; next }
-!found {
+!found && FNR != NR {
   found = 1
   for (n = first; n <= last; n++) {
     if (indent(text[n]) != item || text[n] !~ /^ *-( |$)/) continue
     start[++count] = n
     rest = substr(text[n], item + 2)
     keys[count] = item + 1 + indent(rest)
-    if (content(rest)) { if (rest ~ /^ *name:/) title[count] = value(rest) }
-    else keys[count] = -1
+    if (!content(rest)) keys[count] = -1
+    else if (split_key(rest) && K == "name") title[count] = value(rest)
   }
   start[count + 1] = last + 1
   for (k = 1; k <= count; k++)
     for (n = start[k] + 1; n < start[k + 1]; n++) {
       if (!content(text[n])) continue
       if (keys[k] < 0) keys[k] = indent(text[n])
-      if (indent(text[n]) == keys[k] && text[n] ~ /^ *name:/ && title[k] == "") title[k] = value(text[n])
+      if (indent(text[n]) == keys[k] && split_key(text[n]) && K == "name" && title[k] == "") title[k] = value(text[n])
     }
 }
-{
+FNR != NR {
   fields = split($0, f, "\t")
   message = f[4]
   for (i = 5; i <= fields; i++) message = message "\t" f[i]
@@ -220,7 +265,7 @@ FNR == NR { text[FNR] = $0; next }
   # ShellCheck positions count from the start of a literal block script; point
   # at the script line itself rather than at its run key. Folded scripts keep
   # the run key, since folding moves their lines.
-  if (f[3] == "shellcheck" && text[line] ~ /run:[ \t]*[|][-+0-9]*[ \t]*(#.*)?$/ &&
+  if (f[3] == "shellcheck" && split_key(text[line]) && K == "run" && V ~ /^[|][-+0-9]*$/ &&
       match(message, /SC[0-9]+:[a-z]+:[0-9]+:[0-9]+:/)) {
     split(substr(message, RSTART, RLENGTH), at, ":")
     for (n = line + 1; n <= last && !content(text[n]); n++);
@@ -239,7 +284,7 @@ fi
 action_failed=0
 # Bash 3.2 treats an empty array as unset under set -u.
 for action in ${actions[@]+"${actions[@]}"}; do
-  awk -v file="$action" -v meta="$work/meta" "$wrap_action" "$action" >"$work/workflow.yml"
+  awk -v file="$action" -v meta="$work/meta" "$read_yaml$wrap_action" "$action" >"$work/workflow.yml"
   [[ -s "$work/workflow.yml" ]] || continue
   ((checked_actions += 1))
   read -r first header shift item last <"$work/meta"
@@ -249,7 +294,7 @@ for action in ${actions[@]+"${actions[@]}"}; do
     - <"$work/workflow.yml" >"$work/errors" || status=$?
   if [[ "$status" -eq 1 && -s "$work/errors" ]]; then
     awk -v file="$action" -v first="$first" -v header="$header" -v shift="$shift" \
-      -v item="$item" -v last="$last" "$report_action" "$action" - <"$work/errors"
+      -v item="$item" -v last="$last" "$read_yaml$report_action" "$action" - <"$work/errors"
     action_failed=1
   elif [[ "$status" -ne 0 ]]; then
     cat "$work/errors" >&2

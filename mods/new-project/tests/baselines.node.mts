@@ -33,6 +33,10 @@ process.env['GIT_CONFIG_NOSYSTEM'] = '1'
 const run = (command: string, args: readonly string[], cwd: string) =>
   spawnSync(command, args, { cwd, encoding: 'utf8' })
 
+/** Swaps the composite action fixture's Bash test for one ShellCheck's options reject. */
+const badTest = (text: string) => text.replace('[[ -e $TARGET ]]', '[ -e $TARGET ]')
+const crlf = (text: string) => text.replaceAll('\n', '\r\n')
+
 /** Answers that take every default, with names that test the escaping. */
 function answersFor(stack: Stack) {
   const sections = kickoffFor(parseKickoff(readFileSync(join(BASELINES, 'general/kickoff.md'), 'utf8')), stack)
@@ -390,6 +394,63 @@ runs:
     const flow = check(actionPath)
     assert.equal(flow.status, 2)
     assert.match(flow.stderr, /action\.yml: write runs\.steps as a block list/)
+
+    const checkAction = (text: string) => {
+      writeFileSync(join(repo, actionPath), text)
+      const result = check(actionPath)
+      return { ...result, output: result.stdout + result.stderr }
+    }
+    // A step for another platform keeps its own shell: the generated job's
+    // runner names no platform, so cmd and pwsh are valid there.
+    const windows = action.replace(
+      '    - shell: sh\n',
+      "    - if: runner.os == 'Windows'\n      shell: cmd\n      run: if exist README.md echo found\n" +
+        '    - shell: pwsh\n      run: Test-Path README.md\n    - shell: sh\n',
+    )
+    const windowsClean = checkAction(windows)
+    assert.equal(windowsClean.status, 0, windowsClean.output)
+    const windowsBad = checkAction(badTest(windows))
+    assert.equal(windowsBad.status, 1, windowsBad.output)
+    assert.match(windowsBad.output, /action\.yml:18:9: step 1 .*SC2292/)
+    // CRLF line endings must not turn the action into a skipped one.
+    const crlfClean = checkAction(crlf(action))
+    assert.equal(crlfClean.status, 0, crlfClean.output)
+    assert.match(crlfClean.stdout, /, 1 composite actions\./)
+    const crlfBad = checkAction(crlf(badTest(action)))
+    assert.equal(crlfBad.status, 1, crlfBad.output)
+    assert.match(crlfBad.output, /action\.yml:18:9: step 1 "Look for the target": .*SC2292/)
+    // Quoted keys are still keys, and an entry that is not one fails.
+    const quoted = action
+      .replace('\nruns:', '\n"runs":')
+      .replace('  using: composite', '  \'using\': "composite"')
+      .replace('  steps:', '  "steps":')
+      .replace('      name: Look for the target', '      "name": Look for the target')
+    const quotedClean = checkAction(quoted)
+    assert.equal(quotedClean.status, 0, quotedClean.output)
+    assert.match(quotedClean.stdout, /, 1 composite actions\./)
+    const quotedBad = checkAction(badTest(quoted))
+    assert.equal(quotedBad.status, 1, quotedBad.output)
+    assert.match(quotedBad.output, /action\.yml:18:9: step 1 "Look for the target": .*SC2292/)
+    const unreadable = checkAction(`${action}[not, a, key]\n`)
+    assert.equal(unreadable.status, 2, unreadable.output)
+    assert.match(unreadable.stderr, /action\.yml: line 22: cannot read this top-level entry as a key/)
+    const noRuns = checkAction(action.replace(/\nruns:[^]*/, '\n'))
+    assert.equal(noRuns.status, 2, noRuns.output)
+    assert.match(noRuns.stderr, /cannot find runs in this action/)
+    // Inputs written as a flow mapping are declared too, so only undeclared
+    // names fail.
+    const flowInputs = action.replace(
+      /\ninputs:\n[^]*?\nruns:/,
+      "\ninputs: {target: {description: 'The file, to look for', default: README.md},\n  other: {}}\nruns:",
+    )
+    const flowInputsClean = checkAction(flowInputs)
+    assert.equal(flowInputsClean.status, 0, flowInputsClean.output)
+    const flowInputsBad = checkAction(flowInputs.replace('inputs.target }}"', 'inputs.destination }}"'))
+    assert.equal(flowInputsBad.status, 1, flowInputsBad.output)
+    assert.match(
+      flowInputsBad.output,
+      /property "destination" is not defined in object type \{other: string; target: string\}/,
+    )
     rmSync(join(repo, '.github/actions'), { recursive: true })
 
     const ignored = join(repo, 'ignored-shell')
