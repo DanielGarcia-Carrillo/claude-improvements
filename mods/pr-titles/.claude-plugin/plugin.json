@@ -1,0 +1,9 @@
+{
+  "name": "pr-titles",
+  "version": "0.1.0",
+  "description": "Write pull request titles that explain what changes and why it matters.",
+  "license": "MIT",
+  "author": {
+    "name": "Daniel Garcia Carrillo"
+  }
+}
