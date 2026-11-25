@@ -11,6 +11,13 @@ node = "26"
 description = "Run the repository quality checks"
 run = ["typos", "bash baselines/general/files/scripts/check-shell.sh", "node --test mods/new-project/tests/baselines.node.mts"]
 
+# Scaffold each template through mods/new-project with its pinned lockfile
+# from baselines/scaffold-check/ and run the project's own verify. Name
+# stacks to run only those: `mise run scaffold:verify python`.
+[tasks."scaffold:verify"]
+description = "Check that each template scaffolds into a project that passes its own verify"
+run = "node mods/new-project/tests/scaffold-verify.ts"
+
 [tasks."shell:check"]
 run = "bash baselines/general/files/scripts/check-shell.sh"
 

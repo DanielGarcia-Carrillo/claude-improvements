@@ -1,0 +1,178 @@
+name: scaffold
+
+# Does each template still scaffold, through mods/new-project, into a project
+# that passes its own verify? Each stack installs from its pinned lockfile in
+# baselines/scaffold-check/, so a red job means a change here broke it, not a
+# new upstream release. `mise run scaffold:verify` runs the same locally; see
+# baselines/README.md, "Scaffold check".
+#
+# Each job scaffolds into the workspace itself, where the project's own CI
+# would have it and where the template's actions expect it. Scaffold refuses
+# a folder inside another repository, so the checkout moves out first.
+
+on:
+  push:
+    branches: [main]
+  # ready_for_review starts the first real run of a PR opened as a draft;
+  # converted_to_draft starts a run that skips the work and so cancels any
+  # run still in progress.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # The repository's mise.toml, then the scaffolded project's.
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  web:
+    # Drafts skip the stacks, as the templates' CI does: agents push many of
+    # them, and a draft can't merge. Marking the PR ready runs them.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Node for the scaffolder now, and the template's tools once the project
+      # installs them: the cache is saved after the job, keyed on both files.
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        with:
+          cache_key: "{{default}}-${{ hashFiles('baselines/web/template/mise.toml') }}"
+          cache_save_post: true
+      - name: Scaffold the template into the workspace
+        run: |
+          repo="$RUNNER_TEMP/claude-improvements"
+          node=$(mise which node)
+          script="$repo/mods/new-project/tests/scaffold-verify.ts"
+          printf 'NODE=%s\nSCAFFOLD_VERIFY=%s\n' "$node" "$script" >> "$GITHUB_ENV"
+          mkdir "$repo"
+          shopt -s dotglob
+          mv "$GITHUB_WORKSPACE"/* "$repo"/
+          "$node" "$script" web --phase scaffold --target "$GITHUB_WORKSPACE"
+      # pnpm from the project's packageManager, with its store cached.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+      - name: Install from the pinned lockfile
+        run: '"$NODE" "$SCAFFOLD_VERIFY" web --phase install --target "$GITHUB_WORKSPACE"'
+      # The template's own action: browsers and system packages from main's caches.
+      - uses: ./.github/actions/playwright
+      - name: Verify the project
+        run: '"$NODE" "$SCAFFOLD_VERIFY" web --phase verify --target "$GITHUB_WORKSPACE"'
+      # Only on failure, and briefly: traces record request headers and bodies.
+      - if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 3
+
+  rust:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        with:
+          cache_key: "{{default}}-${{ hashFiles('baselines/rust/template/mise.toml') }}"
+          cache_save_post: true
+      - name: Scaffold the template into the workspace
+        run: |
+          repo="$RUNNER_TEMP/claude-improvements"
+          node=$(mise which node)
+          script="$repo/mods/new-project/tests/scaffold-verify.ts"
+          printf 'NODE=%s\nSCAFFOLD_VERIFY=%s\n' "$node" "$script" >> "$GITHUB_ENV"
+          mkdir "$repo"
+          shopt -s dotglob
+          mv "$GITHUB_WORKSPACE"/* "$repo"/
+          "$node" "$script" rust --phase scaffold --target "$GITHUB_WORKSPACE"
+      # The channel and components from the project's rust-toolchain.toml.
+      - run: rustup toolchain install
+      # Dependencies and build output, keyed on Cargo.lock and the toolchain.
+      # Main writes; pull requests only read.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install from the pinned lockfile
+        run: '"$NODE" "$SCAFFOLD_VERIFY" rust --phase install --target "$GITHUB_WORKSPACE"'
+      - name: Verify the project
+        run: '"$NODE" "$SCAFFOLD_VERIFY" rust --phase verify --target "$GITHUB_WORKSPACE"'
+
+  python:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        with:
+          cache_key: "{{default}}-${{ hashFiles('baselines/python/template/mise.toml') }}"
+          cache_save_post: true
+      - name: Scaffold the template into the workspace
+        run: |
+          repo="$RUNNER_TEMP/claude-improvements"
+          node=$(mise which node)
+          script="$repo/mods/new-project/tests/scaffold-verify.ts"
+          printf 'NODE=%s\nSCAFFOLD_VERIFY=%s\n' "$node" "$script" >> "$GITHUB_ENV"
+          mkdir "$repo"
+          shopt -s dotglob
+          mv "$GITHUB_WORKSPACE"/* "$repo"/
+          "$node" "$script" python --phase scaffold --target "$GITHUB_WORKSPACE"
+      # The Python uv installs from .python-version, and the packages uv.lock pins.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv/python
+          key: uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', '.python-version') }}
+      - name: Install from the pinned lockfile
+        run: '"$NODE" "$SCAFFOLD_VERIFY" python --phase install --target "$GITHUB_WORKSPACE"'
+      - name: Verify the project
+        run: '"$NODE" "$SCAFFOLD_VERIFY" python --phase verify --target "$GITHUB_WORKSPACE"'
+
+  # The one check to require. The stack jobs can be renamed or split without
+  # touching branch protection.
+  scaffold:
+    if: ${{ always() }}
+    needs: [web, rust, python]
+    runs-on: ubuntu-26.04
+    # Read-only access to this run's own job and step timings.
+    permissions:
+      actions: read
+    steps:
+      # The ten slowest steps of the run, in the run's summary page. It never
+      # fails the required check, even if the API call does.
+      - name: Slowest steps
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # jq owns $j below; the shell must not expand it.
+          # shellcheck disable=SC2016
+          {
+            echo '### Slowest steps'
+            echo
+            echo '| Seconds | Job | Step |'
+            echo '|---:|---|---|'
+            gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+              --jq '.jobs[] | .name as $j | .steps[]? | select(.started_at and .completed_at)
+                    | [((.completed_at | fromdate) - (.started_at | fromdate)), $j, .name] | @tsv' \
+              | sort -rn | head -10 | awk -F'\t' '{printf "| %d | %s | %s |\n", $1, $2, $3}'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1

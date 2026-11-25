@@ -1,0 +1,27 @@
+# pnpm 12 reads its settings from here and rejects unknown keys.
+
+# Postinstall scripts run only for packages listed here. Add one when
+# `pnpm install` says its build was skipped and the package needs it.
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+# pnpm checks node_modules against the lockfile before every `pnpm run`. By
+# default it then installs on the spot, and two commands started together in
+# a stale checkout would both install into one node_modules. Ask instead: a
+# terminal gets a prompt, an agent gets an error telling it to run
+# `pnpm install` once.
+verifyDepsBeforeRun: prompt
+
+# Supply chain: no version younger than a day. That is pnpm's default, but
+# set explicitly it is strict: pnpm fails instead of falling back to a younger
+# release. Dependabot waits three days on top. (`trustPolicy: no-downgrade`
+# would be worth having too, but it rejects old releases published before
+# provenance existed, such as semver 6 under Babel, so a fresh install fails.)
+minimumReleaseAge: 1440
+
+# Refuse to install on a Node outside package.json's `engines`.
+engineStrict: true
+
+# Lifecycle hooks such as `predeploy` must fire, or a gate is silently skipped.
+enablePrePostScripts: true
