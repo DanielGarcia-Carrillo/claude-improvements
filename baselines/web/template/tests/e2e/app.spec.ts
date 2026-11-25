@@ -63,11 +63,13 @@ test('stays quiet when the connection drops during an update check', async ({ ho
       const response = await fetch(...args)
       const input = args[0] instanceof Request ? args[0].url : String(args[0])
       if (new URL(input, location.href).pathname !== policyUrl) return response
+      // The whole body first: going offline can fail a body still being read.
+      const policy = new Response(await response.text(), response)
       // Offline once the policy has arrived, before the check asks for a new worker.
       await window.disconnectAfterPolicyCheck()
       window.workerUpdatesAtDisconnect = window.workerUpdates.started
-      const json = response.json.bind(response)
-      response.json = async () => {
+      const json = policy.json.bind(policy)
+      policy.json = async () => {
         const body: unknown = await json()
         // Let the check read the policy and resume before the test continues.
         setTimeout(() => {
@@ -75,7 +77,7 @@ test('stays quiet when the connection drops during an update check', async ({ ho
         }, 0)
         return body
       }
-      return response
+      return policy
     }
   }, UPDATE_POLICY_URL)
   await home.goto()
@@ -84,14 +86,15 @@ test('stays quiet when the connection drops during an update check', async ({ ho
   await expect(home.heading).toHaveText('Replace Me')
 })
 
-// A request that reaches the old worker while a new one takes over can hold
-// the handover back for minutes; UpdatePrompt explains.
+// The check's order: the policy first, then update(). A request that reaches
+// the old worker while a new one takes over can hold the handover back for
+// minutes; UpdatePrompt explains.
 test('the update check sends nothing once it has asked for a new worker', async ({ home, page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Playwright drives service workers in Chromium only')
   await home.trackUpdateChecks()
   await page.addInitScript(() => {
     window.requestsAfterWorkerUpdate = 0
-    // The app's only requests of its own go through fetch.
+    // The policy is the check's one fetch(); none may follow update().
     const fetch = window.fetch.bind(window)
     window.fetch = (...args) => {
       if (window.workerUpdates.started > 0) window.requestsAfterWorkerUpdate++
