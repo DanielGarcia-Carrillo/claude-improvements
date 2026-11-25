@@ -32,11 +32,17 @@ export function UpdatePrompt() {
       const check = async () => {
         // Offline there is nothing to fetch, and a failed request logs an error.
         if (!navigator.onLine) return
+        // The policy before the worker: once update() finds a new worker, this
+        // check sends nothing more through the old one. Chromium hands over to
+        // a worker that skips waiting (the kill switch, or a forced update) by
+        // stopping the old one, and a request that wakes the old one again can
+        // hold the handover back for minutes. The page's other requests (route
+        // chunks, the Temporal polyfill, the app's own API calls) still can.
+        if (await fetchMustUpdate(import.meta.env.BUILD_TIME)) setIsForced(true)
+        // The connection can go offline while the policy is fetched.
+        if (!navigator.onLine) return
         // Mid-install an update check can fail; the next one retries.
         await registration.update().catch(() => undefined)
-        // The connection can go offline while the worker update is pending.
-        if (!navigator.onLine) return
-        if (await fetchMustUpdate(import.meta.env.BUILD_TIME)) setIsForced(true)
       }
       void check()
       setInterval(() => void check(), UPDATE_CHECK_MS)

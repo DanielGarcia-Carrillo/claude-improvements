@@ -69,12 +69,19 @@ test.afterAll(async () => {
   if (scratch !== undefined) rmSync(scratch, { recursive: true, force: true })
 })
 
-/** Opens the current build and waits until its worker controls the page. */
+/**
+ * Opens the current build and waits until its worker controls the page and
+ * the app's own update check is over, so the deploy a test makes next is
+ * found by that test's reload and nothing before it.
+ */
 async function installCurrent(page: Page): Promise<void> {
   setPolicy(builds.current, null)
   site.serve(builds.current)
+  const home = new HomePage(page)
+  await home.trackUpdateChecks()
   await page.goto(`${site.url}/`)
-  await new HomePage(page).waitForServiceWorker()
+  await home.waitForServiceWorker()
+  await home.waitForUpdateCheck()
   expect(await runningEntry(page)).toBe(entryOf(builds.current))
 }
 

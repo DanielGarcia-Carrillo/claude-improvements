@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { mustUpdate } from './update-policy.ts'
+import { fetchMustUpdate, mustUpdate } from './update-policy.ts'
 
 const builtAt = '2026-10-28T12:00:00.000Z'
 
@@ -25,6 +25,29 @@ describe('mustUpdate', () => {
 
   it('forces nothing when the build time is unreadable', () => {
     expect(mustUpdate({ forceUpdateBefore: '2026-10-28T18:00:00Z' }, 'unknown')).toBe(false)
+  })
+})
+
+describe('fetchMustUpdate', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('forces nothing when the policy request hangs past the timeout', async () => {
+    // A request that never answers, and gives up only when its signal aborts.
+    vi.stubGlobal(
+      'fetch',
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+        }),
+    )
+    expect(await fetchMustUpdate(builtAt, 10)).toBe(false)
+  })
+
+  it('forces an older build when the policy arrives in time', async () => {
+    vi.stubGlobal('fetch', async () => Response.json({ forceUpdateBefore: '2026-10-28T18:00:00Z' }))
+    expect(await fetchMustUpdate(builtAt)).toBe(true)
   })
 })
 

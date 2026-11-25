@@ -25,10 +25,17 @@ export function mustUpdate(policy: unknown, builtAt: string): boolean {
   return Number.isFinite(cutoff) && Number.isFinite(built) && built < cutoff
 }
 
-/** Reads the policy past every cache. Offline, or any failure, forces nothing. */
-export async function fetchMustUpdate(builtAt: string): Promise<boolean> {
+/**
+ * How long the update check waits for the policy. It asks for a new worker
+ * only once the policy has arrived, so a request that hangs would hold back
+ * the update too.
+ */
+export const POLICY_TIMEOUT_MS = 5000
+
+/** Reads the policy past every cache. Offline, a timeout, or any other failure forces nothing. */
+export async function fetchMustUpdate(builtAt: string, timeoutMs = POLICY_TIMEOUT_MS): Promise<boolean> {
   try {
-    const response = await fetch(UPDATE_POLICY_URL, { cache: 'no-store' })
+    const response = await fetch(UPDATE_POLICY_URL, { cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) })
     return response.ok && mustUpdate(await response.json(), builtAt)
   } catch {
     return false

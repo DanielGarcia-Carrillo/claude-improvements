@@ -31,60 +31,77 @@ test('main navigation reaches every screen', async ({ home, page }) => {
 
 test('opens offline once the service worker is installed', async ({ home, page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'Playwright drives service workers in Chromium only')
+  await home.trackUpdateChecks()
   await home.goto()
   await home.waitForServiceWorker()
+  // Going offline mid-check would cut off its policy request, which logs an error.
+  await home.waitForUpdateCheck()
   await context.setOffline(true)
   await home.navigateTo('About')
   await page.reload()
   await expect(home.heading).toHaveText('About')
 })
 
-// The injected browser callback coordinates the offline transition with the test runner.
+// The injected browser code coordinates the offline transition with the test runner.
 declare global {
   interface Window {
-    disconnectAfterWorkerUpdate: () => Promise<void>
-    workerUpdateCheckResumed: boolean
-    policyRequestsAfterDisconnect: number
+    disconnectAfterPolicyCheck: () => Promise<void>
+    updateCheckResumed: boolean
+    workerUpdatesAtDisconnect: number
+    requestsAfterWorkerUpdate: number
   }
 }
 
-test('stays quiet when the connection drops during a worker update check', async ({
-  home,
-  page,
-  context,
-  browserName,
-}) => {
+test('stays quiet when the connection drops during an update check', async ({ home, page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'Playwright drives service workers in Chromium only')
-  await page.exposeFunction('disconnectAfterWorkerUpdate', () => context.setOffline(true))
+  await page.exposeFunction('disconnectAfterPolicyCheck', () => context.setOffline(true))
+  await home.trackUpdateChecks()
   await page.addInitScript((policyUrl) => {
-    let disconnected = false
-    window.workerUpdateCheckResumed = false
-    window.policyRequestsAfterDisconnect = 0
+    window.updateCheckResumed = false
     const fetch = window.fetch.bind(window)
-    window.fetch = (...args) => {
+    window.fetch = async (...args) => {
+      const response = await fetch(...args)
       const input = args[0] instanceof Request ? args[0].url : String(args[0])
-      if (disconnected && new URL(input, location.href).pathname === policyUrl) window.policyRequestsAfterDisconnect++
-      return fetch(...args)
-    }
-    const register = navigator.serviceWorker.register.bind(navigator.serviceWorker)
-    navigator.serviceWorker.register = async (...args) => {
-      const registration = await register(...args)
-      const update = registration.update.bind(registration)
-      registration.update = async () => {
-        const updated = await update()
-        await window.disconnectAfterWorkerUpdate()
-        disconnected = true
-        // Let update() resolve and its awaiting caller resume before the test continues.
+      if (new URL(input, location.href).pathname !== policyUrl) return response
+      // The whole body first: going offline can fail a body still being read.
+      const policy = new Response(await response.text(), response)
+      // Offline once the policy has arrived, before the check asks for a new worker.
+      await window.disconnectAfterPolicyCheck()
+      window.workerUpdatesAtDisconnect = window.workerUpdates.started
+      const json = policy.json.bind(policy)
+      policy.json = async () => {
+        const body: unknown = await json()
+        // Let the check read the policy and resume before the test continues.
         setTimeout(() => {
-          window.workerUpdateCheckResumed = true
+          window.updateCheckResumed = true
         }, 0)
-        return updated
+        return body
       }
-      return registration
+      return policy
     }
   }, UPDATE_POLICY_URL)
   await home.goto()
-  await page.waitForFunction(() => window.workerUpdateCheckResumed)
-  expect(await page.evaluate(() => window.policyRequestsAfterDisconnect)).toBe(0)
+  await page.waitForFunction(() => window.updateCheckResumed)
+  expect(await page.evaluate(() => window.workerUpdates.started - window.workerUpdatesAtDisconnect)).toBe(0)
   await expect(home.heading).toHaveText('Replace Me')
+})
+
+// The check's order: the policy first, then update(). A request that reaches
+// the old worker while a new one takes over can hold the handover back for
+// minutes; UpdatePrompt explains.
+test('the update check sends nothing once it has asked for a new worker', async ({ home, page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright drives service workers in Chromium only')
+  await home.trackUpdateChecks()
+  await page.addInitScript(() => {
+    window.requestsAfterWorkerUpdate = 0
+    // The policy is the check's one fetch(); none may follow update().
+    const fetch = window.fetch.bind(window)
+    window.fetch = (...args) => {
+      if (window.workerUpdates.started > 0) window.requestsAfterWorkerUpdate++
+      return fetch(...args)
+    }
+  })
+  await home.goto()
+  await home.waitForUpdateCheck()
+  expect(await page.evaluate(() => window.requestsAfterWorkerUpdate)).toBe(0)
 })
