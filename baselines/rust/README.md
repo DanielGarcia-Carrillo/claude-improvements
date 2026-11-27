@@ -85,6 +85,33 @@ resets an existing hook path automatically.
 | Async or network I/O | tokio with only the features used; a decision recorded in an ADR |
 | Coverage, mutation testing | cargo-llvm-cov, cargo-mutants |
 
+## Debug information in Rust CI
+
+Default routine hosted Rust checks and tests to `line-tables-only` when
+the toolchain supports it (Rust 1.71+). Set it on the affected job before
+restoring the cache or running Cargo, not in the repository-wide profiles:
+
+```yaml
+env:
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
+```
+
+[Line tables](https://doc.rust-lang.org/cargo/reference/profiles.html#debug)
+preserve file and line locations for backtraces. Full debug information is
+useful when a job saves binaries for debugger or core dump analysis that
+needs types, local variables or function parameters. Keep it in those
+diagnostic jobs, and leave local builds and release symbol policies alone.
+For a custom Cargo profile, use its corresponding profile override.
+
+When several required feature configurations share a job, measure free
+space on the target filesystem and the size of the actual Cargo target
+directory before each build and after the last one, including on failure.
+Keep full-debug artifacts out of the new cache namespace: if the cache
+does not already key on profile settings, version its key. Check free space
+on a hosted runner without dropping test configurations, assertions or
+time budgets.
+
 ## Sources
 
 - Microsoft [Pragmatic Rust Guidelines](https://microsoft.github.io/rust-guidelines/guidelines/checklist/index.html),

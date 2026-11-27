@@ -78,6 +78,10 @@ and [Rust](../rust/template/) templates already do them.
 | JS monorepo (pnpm workspace) | `pnpm -r --filter "...[origin/main]"`: changed packages plus their dependents | Turborepo, when re-runs of unchanged packages start to cost |
 | Rust and JS with real dependencies between them | A few lanes in one tested script, or pilot moon | Reuse built artifacts across languages, keyed by their inputs |
 
+Default routine Rust test jobs to
+[CI-only line tables](../rust/README.md#debug-information-in-rust-ci).
+Keep full debug information in jobs that actually need it for diagnosis.
+
 ### What to avoid
 
 - **`cargo test -p <subset>`.** Building a subset changes Cargo's feature
